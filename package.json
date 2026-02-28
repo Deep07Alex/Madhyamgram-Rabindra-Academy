@@ -1,0 +1,18 @@
+{
+    "name": "madhyamgram-rabindra-academy",
+    "private": true,
+    "workspaces": [
+        "client",
+        "server"
+    ],
+    "scripts": {
+        "dev": "npm run server",
+        "dev:all": "concurrently \"npm run server\" \"npm run client\"",
+        "client": "npm run dev -w client",
+        "server": "npm run dev -w server",
+        "install-all": "npm install && npm install -w client && npm install -w server"
+    },
+    "devDependencies": {
+        "concurrently": "^9.2.1"
+    }
+}
