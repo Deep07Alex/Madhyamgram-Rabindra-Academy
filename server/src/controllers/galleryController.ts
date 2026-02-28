@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { prisma } from '../lib/prisma.js';
+import { db } from '../lib/db.js';
+import crypto from 'crypto';
 
 export const uploadGalleryImage = async (req: Request, res: Response) => {
     try {
@@ -12,15 +13,14 @@ export const uploadGalleryImage = async (req: Request, res: Response) => {
             return res.status(400).json({ message: 'Image file is required' });
         }
 
-        const galleryItem = await prisma.gallery.create({
-            data: {
-                title,
-                description,
-                imageUrl
-            }
-        });
+        const id = crypto.randomUUID();
+        const galleryRes = await db.query(
+            `INSERT INTO "Gallery" (id, title, description, "imageUrl") 
+             VALUES ($1, $2, $3, $4) RETURNING *`,
+            [id, title, description || null, imageUrl]
+        );
 
-        res.status(201).json(galleryItem);
+        res.status(201).json(galleryRes.rows[0]);
     } catch (error) {
         res.status(500).json({ message: 'Error uploading image' });
     }
@@ -28,11 +28,8 @@ export const uploadGalleryImage = async (req: Request, res: Response) => {
 
 export const getGalleryImages = async (req: Request, res: Response) => {
     try {
-        const images = await prisma.gallery.findMany({
-            orderBy: { createdAt: 'desc' }
-        });
-
-        res.json(images);
+        const imagesRes = await db.query(`SELECT * FROM "Gallery" ORDER BY "createdAt" DESC`);
+        res.json(imagesRes.rows);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching gallery images' });
     }
@@ -41,7 +38,7 @@ export const getGalleryImages = async (req: Request, res: Response) => {
 export const deleteGalleryImage = async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
-        await prisma.gallery.delete({ where: { id } });
+        await db.query(`DELETE FROM "Gallery" WHERE id = $1`, [id]);
         res.json({ message: 'Image deleted' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting image' });

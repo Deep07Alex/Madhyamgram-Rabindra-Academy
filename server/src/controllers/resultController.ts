@@ -1,23 +1,20 @@
 import { Request, Response } from 'express';
-import { prisma } from '../lib/prisma.js';
+import { db } from '../lib/db.js';
+import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.js';
 
 export const createResult = async (req: Request, res: Response) => {
     try {
         const { semester, subject, marks, totalMarks, grade, studentId } = req.body;
 
-        const result = await prisma.result.create({
-            data: {
-                semester,
-                subject,
-                marks: parseFloat(marks as string),
-                totalMarks: parseFloat(totalMarks as string),
-                grade,
-                studentId
-            }
-        });
+        const id = crypto.randomUUID();
+        const resultRes = await db.query(
+            `INSERT INTO "Result" (id, semester, subject, marks, "totalMarks", grade, "studentId") 
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+            [id, semester, subject, parseFloat(marks as string), parseFloat(totalMarks as string), grade || null, studentId]
+        );
 
-        res.status(201).json(result);
+        res.status(201).json(resultRes.rows[0]);
     } catch (error) {
         res.status(500).json({ message: 'Error creating result' });
     }
@@ -26,23 +23,34 @@ export const createResult = async (req: Request, res: Response) => {
 export const getResults = async (req: AuthRequest, res: Response) => {
     try {
         const { studentId, semester } = req.query;
-        let whereClause: any = {};
+        let query = `
+            SELECT r.*, row_to_json(s.*) as student
+            FROM "Result" r
+            LEFT JOIN "Student" s ON r."studentId" = s.id
+            WHERE 1=1
+        `;
+        const params: any[] = [];
+        let paramCount = 1;
 
         if (req.user?.role === 'STUDENT') {
-            whereClause.studentId = req.user.id;
+            query += ` AND r."studentId" = $${paramCount++}`;
+            params.push(req.user.id);
         } else {
-            if (studentId) whereClause.studentId = studentId as string;
+            if (studentId) {
+                query += ` AND r."studentId" = $${paramCount++}`;
+                params.push(studentId);
+            }
         }
 
-        if (semester) whereClause.semester = semester as string;
+        if (semester) {
+            query += ` AND r.semester = $${paramCount++}`;
+            params.push(semester);
+        }
 
-        const results = await prisma.result.findMany({
-            where: whereClause,
-            include: { student: true },
-            orderBy: { createdAt: 'desc' }
-        });
+        query += ` ORDER BY r."createdAt" DESC`;
+        const resultsRes = await db.query(query, params);
 
-        res.json(results);
+        res.json(resultsRes.rows);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching results' });
     }

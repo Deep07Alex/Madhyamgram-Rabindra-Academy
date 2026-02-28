@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { MAIN_SUBJECTS } from '../../utils/constants';
 
 const TeacherAttendance = () => {
     const [tab, setTab] = useState<'students' | 'self'>('students');
@@ -65,7 +66,10 @@ const TeacherAttendance = () => {
                     <h3>Mark Class Attendance</h3>
                     <div className="form-grid mb-4">
                         <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
-                        <input type="text" placeholder="Subject (Optional)" value={subject} onChange={e => setSubject(e.target.value)} />
+                        <select value={subject} onChange={e => setSubject(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}>
+                            <option value="">Select Subject (Optional)</option>
+                            {MAIN_SUBJECTS.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                        </select>
                         <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)}>
                             <option value="">Select Class to Mark</option>
                             {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}

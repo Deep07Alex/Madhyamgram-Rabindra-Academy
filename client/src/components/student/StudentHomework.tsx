@@ -58,6 +58,7 @@ const StudentHomework = () => {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <div>
                                         <h4>{hw.title}</h4>
+                                        <p style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--primary-color)' }}>{hw.subject || 'General'}</p>
                                         <p style={{ fontSize: '13px', color: '#666', marginTop: '5px' }}>{hw.description}</p>
                                         <p style={{ fontSize: '12px', marginTop: '10px' }}>
                                             <strong>Due Date:</strong> {new Date(hw.dueDate).toLocaleDateString()}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { MAIN_SUBJECTS } from '../../utils/constants';
 
 const TeacherHomework = () => {
     const [tab, setTab] = useState<'create' | 'submissions'>('create');
@@ -11,6 +12,7 @@ const TeacherHomework = () => {
     const [description, setDescription] = useState('');
     const [dueDate, setDueDate] = useState('');
     const [classId, setClassId] = useState('');
+    const [subject, setSubject] = useState('');
     const [file, setFile] = useState<File | null>(null);
 
     // Submissions state
@@ -38,6 +40,7 @@ const TeacherHomework = () => {
         formData.append('description', description);
         formData.append('dueDate', dueDate);
         formData.append('classId', classId);
+        if (subject) formData.append('subject', subject);
         if (file) formData.append('file', file);
 
         try {
@@ -45,7 +48,7 @@ const TeacherHomework = () => {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             alert('Homework created successfully!');
-            setTitle(''); setDescription(''); setDueDate(''); setClassId(''); setFile(null);
+            setTitle(''); setDescription(''); setDueDate(''); setClassId(''); setSubject(''); setFile(null);
             fetchHomeworks();
         } catch (error) {
             console.error('Error creating homework', error);
@@ -87,6 +90,10 @@ const TeacherHomework = () => {
                         <select value={classId} onChange={e => setClassId(e.target.value)} required>
                             <option value="">Select Class</option>
                             {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                        <select value={subject} onChange={e => setSubject(e.target.value)} required>
+                            <option value="">Select Subject</option>
+                            {MAIN_SUBJECTS.map(sub => <option key={sub} value={sub}>{sub}</option>)}
                         </select>
                         <input type="date" placeholder="Due Date" value={dueDate} onChange={e => setDueDate(e.target.value)} required />
                         <div style={{ gridColumn: '1 / -1' }}>

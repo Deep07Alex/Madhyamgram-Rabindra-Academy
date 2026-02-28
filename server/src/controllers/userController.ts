@@ -1,13 +1,27 @@
 import { Request, Response } from 'express';
-import { prisma } from '../lib/prisma.js';
+import { db } from '../lib/db.js';
+import crypto from 'crypto';
+import { AuthRequest } from '../middleware/auth.js';
 
 // Get all students
-export const getStudents = async (req: Request, res: Response) => {
+export const getStudents = async (req: AuthRequest, res: Response) => {
     try {
-        const students = await prisma.student.findMany({
-            include: { class: true }
-        });
-        res.json(students);
+        let query = `
+            SELECT s.*, row_to_json(c.*) as class 
+            FROM "Student" s 
+            LEFT JOIN "Class" c ON s."classId" = c.id
+            WHERE 1=1
+        `;
+        const params: any[] = [];
+        let paramCount = 1;
+
+        if (req.user?.role === 'TEACHER') {
+            query += ` AND s."classId" IN (SELECT "A" FROM "_ClassToTeacher" WHERE "B" = $${paramCount++})`;
+            params.push(req.user.id);
+        }
+
+        const studentsRes = await db.query(query, params);
+        res.json(studentsRes.rows);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching students' });
     }
@@ -16,10 +30,8 @@ export const getStudents = async (req: Request, res: Response) => {
 // Get all teachers
 export const getTeachers = async (req: Request, res: Response) => {
     try {
-        const teachers = await prisma.teacher.findMany({
-            include: { classes: true }
-        });
-        res.json(teachers);
+        const teachersRes = await db.query(`SELECT * FROM "Teacher"`);
+        res.json(teachersRes.rows);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching teachers' });
     }
@@ -28,10 +40,16 @@ export const getTeachers = async (req: Request, res: Response) => {
 // Get all classes
 export const getClasses = async (req: Request, res: Response) => {
     try {
-        const classes = await prisma.class.findMany({
-            include: { _count: { select: { students: true } } }
-        });
-        res.json(classes);
+        const classesRes = await db.query(`
+            SELECT c.*, 
+            (SELECT COUNT(*) FROM "Student" s WHERE s."classId" = c.id) as "_count_students"
+            FROM "Class" c
+        `);
+        const formatted = classesRes.rows.map(c => ({
+            ...c,
+            _count: { students: parseInt(c._count_students, 10) }
+        }));
+        res.json(formatted);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching classes' });
     }
@@ -41,10 +59,12 @@ export const getClasses = async (req: Request, res: Response) => {
 export const createClass = async (req: Request, res: Response) => {
     const { name, grade } = req.body;
     try {
-        const newClass = await prisma.class.create({
-            data: { name, grade: parseInt(grade as string) }
-        });
-        res.status(201).json(newClass);
+        const id = crypto.randomUUID();
+        const newClassRes = await db.query(
+            `INSERT INTO "Class" (id, name, grade) VALUES ($1, $2, $3) RETURNING *`,
+            [id, name, parseInt(grade as string)]
+        );
+        res.status(201).json(newClassRes.rows[0]);
     } catch (error) {
         res.status(500).json({ message: 'Error creating class' });
     }
@@ -54,7 +74,7 @@ export const createClass = async (req: Request, res: Response) => {
 export const deleteStudent = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     try {
-        await prisma.student.delete({ where: { id } });
+        await db.query(`DELETE FROM "Student" WHERE id = $1`, [id]);
         res.json({ message: 'Student deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting student' });
@@ -65,7 +85,7 @@ export const deleteStudent = async (req: Request, res: Response) => {
 export const deleteTeacher = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     try {
-        await prisma.teacher.delete({ where: { id } });
+        await db.query(`DELETE FROM "Teacher" WHERE id = $1`, [id]);
         res.json({ message: 'Teacher deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting teacher' });
@@ -76,7 +96,7 @@ export const deleteTeacher = async (req: Request, res: Response) => {
 export const deleteClass = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     try {
-        await prisma.class.delete({ where: { id } });
+        await db.query(`DELETE FROM "Class" WHERE id = $1`, [id]);
         res.json({ message: 'Class deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting class' });

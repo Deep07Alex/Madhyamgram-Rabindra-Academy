@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { MAIN_SUBJECTS } from '../../utils/constants';
 
 const ManageResults = () => {
     const [results, setResults] = useState([]);
@@ -54,7 +55,10 @@ const ManageResults = () => {
                         <option value="Final Term">Final Term</option>
                     </select>
 
-                    <input type="text" placeholder="Subject (e.g., Mathematics)" value={newResult.subject} onChange={e => setNewResult({ ...newResult, subject: e.target.value })} required />
+                    <select value={newResult.subject} onChange={e => setNewResult({ ...newResult, subject: e.target.value })} required>
+                        <option value="">Select Subject</option>
+                        {MAIN_SUBJECTS.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                    </select>
                     <input type="number" placeholder="Marks Obtained" value={newResult.marks} onChange={e => setNewResult({ ...newResult, marks: e.target.value })} required />
                     <input type="number" placeholder="Total Marks" value={newResult.totalMarks} onChange={e => setNewResult({ ...newResult, totalMarks: e.target.value })} required />
                     <input type="text" placeholder="Grade (e.g., A+)" value={newResult.grade} onChange={e => setNewResult({ ...newResult, grade: e.target.value })} required />

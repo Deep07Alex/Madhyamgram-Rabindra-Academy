@@ -4,7 +4,6 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { PrismaClient } from '@prisma/client';
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
@@ -12,7 +11,9 @@ import homeworkRoutes from './routes/homeworkRoutes.js';
 import feeRoutes from './routes/feeRoutes.js';
 import resultRoutes from './routes/resultRoutes.js';
 import galleryRoutes from './routes/galleryRoutes.js';
-import { prisma } from './lib/prisma.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import { db } from './lib/db.js';
+import { initDb } from './lib/initDb.js';
 
 dotenv.config();
 
@@ -40,12 +41,15 @@ app.use('/api/homework', homeworkRoutes);
 app.use('/api/fees', feeRoutes);
 app.use('/api/results', resultRoutes);
 app.use('/api/gallery', galleryRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 app.get('/', (req, res) => {
     res.send('Madhyamgram Rabindra Academy API is running');
 });
 
-// Start the server
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+// Initialize database then Start the server
+initDb().then(() => {
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
 });
