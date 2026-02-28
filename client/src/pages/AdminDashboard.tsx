@@ -2,33 +2,22 @@ import { LogOut, LayoutDashboard, UserCheck, BookOpen, CreditCard, ClipboardList
 import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { logout, getCurrentUser } from '../services/authService.js';
 
-// Placeholder Components
+import ManageUsers from '../components/admin/ManageUsers.js';
+import ManageClasses from '../components/admin/ManageClasses.js';
+import ManageFees from '../components/admin/ManageFees.js';
+import ManageResults from '../components/admin/ManageResults.js';
+import ManageGallery from '../components/admin/ManageGallery.js';
+
 const AdminOverview = () => (
     <>
         <div className="stats-grid">
             <div className="stat-card">
-                <h3>400</h3>
-                <p>Total Students</p>
+                <h3>Admin Dashboard</h3>
+                <p>Select an option from the sidebar to manage the system.</p>
             </div>
-            <div className="stat-card">
-                <h3>25</h3>
-                <p>Total Teachers</p>
-            </div>
-            <div className="stat-card">
-                <h3>7</h3>
-                <p>Total Classes</p>
-            </div>
-        </div>
-        <div className="content-placeholder">
-            <p>Admin Overview features will be implemented here.</p>
         </div>
     </>
 );
-
-const ManageStaff = () => <div className="content-placeholder"><p>Manage Staff interface.</p></div>;
-const ManageClasses = () => <div className="content-placeholder"><p>Manage Classes interface.</p></div>;
-const FeeStructure = () => <div className="content-placeholder"><p>Fee Structure interface.</p></div>;
-const Reports = () => <div className="content-placeholder"><p>Reports interface.</p></div>;
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -51,10 +40,11 @@ const AdminDashboard = () => {
                 </div>
                 <nav className="sidebar-nav">
                     <Link to="/admin" className={`nav-item ${location.pathname === '/admin' ? 'active' : ''}`}><LayoutDashboard size={20} /> Dashboard</Link>
-                    <Link to="/admin/staff" className={`nav-item ${isActive('/admin/staff')}`}><UserCheck size={20} /> Manage Staff</Link>
+                    <Link to="/admin/users" className={`nav-item ${isActive('/admin/users')}`}><UserCheck size={20} /> Manage Users</Link>
                     <Link to="/admin/classes" className={`nav-item ${isActive('/admin/classes')}`}><BookOpen size={20} /> Manage Classes</Link>
                     <Link to="/admin/fees" className={`nav-item ${isActive('/admin/fees')}`}><CreditCard size={20} /> Fee Structure</Link>
-                    <Link to="/admin/reports" className={`nav-item ${isActive('/admin/reports')}`}><ClipboardList size={20} /> Reports</Link>
+                    <Link to="/admin/results" className={`nav-item ${isActive('/admin/results')}`}><ClipboardList size={20} /> Results</Link>
+                    <Link to="/admin/gallery" className={`nav-item ${isActive('/admin/gallery')}`}><ClipboardList size={20} /> Gallery</Link>
                 </nav>
                 <button className="logout-btn" onClick={handleLogout}>
                     <LogOut size={20} /> Logout
@@ -71,10 +61,11 @@ const AdminDashboard = () => {
 
                 <Routes>
                     <Route path="/" element={<AdminOverview />} />
-                    <Route path="/staff" element={<ManageStaff />} />
+                    <Route path="/users" element={<ManageUsers />} />
                     <Route path="/classes" element={<ManageClasses />} />
-                    <Route path="/fees" element={<FeeStructure />} />
-                    <Route path="/reports" element={<Reports />} />
+                    <Route path="/fees" element={<ManageFees />} />
+                    <Route path="/results" element={<ManageResults />} />
+                    <Route path="/gallery" element={<ManageGallery />} />
                 </Routes>
             </main>
         </div>

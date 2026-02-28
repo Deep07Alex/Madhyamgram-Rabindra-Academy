@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDashboard from './pages/StudentDashboard';
+import Gallery from './pages/Gallery';
 
 const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) => {
   const userJson = localStorage.getItem('user');
@@ -54,6 +55,7 @@ function App() {
           }
         />
 
+        <Route path="/gallery" element={<Gallery />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>

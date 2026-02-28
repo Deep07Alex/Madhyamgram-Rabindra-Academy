@@ -10,7 +10,8 @@ datasource db {
 
 model Admin {
   id        String   @id @default(uuid())
-  username  String   @unique
+  adminId   String   @unique
+  username  String?  @unique
   password  String
   name      String
   email     String?  @unique
@@ -20,7 +21,6 @@ model Admin {
 
 model Teacher {
   id        String   @id @default(uuid())
-  username  String   @unique
   password  String
   name      String
   email     String?  @unique
@@ -28,20 +28,21 @@ model Teacher {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  classes     Class[]
-  attendance  Attendance[]
-  homework    Homework[]
+  classes           Class[]
+  attendance        Attendance[]
+  homework          Homework[]
+  teacherAttendance TeacherAttendance[]
 }
 
 model Student {
   id         String   @id @default(uuid())
-  username   String   @unique
+  studentId  String   @unique
   password   String
   name       String
   email      String?  @unique
-  rollNumber String   @unique
+  rollNumber String
   classId    String
-  class      Class    @relation(fields: [classId], references: [id])
+  class      Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   
@@ -66,11 +67,11 @@ model Attendance {
   date      DateTime @default(now())
   status    AttendanceStatus
   studentId String
-  student   Student  @relation(fields: [studentId], references: [id])
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   teacherId String
-  teacher   Teacher  @relation(fields: [teacherId], references: [id])
+  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   classId   String
-  class     Class    @relation(fields: [classId], references: [id])
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   subject   String?
 }
 
@@ -80,6 +81,14 @@ enum AttendanceStatus {
   LATE
 }
 
+model TeacherAttendance {
+  id        String   @id @default(uuid())
+  date      DateTime @default(now())
+  status    AttendanceStatus
+  teacherId String
+  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+}
+
 model Homework {
   id          String   @id @default(uuid())
   title       String
@@ -87,9 +96,9 @@ model Homework {
   fileUrl     String?
   dueDate     DateTime
   teacherId   String
-  teacher     Teacher  @relation(fields: [teacherId], references: [id])
+  teacher     Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   classId     String
-  class       Class    @relation(fields: [classId], references: [id])
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   
   submissions Submission[]
@@ -101,9 +110,9 @@ model Submission {
   fileUrl     String?
   status      SubmissionStatus @default(PENDING)
   studentId   String
-  student     Student  @relation(fields: [studentId], references: [id])
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   homeworkId  String
-  homework    Homework @relation(fields: [homeworkId], references: [id])
+  homework    Homework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
   submittedAt DateTime @default(now())
 }
 
@@ -123,7 +132,7 @@ model Fee {
   paymentMethod String?
   transactionId String?
   studentId   String
-  student     Student  @relation(fields: [studentId], references: [id])
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   remark      String?
 }
 
@@ -141,7 +150,7 @@ model Result {
   totalMarks  Float
   grade       String?
   studentId   String
-  student     Student  @relation(fields: [studentId], references: [id])
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
 }
 

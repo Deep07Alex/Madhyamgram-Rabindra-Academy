@@ -6,24 +6,38 @@ import { prisma } from '../lib/prisma.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret_key_change_in_production';
 
 export const login = async (req: Request, res: Response) => {
-    const { username, password } = req.body;
+    // The frontend sends 'username' but it functionally acts as the login ID
+    const { username: loginId, password } = req.body;
 
     try {
         // Try to find the user in each table
         let userData: any = null;
         let role: string = '';
 
-        const admin = await prisma.admin.findUnique({ where: { username } });
+        const admin = await prisma.admin.findFirst({
+            where: {
+                OR: [
+                    { adminId: loginId },
+                    { username: loginId }
+                ]
+            }
+        });
         if (admin) {
             userData = admin;
             role = 'ADMIN';
         } else {
-            const teacher = await prisma.teacher.findUnique({ where: { username } });
+            // Check teacher by teacherId
+            const teacher = await prisma.teacher.findUnique({
+                where: { teacherId: loginId }
+            });
             if (teacher) {
                 userData = teacher;
                 role = 'TEACHER';
             } else {
-                const student = await prisma.student.findUnique({ where: { username } });
+                // Check student by studentId
+                const student = await prisma.student.findUnique({
+                    where: { studentId: loginId }
+                });
                 if (student) {
                     userData = student;
                     role = 'STUDENT';
@@ -51,10 +65,10 @@ export const login = async (req: Request, res: Response) => {
             user: {
                 id: userData.id,
                 name: userData.name,
-                username: userData.username,
                 role: role,
-                ...(role === 'STUDENT' && { studentId: userData.id }),
-                ...(role === 'TEACHER' && { teacherId: userData.id }),
+                ...(role === 'ADMIN' && { adminId: userData.adminId, username: userData.username }),
+                ...(role === 'STUDENT' && { studentId: userData.studentId, rollNumber: userData.rollNumber }),
+                ...(role === 'TEACHER' && { teacherId: userData.teacherId }),
             },
         });
     } catch (error) {
@@ -64,29 +78,52 @@ export const login = async (req: Request, res: Response) => {
 };
 
 export const register = async (req: Request, res: Response) => {
-    const { name, username, password, role, email, rollNumber, teacherId, classId } = req.body;
+    const { name, password, role, email, rollNumber, teacherId, adminId, username, classId } = req.body;
+
+    if (!password) {
+        return res.status(400).json({ message: 'Password is required' });
+    }
 
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         let newUser: any;
 
+        const generate10DigitId = () => Math.floor(1000000000 + Math.random() * 9000000000).toString();
+
         if (role === 'ADMIN') {
             newUser = await prisma.admin.create({
-                data: { name, username, password: hashedPassword, email }
+                data: { name, adminId, username, password: hashedPassword, email }
             });
         } else if (role === 'TEACHER') {
+            let uniqueId = teacherId;
+            if (!uniqueId) {
+                let isUnique = false;
+                while (!isUnique) {
+                    uniqueId = generate10DigitId();
+                    const existing = await prisma.teacher.findUnique({ where: { teacherId: uniqueId } });
+                    if (!existing) isUnique = true;
+                }
+            }
             newUser = await prisma.teacher.create({
-                data: { name, username, password: hashedPassword, email, teacherId }
+                data: { name, password: hashedPassword, email, teacherId: uniqueId }
             });
         } else if (role === 'STUDENT') {
+            let uniqueId = '';
+            let isUnique = false;
+            while (!isUnique) {
+                uniqueId = generate10DigitId();
+                const existing = await prisma.student.findUnique({ where: { studentId: uniqueId } });
+                if (!existing) isUnique = true;
+            }
+
             newUser = await prisma.student.create({
                 data: {
                     name,
-                    username,
                     password: hashedPassword,
                     email,
                     rollNumber,
+                    studentId: uniqueId,
                     class: { connect: { id: classId } }
                 }
             });

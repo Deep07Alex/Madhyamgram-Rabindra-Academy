@@ -29,7 +29,7 @@ async function main() {
         // 1. Create Admin
         const admin = await prisma.admin.create({
             data: {
-                username: 'admin',
+                adminId: 'admin',
                 password: adminPassword,
                 name: 'System Admin',
                 email: 'admin@academy.com',
@@ -55,16 +55,15 @@ async function main() {
 
         // 3. Create Teachers
         const teachersData = [
-            { username: 'teacher1', name: 'John Smith', email: 'teacher1@academy.com', teacherId: 'T1001' },
-            { username: 'teacher2', name: 'Sarah Wilson', email: 'teacher2@academy.com', teacherId: 'T1002' },
-            { username: 'teacher3', name: 'Robert Brown', email: 'teacher3@academy.com', teacherId: 'T1003' }
+            { name: 'John Smith', email: 'teacher1@academy.com', teacherId: 'T1001' },
+            { name: 'Sarah Wilson', email: 'teacher2@academy.com', teacherId: 'T1002' },
+            { name: 'Robert Brown', email: 'teacher3@academy.com', teacherId: 'T1003' }
         ];
 
         const teacherRecords = [];
         for (const t of teachersData) {
             const record = await prisma.teacher.create({
                 data: {
-                    username: t.username,
                     password: teacherPassword,
                     name: t.name,
                     email: t.email,
@@ -72,21 +71,20 @@ async function main() {
                 }
             });
             teacherRecords.push(record);
-            console.log(`✔ Teacher created: ${t.username}/teacher123`);
+            console.log(`✔ Teacher created: ${t.teacherId}/teacher123`);
         }
 
         // 4. Create Students
         const studentsData = [
-            { username: 'student1', name: 'Aritra Dutta', email: 'student1@academy.com', roll: 'S2026-001', classId: class5.id },
-            { username: 'student2', name: 'Rahul Sharma', email: 'student2@academy.com', roll: 'S2026-002', classId: class6.id },
-            { username: 'student3', name: 'Priya Das', email: 'student3@academy.com', roll: 'S2026-003', classId: class5.id }
+            { name: 'Aritra Dutta', email: 'student1@academy.com', roll: 'S2026-001', classId: class5.id },
+            { name: 'Rahul Sharma', email: 'student2@academy.com', roll: 'S2026-002', classId: class6.id },
+            { name: 'Priya Das', email: 'student3@academy.com', roll: 'S2026-003', classId: class5.id }
         ];
 
         const studentRecords = [];
         for (const s of studentsData) {
             const record = await prisma.student.create({
                 data: {
-                    username: s.username,
                     password: studentPassword,
                     name: s.name,
                     email: s.email,
@@ -95,7 +93,7 @@ async function main() {
                 }
             });
             studentRecords.push(record);
-            console.log(`✔ Student created: ${s.username}/student123`);
+            console.log(`✔ Student created: ${s.roll}/student123`);
         }
 
         // 5. Create Homework

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, Users, ShieldCheck } from 'lucide-react';
+import { LogIn, Users, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { login } from '../services/authService.js';
 
 const Login = () => {
-    const [username, setUsername] = useState('');
+    const [loginId, setLoginId] = useState('');
     const [password, setPassword] = useState('');
     const [role, setRole] = useState<'STUDENT' | 'TEACHER' | 'ADMIN'>('STUDENT');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -17,7 +18,7 @@ const Login = () => {
         setError('');
 
         try {
-            const data = await login(username, password);
+            const data = await login(loginId, password);
             const userRole = data.user.role;
 
             // Optional: Verify if the logged-in user matches the selected role
@@ -40,9 +41,9 @@ const Login = () => {
     const getRoleLabel = () => {
         switch (role) {
             case 'ADMIN': return 'Administrator ID / Username';
-            case 'TEACHER': return 'Teacher ID / Username';
-            case 'STUDENT': return 'Student ID / Username';
-            default: return 'Username';
+            case 'TEACHER': return 'Teacher ID';
+            case 'STUDENT': return 'Student ID';
+            default: return 'Login ID';
         }
     };
 
@@ -86,15 +87,15 @@ const Login = () => {
 
                 <form onSubmit={handleLogin} className="login-form">
                     <div className="input-group">
-                        <label htmlFor="username">{getRoleLabel()}</label>
+                        <label htmlFor="loginId">{getRoleLabel()}</label>
                         <div className="input-with-icon">
                             <Users size={18} className="field-icon" />
                             <input
-                                id="username"
+                                id="loginId"
                                 type="text"
-                                placeholder={`Enter your ${role.toLowerCase()} ID`}
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
+                                placeholder={role === 'ADMIN' ? 'Enter Admin ID or Username' : `Enter your ${role.toLowerCase()} ID`}
+                                value={loginId}
+                                onChange={(e) => setLoginId(e.target.value)}
                                 required
                             />
                         </div>
@@ -102,16 +103,37 @@ const Login = () => {
 
                     <div className="input-group">
                         <label htmlFor="password">Password</label>
-                        <div className="input-with-icon">
+                        <div className="input-with-icon" style={{ position: 'relative' }}>
                             <ShieldCheck size={18} className="field-icon" />
                             <input
                                 id="password"
-                                type="password"
+                                type={showPassword ? "text" : "password"}
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
+                                style={{ paddingRight: '40px' }}
                                 required
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: '#64748b',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '5px'
+                                }}
+                            >
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
                         </div>
                     </div>
 

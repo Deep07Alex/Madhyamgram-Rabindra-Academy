@@ -2,33 +2,24 @@ import { LogOut, LayoutDashboard, Calendar, ClipboardList, BookOpen, CreditCard 
 import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { logout, getCurrentUser } from '../services/authService.js';
 
-// Placeholder Components
+import StudentAttendance from '../components/student/StudentAttendance.js';
+import StudentHomework from '../components/student/StudentHomework.js';
+import StudentFees from '../components/student/StudentFees.js';
+import StudentResults from '../components/student/StudentResults.js';
+
 const StudentOverview = () => (
     <>
         <div className="stats-grid">
             <div className="stat-card">
-                <h3>95%</h3>
-                <p>Your Attendance</p>
-            </div>
-            <div className="stat-card">
-                <h3>2</h3>
-                <p>Pending Homework</p>
-            </div>
-            <div className="stat-card">
-                <h3>Paid</h3>
-                <p>Fee Status</p>
+                <h3>Welcome</h3>
+                <p>To Student Portal</p>
             </div>
         </div>
         <div className="content-placeholder">
-            <p>Student Overview features will be implemented here.</p>
+            <p>Select an option from the sidebar to view your progress.</p>
         </div>
     </>
 );
-
-const Attendance = () => <div className="content-placeholder"><p>View attendance records.</p></div>;
-const Homework = () => <div className="content-placeholder"><p>View and submit homework.</p></div>;
-const Fees = () => <div className="content-placeholder"><p>View and pay fees.</p></div>;
-const Results = () => <div className="content-placeholder"><p>View term results.</p></div>;
 
 const StudentDashboard = () => {
     const navigate = useNavigate();
@@ -71,10 +62,10 @@ const StudentDashboard = () => {
 
                 <Routes>
                     <Route path="/" element={<StudentOverview />} />
-                    <Route path="/attendance" element={<Attendance />} />
-                    <Route path="/homework" element={<Homework />} />
-                    <Route path="/fees" element={<Fees />} />
-                    <Route path="/results" element={<Results />} />
+                    <Route path="/attendance" element={<StudentAttendance />} />
+                    <Route path="/homework" element={<StudentHomework />} />
+                    <Route path="/fees" element={<StudentFees />} />
+                    <Route path="/results" element={<StudentResults />} />
                 </Routes>
             </main>
         </div>
