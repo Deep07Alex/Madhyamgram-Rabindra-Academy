@@ -178,7 +178,7 @@ const TeacherHomework = () => {
                             onBlur={e => e.target.style.borderColor = 'var(--border-soft)'}
                         ></textarea>
                     </div>
-                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                    <div className="form-group">
                         <FileUploadPicker
                             file={attachedFile}
                             onChange={setAttachedFile}
@@ -187,7 +187,10 @@ const TeacherHomework = () => {
                         />
                     </div>
                     {/* Allow student file upload toggle */}
-                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                    <div className="form-group">
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'transparent', marginBottom: '8px', userSelect: 'none' }}>
+                            Spacing Label
+                        </label>
                         <label
                             onClick={() => setNewHomework(p => ({ ...p, allowFileUpload: !p.allowFileUpload }))}
                             style={{
