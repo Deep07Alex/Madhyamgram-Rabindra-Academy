@@ -8,45 +8,41 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret_key_change_in
 
 export const login = async (req: Request, res: Response) => {
     // The frontend sends 'username' but it functionally acts as the login ID
-    const { username: loginId, password } = req.body;
+    const { username: loginId, password, role: requestedRole } = req.body;
+
+    if (!requestedRole) {
+        return res.status(400).json({ message: 'User role is required' });
+    }
 
     try {
-        // Try to find the user in each table
         let userData: any = null;
-        let role: string = '';
+        let role: string = requestedRole.toUpperCase();
 
-        const adminRes = await db.query(
-            `SELECT * FROM "Admin" WHERE "adminId" = $1 OR "username" = $1 LIMIT 1`,
-            [loginId]
-        );
-
-        if (adminRes.rows.length > 0) {
-            userData = adminRes.rows[0];
-            role = 'ADMIN';
-        } else {
-            // Check teacher by teacherId
+        if (role === 'ADMIN') {
+            const adminRes = await db.query(
+                `SELECT * FROM "Admin" WHERE "adminId" = $1 OR "username" = $1 LIMIT 1`,
+                [loginId]
+            );
+            if (adminRes.rows.length > 0) userData = adminRes.rows[0];
+        } else if (role === 'TEACHER') {
             const teacherRes = await db.query(
                 `SELECT * FROM "Teacher" WHERE "teacherId" = $1 LIMIT 1`,
                 [loginId]
             );
-            if (teacherRes.rows.length > 0) {
-                userData = teacherRes.rows[0];
-                role = 'TEACHER';
-            } else {
-                // Check student by studentId
-                const studentRes = await db.query(
-                    `SELECT * FROM "Student" WHERE "studentId" = $1 LIMIT 1`,
-                    [loginId]
-                );
-                if (studentRes.rows.length > 0) {
-                    userData = studentRes.rows[0];
-                    role = 'STUDENT';
-                }
-            }
+            if (teacherRes.rows.length > 0) userData = teacherRes.rows[0];
+        } else if (role === 'STUDENT') {
+            const studentRes = await db.query(
+                `SELECT * FROM "Student" WHERE "studentId" = $1 LIMIT 1`,
+                [loginId]
+            );
+            if (studentRes.rows.length > 0) userData = studentRes.rows[0];
+        } else {
+            return res.status(400).json({ message: 'Invalid role' });
         }
 
         if (!userData) {
-            return res.status(401).json({ message: 'Invalid credentials' });
+            const notFoundMsg = role === 'TEACHER' ? 'No faculty found' : role === 'STUDENT' ? 'No student found' : 'No administrator found';
+            return res.status(401).json({ message: notFoundMsg });
         }
 
         const isPasswordValid = await bcrypt.compare(password, userData.password);
@@ -65,9 +61,10 @@ export const login = async (req: Request, res: Response) => {
             user: {
                 id: userData.id,
                 name: userData.name,
+                email: userData.email,
                 role: role,
                 ...(role === 'ADMIN' && { adminId: userData.adminId, username: userData.username }),
-                ...(role === 'STUDENT' && { studentId: userData.studentId, rollNumber: userData.rollNumber }),
+                ...(role === 'STUDENT' && { studentId: userData.studentId, rollNumber: userData.rollNumber, classId: userData.classId }),
                 ...(role === 'TEACHER' && { teacherId: userData.teacherId }),
             },
         });
@@ -80,9 +77,22 @@ export const login = async (req: Request, res: Response) => {
 export const register = async (req: Request, res: Response) => {
     const { name, password, role, email, rollNumber, teacherId, adminId, username, classId } = req.body;
 
+    // Basic validation
+    if (!name || !name.trim()) {
+        return res.status(400).json({ message: 'Name is required' });
+    }
     if (!password) {
         return res.status(400).json({ message: 'Password is required' });
     }
+    if (!role) {
+        return res.status(400).json({ message: 'Role is required' });
+    }
+    if (role === 'STUDENT' && !classId) {
+        return res.status(400).json({ message: 'Class is required for students' });
+    }
+
+    // Treat empty email as NULL so the unique constraint isn't violated
+    const safeEmail = (email && email.trim()) ? email.trim() : null;
 
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -92,35 +102,35 @@ export const register = async (req: Request, res: Response) => {
 
         if (role === 'ADMIN') {
             await db.query(
-                `INSERT INTO "Admin" (id, "adminId", username, password, name, email) VALUES ($1, $2, $3, $4, $5, $6)`,
-                [newUserId, adminId, username, hashedPassword, name, email]
+                `INSERT INTO "Admin" (id, "adminId", username, password, "plainPassword", name, email) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [newUserId, adminId, username, hashedPassword, password, name, safeEmail]
             );
         } else if (role === 'TEACHER') {
             let uniqueId = teacherId;
             if (!uniqueId) {
                 let isUnique = false;
                 while (!isUnique) {
-                    uniqueId = generate10DigitId();
+                    uniqueId = 'T-' + generate10DigitId();
                     const existingRes = await db.query(`SELECT id FROM "Teacher" WHERE "teacherId" = $1`, [uniqueId]);
                     if (existingRes.rows.length === 0) isUnique = true;
                 }
             }
             await db.query(
-                `INSERT INTO "Teacher" (id, password, name, email, "teacherId") VALUES ($1, $2, $3, $4, $5)`,
-                [newUserId, hashedPassword, name, email, uniqueId]
+                `INSERT INTO "Teacher" (id, password, "plainPassword", name, email, "teacherId") VALUES ($1, $2, $3, $4, $5, $6)`,
+                [newUserId, hashedPassword, password, name, safeEmail, uniqueId]
             );
         } else if (role === 'STUDENT') {
             let uniqueId = '';
             let isUnique = false;
             while (!isUnique) {
-                uniqueId = generate10DigitId();
+                uniqueId = 'S-' + generate10DigitId();
                 const existingRes = await db.query(`SELECT id FROM "Student" WHERE "studentId" = $1`, [uniqueId]);
                 if (existingRes.rows.length === 0) isUnique = true;
             }
 
             await db.query(
-                `INSERT INTO "Student" (id, "studentId", password, name, email, "rollNumber", "classId") VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                [newUserId, uniqueId, hashedPassword, name, email, rollNumber, classId]
+                `INSERT INTO "Student" (id, "studentId", password, "plainPassword", name, email, "rollNumber", "classId") VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                [newUserId, uniqueId, hashedPassword, password, name, safeEmail, rollNumber, classId]
             );
         } else {
             return res.status(400).json({ message: 'Invalid role' });

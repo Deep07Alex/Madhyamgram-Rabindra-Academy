@@ -1,24 +1,52 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+import { useToast } from '../../context/ToastContext';
+import useServerEvents from '../../hooks/useServerEvents';
+import FileUploadPicker from '../shared/FileUploadPicker';
+import {
+    BookOpen,
+    Calendar,
+    FileText,
+    Paperclip,
+    Upload,
+    CheckCircle2,
+    Clock,
+    ArrowRight,
+    Send,
+    XCircle
+} from 'lucide-react';
 
 const StudentHomework = () => {
+    const { showToast } = useToast();
     const [assignments, setAssignments] = useState([]);
     const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
     const [file, setFile] = useState<File | null>(null);
     const [content, setContent] = useState('');
 
-    const fetchAssignments = async () => {
+    const fetchAssignments = useCallback(async () => {
         try {
             const res = await api.get('/homework');
             setAssignments(res.data);
         } catch (error) {
             console.error('Failed to fetch homework assignments', error);
         }
-    };
-
-    useEffect(() => {
-        fetchAssignments();
     }, []);
+
+    useEffect(() => { fetchAssignments(); }, [fetchAssignments]);
+
+    // Live: refresh on assignment changes and on own submission
+    useServerEvents({
+        'homework:created': fetchAssignments,
+        'homework:deleted': (data: any) => {
+            fetchAssignments();
+            if (data && data.id === selectedAssignment?.id) {
+                setSelectedAssignment(null);
+                setContent('');
+                setFile(null);
+            }
+        },
+        'homework:submitted': fetchAssignments,
+    });
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -33,87 +61,213 @@ const StudentHomework = () => {
             await api.post('/homework/submit', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-            alert('Homework submitted successfully!');
+            showToast('Homework submitted successfully!', 'success');
             setSelectedAssignment(null);
             setContent('');
             setFile(null);
-            fetchAssignments(); // Refresh list to get updated submission status
+            fetchAssignments();
         } catch (error) {
             console.error('Failed to submit homework:', error);
-            alert('Failed to submit homework');
+            showToast('Failed to submit homework. Please try again.', 'error');
         }
     };
 
     return (
         <div className="manage-section">
             <div className="card">
-                <h3>My Homework Assignments</h3>
-                <div style={{ display: 'grid', gap: '20px', marginTop: '20px' }}>
+                <h3>
+                    <BookOpen size={20} color="var(--primary)" />
+                    Academic Tasks & Assignments
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', marginTop: '24px' }}>
                     {assignments.map((hw: any) => {
                         const hasSubmitted = hw.submissions?.length > 0;
-                        const submission = hw.submissions?.[0]; // Get the student's own submission
+                        const submission = hw.submissions?.[0];
+                        const isPastDue = new Date(hw.dueDate).getTime() < new Date().getTime();
+                        const canEdit = !isPastDue && submission?.status !== 'GRADED';
 
                         return (
-                            <div key={hw.id} style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '8px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                    <div>
-                                        <h4>{hw.title}</h4>
-                                        <p style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--primary-color)' }}>{hw.subject || 'General'}</p>
-                                        <p style={{ fontSize: '13px', color: '#666', marginTop: '5px' }}>{hw.description}</p>
-                                        <p style={{ fontSize: '12px', marginTop: '10px' }}>
-                                            <strong>Due Date:</strong> {new Date(hw.dueDate).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        {hw.fileUrl && (
-                                            <a href={`http://localhost:5000${hw.fileUrl}`} target="_blank" rel="noreferrer" className="btn-primary btn-sm mb-2" style={{ display: 'inline-block' }}>
-                                                View Attachment
-                                            </a>
-                                        )}
+                            <div key={hw.id} style={{
+                                border: '1px solid var(--border-soft)',
+                                padding: '24px',
+                                borderRadius: 'var(--radius-md)',
+                                background: 'white',
+                                transition: 'var(--transition-base)',
+                                position: 'relative',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between'
+                            }} className="assignment-card">
+                                <div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                        <span className="badge" style={{ background: 'var(--primary-soft)', color: 'var(--primary)', fontWeight: 800, fontSize: '0.7rem' }}>
+                                            {hw.subject || 'Core Study'}
+                                        </span>
                                         {hasSubmitted ? (
-                                            <div>
-                                                <span className={`badge ${submission.status.toLowerCase()}`}>{submission.status}</span>
-                                            </div>
+                                            <span className={`badge ${submission.status.toLowerCase()}`} style={{ fontSize: '0.7rem' }}>
+                                                {submission.status === 'GRADED' ? <CheckCircle2 size={12} /> : <Clock size={12} />}
+                                                {submission.status}
+                                            </span>
                                         ) : (
-                                            <div>
-                                                <button onClick={() => setSelectedAssignment(hw)} className="btn-success btn-sm mt-3">
-                                                    Submit Work
-                                                </button>
-                                            </div>
+                                            <span className="badge" style={{ background: '#fff7ed', color: '#c2410c', border: '1px solid #ffedd5', fontSize: '0.7rem' }}>
+                                                Pending Action
+                                            </span>
                                         )}
+                                    </div>
+                                    <h4 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>{hw.title}</h4>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '20px' }}>{hw.description}</p>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <Calendar size={14} /> Due: {new Date(hw.dueDate).toLocaleDateString()}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid var(--border-soft)' }}>
+                                    {hw.fileUrl ? (
+                                        <a href={`http://localhost:5000${hw.fileUrl}`} target="_blank" rel="noreferrer" style={{
+                                            fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700,
+                                            textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px'
+                                        }}>
+                                            <Paperclip size={14} /> Teacher's Resource
+                                        </a>
+                                    ) : <div></div>}
+
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        {isPastDue ? (
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--error)', fontWeight: 600, background: 'var(--error-soft)', padding: '6px 12px', borderRadius: 'var(--radius-full)' }}>Closed</span>
+                                        ) : !hasSubmitted ? (
+                                            <button onClick={() => {
+                                                setSelectedAssignment(hw);
+                                                setContent('');
+                                                setFile(null);
+                                            }} className="btn-primary" style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', gap: '6px' }}>
+                                                Submit Assignment <ArrowRight size={14} />
+                                            </button>
+                                        ) : canEdit ? (
+                                            <button onClick={() => {
+                                                setSelectedAssignment(hw);
+                                                setContent(submission.content || '');
+                                                setFile(null);
+                                            }} style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', background: 'white', color: 'var(--text-main)', border: '1px solid var(--border-soft)', fontWeight: 600 }}>
+                                                Edit Submission <Send size={14} />
+                                            </button>
+                                        ) : null}
                                     </div>
                                 </div>
                             </div>
                         );
                     })}
-                    {assignments.length === 0 && <p>No homework assignments found.</p>}
+                    {assignments.length === 0 && (
+                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px', background: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)' }}>
+                            <FileText size={32} style={{ opacity: 0.2, marginBottom: '12px' }} />
+                            <p style={{ color: 'var(--text-muted)', fontWeight: 600 }}>No academic tasks assigned to your profile yet.</p>
+                        </div>
+                    )}
                 </div>
             </div>
 
             {selectedAssignment && (
-                <div className="card mt-4" style={{ border: '2px solid #3b82f6' }}>
-                    <h3>Submit Assignment: {selectedAssignment.title}</h3>
-                    <form onSubmit={handleSubmit} className="mt-4">
-                        <div className="mb-4">
-                            <label>Text Answer (Optional):</label>
-                            <textarea
-                                value={content}
-                                onChange={e => setContent(e.target.value)}
-                                rows={4}
-                                style={{ width: '100%', padding: '10px', marginTop: '5px', border: '1px solid #ccc', borderRadius: '4px' }}
-                            />
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    background: 'rgba(15, 23, 42, 0.4)',
+                    backdropFilter: 'blur(8px)',
+                    zIndex: 1000,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px'
+                }}>
+                    <div className="card" style={{ width: '100%', maxWidth: '500px', padding: '32px', position: 'relative', animation: 'scaleUp 0.3s var(--ease-back)' }}>
+                        <button
+                            onClick={() => setSelectedAssignment(null)}
+                            style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                        >
+                            <XCircle size={24} />
+                        </button>
+
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--primary-soft)', color: 'var(--primary)', padding: '6px 16px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '16px' }}>
+                            <Upload size={14} /> submission Gateway
                         </div>
-                        <div className="mb-4">
-                            <label>File Upload (Optional):</label>
-                            <input type="file" onChange={e => setFile(e.target.files ? e.target.files[0] : null)} style={{ display: 'block', marginTop: '5px' }} />
-                        </div>
-                        <div>
-                            <button type="submit" className="btn-primary mr-2">Submit</button>
-                            <button type="button" onClick={() => setSelectedAssignment(null)} className="btn-danger">Cancel</button>
-                        </div>
-                    </form>
+                        <h3 style={{ marginBottom: '8px' }}>{selectedAssignment.title}</h3>
+                        {selectedAssignment.description && (
+                            <div style={{
+                                background: '#f8fafc', border: '1px solid var(--border-soft)',
+                                borderRadius: 'var(--radius-md)', padding: '12px 16px', marginBottom: '20px'
+                            }}>
+                                <p style={{ margin: '0 0 4px', fontSize: '0.72rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--primary)' }}>
+                                    Teacher's Instructions
+                                </p>
+                                <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-main)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                                    {selectedAssignment.description}
+                                </p>
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit}>
+                            <div className="form-group" style={{ marginBottom: '20px' }}>
+                                <label>Research / Text Component</label>
+                                <textarea
+                                    placeholder="Type your findings or response here..."
+                                    value={content}
+                                    onChange={e => setContent(e.target.value)}
+                                    rows={4}
+                                    style={{ width: '100%', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-soft)', outline: 'none', transition: 'var(--transition-fast)' }}
+                                    onFocus={e => e.target.style.borderColor = 'var(--primary)'}
+                                    onBlur={e => e.target.style.borderColor = 'var(--border-soft)'}
+                                />
+                            </div>
+                            <div className="form-group" style={{ marginBottom: '32px' }}>
+                                {selectedAssignment.allowFileUpload ? (
+                                    <div>
+                                        <FileUploadPicker
+                                            file={file}
+                                            onChange={setFile}
+                                            label="Your Submission File (Optional)"
+                                            hint="Upload photos, PDF, Word, Excel, PPT, ZIP — up to 50 MB"
+                                        />
+                                        {selectedAssignment.submissions?.[0]?.fileUrl && !file && (
+                                            <p style={{ marginTop: '8px', fontSize: '0.75rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <Paperclip size={12} /> You have previously attached a file. Uploading a new one will replace it.
+                                            </p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div style={{
+                                        padding: '10px 14px', borderRadius: 'var(--radius-sm)',
+                                        background: '#f8fafc', border: '1px dashed var(--border-soft)',
+                                        fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px'
+                                    }}>
+                                        <span>📝</span>
+                                        <span>File upload is not required for this assignment. Only a written response is accepted.</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button type="submit" className="btn-primary" style={{ flex: 1, height: '48px', fontSize: '1rem' }}>
+                                    <Send size={18} /> Transmit Work
+                                </button>
+                                <button type="button" onClick={() => setSelectedAssignment(null)} className="btn-danger" style={{ padding: '0 24px', opacity: 0.6 }}>
+                                    Discard
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
+
+            <style>{`
+                @keyframes scaleUp {
+                    from { transform: scale(0.95); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                }
+                .assignment-card:hover {
+                    border-color: var(--primary) !important;
+                    box-shadow: var(--shadow-lg);
+                }
+            `}</style>
         </div>
     );
 };

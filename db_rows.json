@@ -1,0 +1,11 @@
+[
+  {
+    "id": "4b00e5e6-1224-4160-9e34-abc8f66453ba",
+    "date": "2026-02-28T18:30:00.000Z",
+    "status": "PRESENT",
+    "studentId": "c9a3871d-07ea-4fa7-8ff8-371074319f8e",
+    "teacherId": "ff69318a-1bfb-4790-a3a8-024b3f9f289e",
+    "classId": "class-7",
+    "subject": null
+  }
+]

@@ -75,24 +75,28 @@ export const initDb = async () => {
                 "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            -- Attendance Table
+            -- Attendance Table (create with date stored as DATE for one-per-day)
             CREATE TABLE IF NOT EXISTS "Attendance" (
                 "id" TEXT PRIMARY KEY,
-                "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                "date" DATE NOT NULL DEFAULT CURRENT_DATE,
                 "status" "AttendanceStatus" NOT NULL,
                 "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE,
                 "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE,
                 "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
                 "subject" TEXT
             );
+            -- One attendance record per student per day
+            CREATE UNIQUE INDEX IF NOT EXISTS "Attendance_student_date_unique" ON "Attendance"("studentId", "date");
 
             -- TeacherAttendance Table
             CREATE TABLE IF NOT EXISTS "TeacherAttendance" (
                 "id" TEXT PRIMARY KEY,
-                "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                "date" DATE NOT NULL DEFAULT CURRENT_DATE,
                 "status" "AttendanceStatus" NOT NULL,
                 "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE
             );
+            -- One attendance record per teacher per day
+            CREATE UNIQUE INDEX IF NOT EXISTS "TeacherAttendance_teacher_date_unique" ON "TeacherAttendance"("teacherId", "date");
 
             -- Homework Table
             CREATE TABLE IF NOT EXISTS "Homework" (
@@ -155,6 +159,54 @@ export const initDb = async () => {
         `);
 
         console.log('Database tables verified/initialized successfully.');
+
+        // --- Migrations: run idempotently on every start ---
+        // 1. Alter date columns from TIMESTAMP to DATE if not already DATE
+        await db.query(`
+            DO $$ BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'Attendance' AND column_name = 'date' AND data_type = 'timestamp without time zone'
+                ) THEN
+                    -- Remove duplicates first (keep the one with lowest id for each student+day)
+                    DELETE FROM "Attendance"
+                    WHERE id NOT IN (
+                        SELECT DISTINCT ON ("studentId", date::DATE) id
+                        FROM "Attendance"
+                        ORDER BY "studentId", date::DATE, id ASC
+                    );
+                    -- Alter column type
+                    ALTER TABLE "Attendance" ALTER COLUMN date TYPE DATE USING date::DATE;
+                END IF;
+            END $$;
+        `);
+
+        await db.query(`
+            DO $$ BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'TeacherAttendance' AND column_name = 'date' AND data_type = 'timestamp without time zone'
+                ) THEN
+                    -- Remove duplicates first
+                    DELETE FROM "TeacherAttendance"
+                    WHERE id NOT IN (
+                        SELECT DISTINCT ON ("teacherId", date::DATE) id
+                        FROM "TeacherAttendance"
+                        ORDER BY "teacherId", date::DATE, id ASC
+                    );
+                    -- Alter column type
+                    ALTER TABLE "TeacherAttendance" ALTER COLUMN date TYPE DATE USING date::DATE;
+                END IF;
+            END $$;
+        `);
+
+        // 2. Create unique indexes if they don't exist
+        await db.query(`
+            CREATE UNIQUE INDEX IF NOT EXISTS "Attendance_student_date_unique" ON "Attendance"("studentId", date);
+            CREATE UNIQUE INDEX IF NOT EXISTS "TeacherAttendance_teacher_date_unique" ON "TeacherAttendance"("teacherId", date);
+        `);
+
+        console.log('Migrations applied successfully.');
     } catch (error) {
         console.error('Error initializing database:', error);
     }

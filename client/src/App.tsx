@@ -5,6 +5,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import Gallery from './pages/Gallery';
+import { ToastProvider } from './context/ToastContext';
 
 const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) => {
   const userJson = localStorage.getItem('user');
@@ -24,41 +25,43 @@ const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, a
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<Login />} />
+    <ToastProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login />} />
 
-        <Route
-          path="/admin/*"
-          element={
-            <PrivateRoute allowedRoles={['ADMIN']}>
-              <AdminDashboard />
-            </PrivateRoute>
-          }
-        />
+          <Route
+            path="/admin/*"
+            element={
+              <PrivateRoute allowedRoles={['ADMIN']}>
+                <AdminDashboard />
+              </PrivateRoute>
+            }
+          />
 
-        <Route
-          path="/teacher/*"
-          element={
-            <PrivateRoute allowedRoles={['TEACHER']}>
-              <TeacherDashboard />
-            </PrivateRoute>
-          }
-        />
+          <Route
+            path="/teacher/*"
+            element={
+              <PrivateRoute allowedRoles={['TEACHER']}>
+                <TeacherDashboard />
+              </PrivateRoute>
+            }
+          />
 
-        <Route
-          path="/student/*"
-          element={
-            <PrivateRoute allowedRoles={['STUDENT']}>
-              <StudentDashboard />
-            </PrivateRoute>
-          }
-        />
+          <Route
+            path="/student/*"
+            element={
+              <PrivateRoute allowedRoles={['STUDENT']}>
+                <StudentDashboard />
+              </PrivateRoute>
+            }
+          />
 
-        <Route path="/gallery" element={<Gallery />} />
-        <Route path="/" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </Router>
+          <Route path="/gallery" element={<Gallery />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Router>
+    </ToastProvider>
   );
 }
 

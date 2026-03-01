@@ -1,156 +1,145 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, Users, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { login } from '../services/authService.js';
+import { Lock, User, Eye, EyeOff, GraduationCap, ChevronRight } from 'lucide-react';
 
 const Login = () => {
-    const [loginId, setLoginId] = useState('');
+    const [userId, setUserId] = useState('');
     const [password, setPassword] = useState('');
-    const [role, setRole] = useState<'STUDENT' | 'TEACHER' | 'ADMIN'>('STUDENT');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const [activeRole, setActiveRole] = useState<'STUDENT' | 'TEACHER' | 'ADMIN'>('STUDENT');
+
+    const roleConfigs = {
+        STUDENT: { label: 'Scholar ID', placeholder: 'e.g. S-1302487085', icon: <GraduationCap size={20} className="input-icon" /> },
+        TEACHER: { label: 'Faculty ID', placeholder: 'e.g. T-8100474669', icon: <User className="input-icon" size={20} /> },
+        ADMIN: { label: 'Admin Identifier', placeholder: 'Username or Admin ID', icon: <Lock className="input-icon" size={20} /> }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
         setError('');
+        setLoading(true);
 
         try {
-            const data = await login(loginId, password);
-            const userRole = data.user.role;
+            const data = await login(userId, password, activeRole); // Pass activeRole to the login service
+            const user = data.user;
 
-            // Optional: Verify if the logged-in user matches the selected role
-            if (userRole !== role) {
-                // You might want to handle this, e.g., show an error or just proceed
-                console.warn(`User logged in as ${userRole} but selected ${role}`);
-            }
-
-            // Redirect based on role
-            if (userRole === 'ADMIN') navigate('/admin');
-            else if (userRole === 'TEACHER') navigate('/teacher');
+            if (user.role === 'ADMIN') navigate('/admin');
+            else if (user.role === 'TEACHER') navigate('/teacher');
             else navigate('/student');
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Login failed. Please try again.');
+            setError(err.response?.data?.message || 'Invalid credentials. Please verify your ID and password.');
         } finally {
             setLoading(false);
         }
     };
 
-    const getRoleLabel = () => {
-        switch (role) {
-            case 'ADMIN': return 'Administrator ID / Username';
-            case 'TEACHER': return 'Teacher ID';
-            case 'STUDENT': return 'Student ID';
-            default: return 'Login ID';
-        }
-    };
-
     return (
-        <div className="login-container">
+        <div className="login-page">
             <div className="login-card">
                 <div className="login-header">
-                    <div className="logo-badge">
-                        <img src="/RABINDRA_LOGO.jpeg" alt="MRA Logo" className="logo-img" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }} />
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <img src="/RABINDRA_LOGO.jpeg" alt="Academy Logo" className="login-logo" />
+                        <div style={{
+                            position: 'absolute',
+                            bottom: '24px',
+                            right: '-10px',
+                            background: 'var(--primary)',
+                            color: 'white',
+                            padding: '6px',
+                            borderRadius: '50%',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.2)'
+                        }}>
+                            {roleConfigs[activeRole].icon}
+                        </div>
                     </div>
-                    <h1>Madhyamgram Rabindra Academy</h1>
-                    <p>Centralized Academic Management Platform</p>
+                    <h2>Welcome Back</h2>
+                    <p>Madhyamgram Rabindra Academy</p>
                 </div>
 
-                <div className="role-selector">
-                    <button
-                        className={`role-chip ${role === 'ADMIN' ? 'active' : ''}`}
-                        onClick={() => setRole('ADMIN')}
-                        type="button"
-                    >
-                        <span className="role-icon">🛡️</span>
-                        Admin
-                    </button>
-                    <button
-                        className={`role-chip ${role === 'TEACHER' ? 'active' : ''}`}
-                        onClick={() => setRole('TEACHER')}
-                        type="button"
-                    >
-                        <span className="role-icon">👨‍🏫</span>
-                        Teacher
-                    </button>
-                    <button
-                        className={`role-chip ${role === 'STUDENT' ? 'active' : ''}`}
-                        onClick={() => setRole('STUDENT')}
-                        type="button"
-                    >
-                        <span className="role-icon">🎓</span>
-                        Student
-                    </button>
+                <div className="login-tabs">
+                    {(['STUDENT', 'TEACHER', 'ADMIN'] as const).map((role) => (
+                        <button
+                            key={role}
+                            className={`tab-btn ${activeRole === role ? 'active' : ''}`}
+                            onClick={() => {
+                                setActiveRole(role);
+                                setUserId('');
+                                setPassword('');
+                                setError('');
+                            }}
+                        >
+                            {role.charAt(0) + role.slice(1).toLowerCase()}
+                        </button>
+                    ))}
                 </div>
 
-                <form onSubmit={handleLogin} className="login-form">
-                    <div className="input-group">
-                        <label htmlFor="loginId">{getRoleLabel()}</label>
+                {error && (
+                    <div className="error-message" style={{ animation: 'fadeIn 0.3s ease', marginBottom: '20px' }}>
+                        {error}
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="login-form">
+                    <div className="form-group">
+                        <label htmlFor="userId">{roleConfigs[activeRole].label}</label>
                         <div className="input-with-icon">
-                            <Users size={18} className="field-icon" />
+                            {roleConfigs[activeRole].icon}
                             <input
-                                id="loginId"
                                 type="text"
-                                placeholder={role === 'ADMIN' ? 'Enter Admin ID or Username' : `Enter your ${role.toLowerCase()} ID`}
-                                value={loginId}
-                                onChange={(e) => setLoginId(e.target.value)}
+                                id="userId"
+                                placeholder={roleConfigs[activeRole].placeholder}
+                                value={userId}
+                                onChange={(e) => setUserId(e.target.value)}
                                 required
                             />
                         </div>
                     </div>
 
-                    <div className="input-group">
-                        <label htmlFor="password">Password</label>
-                        <div className="input-with-icon" style={{ position: 'relative' }}>
-                            <ShieldCheck size={18} className="field-icon" />
+                    <div className="form-group" style={{ marginTop: '16px' }}>
+                        <label htmlFor="password">Security Password</label>
+                        <div className="input-with-icon">
+                            <Lock className="input-icon" size={20} />
                             <input
-                                id="password"
                                 type={showPassword ? "text" : "password"}
+                                id="password"
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                style={{ paddingRight: '40px' }}
                                 required
                             />
                             <button
                                 type="button"
+                                className="password-toggle"
                                 onClick={() => setShowPassword(!showPassword)}
-                                style={{
-                                    position: 'absolute',
-                                    right: '10px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    color: '#64748b',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    padding: '5px'
-                                }}
+                                tabIndex={-1}
                             >
                                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
                         </div>
                     </div>
 
-                    {error && <div className="error-message">{error}</div>}
-
-                    <button type="submit" className="login-button" disabled={loading}>
-                        {loading ? 'Logging in...' : (
+                    <button
+                        type="submit"
+                        className="btn-primary login-button"
+                        disabled={loading}
+                        style={{ width: '100%', height: '52px', marginTop: '32px', borderRadius: '12px', fontSize: '1rem', fontWeight: 700 }}
+                    >
+                        {loading ? 'Authenticating...' : (
                             <>
-                                <LogIn size={18} style={{ marginRight: '8px' }} />
-                                Sign In
+                                Access {activeRole.charAt(0) + activeRole.slice(1).toLowerCase()} Portal <ChevronRight size={18} />
                             </>
                         )}
                     </button>
                 </form>
 
-                <div className="login-footer">
-                    <p>Forgot password? Contact your administrator.</p>
+                <div className="login-footer" style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '24px' }}>
+                    <p>© {new Date().getFullYear()} Madhyamgram Rabindra Academy</p>
+                    <p style={{ fontSize: '11px', opacity: 0.6, marginTop: '4px' }}>Secured Academic Management System</p>
                 </div>
             </div>
         </div>

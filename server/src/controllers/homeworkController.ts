@@ -2,12 +2,13 @@ import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.js';
+import { broadcast } from '../lib/sseManager.js';
 
 // --- Homework Management ---
 
 export const createHomework = async (req: AuthRequest, res: Response) => {
     try {
-        const { title, description, dueDate, classId, subject } = req.body;
+        const { title, description, dueDate, classId, subject, allowFileUpload } = req.body;
         const teacherId = req.user?.id;
 
         let fileUrl = null;
@@ -19,24 +20,51 @@ export const createHomework = async (req: AuthRequest, res: Response) => {
 
         const id = crypto.randomUUID();
         const homeworkRes = await db.query(
-            `INSERT INTO "Homework" (id, title, description, subject, "dueDate", "classId", "teacherId", "fileUrl") 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-            [id, title, description, subject || null, new Date(dueDate), classId, teacherId, fileUrl]
+            `INSERT INTO "Homework" (id, title, description, subject, "dueDate", "classId", "teacherId", "fileUrl", "allowFileUpload") 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+            [id, title, description, subject || null, new Date(dueDate), classId, teacherId, fileUrl, allowFileUpload === 'true' || allowFileUpload === true]
         );
 
+        broadcast('homework:created', { classId: homeworkRes.rows[0].classId });
         res.status(201).json(homeworkRes.rows[0]);
     } catch (error) {
+        console.error(error);
         res.status(500).json({ message: 'Error creating homework' });
+    }
+};
+
+export const deleteHomework = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        // Remove submissions first to avoid FK violation
+        await db.query(`DELETE FROM "Submission" WHERE "homeworkId" = $1`, [id]);
+        const result = await db.query(`DELETE FROM "Homework" WHERE id = $1 RETURNING id`, [id]);
+        if (result.rows.length === 0) return res.status(404).json({ message: 'Homework not found' });
+        broadcast('homework:deleted', { id });
+        res.json({ message: 'Homework deleted' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error deleting homework' });
     }
 };
 
 export const getHomeworks = async (req: AuthRequest, res: Response) => {
     try {
         const { classId } = req.query;
+        const userId = req.user?.id;
+        const role = req.user?.role;
+
+        // For students: include their own submissions in each homework row
+        const submissionsSubquery = role === 'STUDENT'
+            ? `(SELECT json_agg(json_build_object('id', s.id, 'status', s.status, 'content', s.content, 'fileUrl', s."fileUrl", 'submittedAt', s."submittedAt"))
+               FROM "Submission" s WHERE s."homeworkId" = h.id AND s."studentId" = '${userId}') as submissions`
+            : `'[]'::json as submissions`;
+
         let query = `
-            SELECT h.*, 
-                   row_to_json(t.*) as teacher, 
-                   row_to_json(c.*) as class 
+            SELECT h.*,
+                   row_to_json(t.*) as teacher,
+                   row_to_json(c.*) as class,
+                   ${submissionsSubquery}
             FROM "Homework" h
             LEFT JOIN "Teacher" t ON h."teacherId" = t.id
             LEFT JOIN "Class" c ON h."classId" = c.id
@@ -50,8 +78,8 @@ export const getHomeworks = async (req: AuthRequest, res: Response) => {
             params.push(classId);
         }
 
-        if (req.user?.role === 'STUDENT') {
-            const studentRes = await db.query(`SELECT "classId" FROM "Student" WHERE id = $1`, [req.user.id]);
+        if (role === 'STUDENT') {
+            const studentRes = await db.query(`SELECT "classId" FROM "Student" WHERE id = $1`, [userId]);
             if (studentRes.rows.length > 0) {
                 query += ` AND h."classId" = $${paramCount++}`;
                 params.push(studentRes.rows[0].classId);
@@ -63,6 +91,7 @@ export const getHomeworks = async (req: AuthRequest, res: Response) => {
 
         res.json(homeworksRes.rows);
     } catch (error) {
+        console.error(error);
         res.status(500).json({ message: 'Error fetching homeworks' });
     }
 };
@@ -95,6 +124,7 @@ export const submitHomework = async (req: AuthRequest, res: Response) => {
                  WHERE id = $3 RETURNING *`,
                 [content, fileUrl, existingId]
             );
+            broadcast('homework:submitted', { homeworkId, studentId });
             return res.json(updatedRes.rows[0]);
         }
 
@@ -105,6 +135,7 @@ export const submitHomework = async (req: AuthRequest, res: Response) => {
             [subId, homeworkId, studentId, content, fileUrl]
         );
 
+        broadcast('homework:submitted', { homeworkId, studentId });
         res.status(201).json(submissionRes.rows[0]);
     } catch (error) {
         res.status(500).json({ message: 'Error submitting homework' });
@@ -113,7 +144,9 @@ export const submitHomework = async (req: AuthRequest, res: Response) => {
 
 export const getSubmissions = async (req: Request, res: Response) => {
     try {
-        const { homeworkId, studentId } = req.query;
+        // Support both /homework/:id/submissions (params.id) and /homework/submissions?homeworkId=...
+        const homeworkId = (req.params as any).id || req.query.homeworkId;
+        const { studentId } = req.query;
         let query = `
             SELECT s.*, 
                    row_to_json(st.*) as student, 

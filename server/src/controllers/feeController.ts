@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.js';
+import { broadcast } from '../lib/sseManager.js';
 
 export const createFee = async (req: Request, res: Response) => {
     try {
@@ -14,6 +15,7 @@ export const createFee = async (req: Request, res: Response) => {
             [id, studentId, parseFloat(amount as string), new Date(dueDate), type]
         );
 
+        broadcast('fee:created', { studentId: feeRes.rows[0].studentId });
         res.status(201).json(feeRes.rows[0]);
     } catch (error) {
         res.status(500).json({ message: 'Error creating fee' });
@@ -37,6 +39,7 @@ export const createFeesForClass = async (req: Request, res: Response) => {
             count++;
         }
 
+        broadcast('fee:created', { classId });
         res.status(201).json({ message: `${count} fees created` });
     } catch (error) {
         res.status(500).json({ message: 'Error creating fees for class' });

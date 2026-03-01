@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import { Image as ImageIcon, ArrowRight, UserCircle, Calendar } from 'lucide-react';
 
 const Gallery = () => {
     const [images, setImages] = useState([]);
@@ -8,7 +9,6 @@ const Gallery = () => {
     useEffect(() => {
         const fetchImages = async () => {
             try {
-                // The /gallery endpoint is public
                 const res = await api.get('/gallery');
                 setImages(res.data);
             } catch (error) {
@@ -19,52 +19,113 @@ const Gallery = () => {
     }, []);
 
     return (
-        <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto', fontFamily: '"Inter", sans-serif' }}>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', paddingBottom: '20px', borderBottom: '1px solid #eee' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <img src="/RABINDRA_LOGO.jpeg" alt="Academy Logo" style={{ width: '50px', height: '50px', borderRadius: '50%' }} />
-                    <h1 style={{ margin: 0, color: '#1e3a8a' }}>MRA Academy Gallery</h1>
-                </div>
-                <div>
-                    <Link to="/login" style={{ textDecoration: 'none', color: '#3b82f6', fontWeight: 600 }}>Login Portal</Link>
-                </div>
-            </header>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '30px' }}>
-                {images.map((img: any) => (
-                    <div key={img.id} style={{
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '12px',
-                        overflow: 'hidden',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                        transition: 'transform 0.2s ease',
-                        cursor: 'pointer'
-                    }}
-                        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-5px)'}
-                        onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-                    >
-                        <img
-                            src={`http://localhost:5000${img.imageUrl}`}
-                            alt={img.title}
-                            style={{ width: '100%', height: '220px', objectFit: 'cover' }}
-                        />
-                        <div style={{ padding: '20px' }}>
-                            <h3 style={{ margin: '0 0 10px 0', color: '#1f2937', fontSize: '18px' }}>{img.title}</h3>
-                            <p style={{ margin: 0, color: '#64748b', fontSize: '14px', lineHeight: '1.5' }}>{img.description || 'No description provided.'}</p>
-                            <span style={{ display: 'block', marginTop: '15px', fontSize: '12px', color: '#94a3b8' }}>
-                                Added on {new Date(img.createdAt).toLocaleDateString()}
-                            </span>
-                        </div>
+        <div className="modern-page" style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+            paddingBottom: '80px'
+        }}>
+            {/* Dynamic Navbar */}
+            <nav style={{
+                padding: '20px 5%',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: 'rgba(255, 255, 255, 0.8)',
+                backdropFilter: 'blur(12px)',
+                position: 'sticky',
+                top: 0,
+                zIndex: 100,
+                borderBottom: '1px solid rgba(255, 255, 255, 0.3)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div className="logo-container" style={{ position: 'relative' }}>
+                        <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '42px', height: '42px', borderRadius: '50%', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }} />
+                        <div style={{ position: 'absolute', bottom: -2, right: -2, width: '12px', height: '12px', background: 'var(--success)', borderRadius: '50%', border: '2px solid white' }}></div>
                     </div>
-                ))}
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-main)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>Madhyamgram</span>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary)', letterSpacing: '0.5px' }}>Rabindra Academy</span>
+                    </div>
+                </div>
+                <Link to="/login" className="btn-primary" style={{
+                    padding: '10px 24px',
+                    borderRadius: 'var(--radius-full)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    textDecoration: 'none',
+                    fontSize: '0.9rem',
+                    fontWeight: 700
+                }}>
+                    <UserCircle size={18} /> Student Portal <ArrowRight size={16} />
+                </Link>
+            </nav>
+
+            {/* Hero Section */}
+            <div style={{ padding: '80px 5% 40px', textAlign: 'center' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--primary-soft)', color: 'var(--primary)', padding: '6px 16px', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '20px' }}>
+                    <ImageIcon size={14} /> Academic Archive
+                </div>
+                <h1 style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', fontWeight: 900, color: 'var(--text-main)', marginBottom: '16px', letterSpacing: '-2px' }}>Memory <span style={{ color: 'var(--primary)' }}>Gallery</span></h1>
+                <p style={{ maxWidth: '600px', margin: '0 auto', color: 'var(--text-muted)', fontSize: '1.1rem', lineHeight: 1.6 }}>Witness the vibrant life and excellence at Madhyamgram Rabindra Academy through our curated visual journey.</p>
             </div>
 
-            {images.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>
-                    <h2>No photos in the gallery yet.</h2>
-                    <p>Check back soon for updates from our events!</p>
+            {/* Gallery Grid */}
+            <div style={{ padding: '0 5%', maxWidth: '1400px', margin: '0 auto' }}>
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                    gap: '32px'
+                }}>
+                    {images.map((img: any) => (
+                        <div key={img.id} className="card" style={{
+                            padding: 0,
+                            overflow: 'hidden',
+                            position: 'relative',
+                            transition: 'var(--transition-base)',
+                            border: '1px solid rgba(255, 255, 255, 0.4)'
+                        }}>
+                            <div style={{ overflow: 'hidden', height: '240px' }}>
+                                <img
+                                    src={`http://localhost:5000${img.imageUrl}`}
+                                    alt={img.title}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease' }}
+                                    className="gallery-img"
+                                />
+                            </div>
+                            <div style={{ padding: '24px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                    <Calendar size={14} /> {new Date(img.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                                </div>
+                                <h3 style={{ margin: '0 0 10px 0', color: 'var(--text-main)', fontSize: '1.25rem', fontWeight: 800 }}>{img.title}</h3>
+                                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: '1.6' }}>{img.description || 'Captured moments from our academic excellence events.'}</p>
+                            </div>
+                        </div>
+                    ))}
                 </div>
-            )}
+
+                {images.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '100px 20px', background: 'rgba(255,255,255,0.5)', borderRadius: 'var(--radius-lg)', border: '2px dashed var(--border-soft)' }}>
+                        <div style={{ background: 'var(--primary-soft)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: 'var(--primary)' }}>
+                            <ImageIcon size={32} />
+                        </div>
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>No moments captured yet.</h2>
+                        <p style={{ color: 'var(--text-muted)' }}>Stay tuned while we curate our gallery of achievements.</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Visual enhancements for index.css (these would usually go there, but I'll add inline classes for hover) */}
+            <style>{`
+                .card:hover .gallery-img {
+                    transform: scale(1.1);
+                }
+                .card:hover {
+                    transform: translateY(-8px);
+                    box-shadow: var(--shadow-xl);
+                }
+            `}</style>
         </div>
     );
 };

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.js';
+import { broadcast } from '../lib/sseManager.js';
 
 export const createResult = async (req: Request, res: Response) => {
     try {
@@ -14,6 +15,7 @@ export const createResult = async (req: Request, res: Response) => {
             [id, semester, subject, parseFloat(marks as string), parseFloat(totalMarks as string), grade || null, studentId]
         );
 
+        broadcast('result:created', { studentId: resultRes.rows[0].studentId });
         res.status(201).json(resultRes.rows[0]);
     } catch (error) {
         res.status(500).json({ message: 'Error creating result' });

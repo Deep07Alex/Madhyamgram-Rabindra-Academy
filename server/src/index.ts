@@ -43,6 +43,38 @@ app.use('/api/results', resultRoutes);
 app.use('/api/gallery', galleryRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
+// --- Server-Sent Events (SSE) endpoint ---
+import { addClient, removeClient } from './lib/sseManager.js';
+
+app.get('/api/events', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.flushHeaders();
+
+    // Register client
+    addClient(res);
+
+    // Send initial ping to confirm connection
+    res.write('event: connected\ndata: {"message":"SSE connected"}\n\n');
+
+    // Keep alive every 25s
+    const heartbeat = setInterval(() => {
+        try {
+            res.write(':ping\n\n');
+        } catch {
+            clearInterval(heartbeat);
+        }
+    }, 25000);
+
+    // Cleanup when client disconnects
+    req.on('close', () => {
+        clearInterval(heartbeat);
+        removeClient(res);
+    });
+});
+
 app.get('/', (req, res) => {
     res.send('Madhyamgram Rabindra Academy API is running');
 });

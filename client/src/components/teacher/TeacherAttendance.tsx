@@ -1,118 +1,433 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+import { useToast } from '../../context/ToastContext';
 import { MAIN_SUBJECTS } from '../../utils/constants';
+import useServerEvents from '../../hooks/useServerEvents';
+import {
+    Users,
+    UserCheck,
+    Calendar,
+    BookOpen,
+    Clock,
+    ClipboardCheck,
+    AlertCircle,
+    CheckCircle2,
+    XCircle,
+    Search,
+    BarChart3
+} from 'lucide-react';
+
+type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE';
+
+const STATUS_COLORS: Record<AttendanceStatus, { bg: string; text: string; border: string }> = {
+    PRESENT: { bg: '#dcfce7', text: '#15803d', border: '#86efac' },
+    ABSENT: { bg: '#fee2e2', text: '#dc2626', border: '#fca5a5' },
+    LATE: { bg: '#fef3c7', text: '#d97706', border: '#fcd34d' },
+};
+
+const StatusBadge = ({ status }: { status: AttendanceStatus | null }) => {
+    if (!status) return (
+        <span style={{ padding: '3px 10px', borderRadius: '20px', background: '#f1f5f9', color: '#94a3b8', fontWeight: '600', fontSize: '0.75rem', border: '1px dashed #cbd5e1' }}>
+            No Record
+        </span>
+    );
+    const c = STATUS_COLORS[status];
+    return (
+        <span style={{ padding: '3px 12px', borderRadius: '20px', background: c.bg, color: c.text, fontWeight: '700', fontSize: '0.75rem', border: `1px solid ${c.border}` }}>
+            {status}
+        </span>
+    );
+};
+
+// ── Inline status toggle buttons ──────────────────────────────────────────────
+const StatusToggle = ({ studentId, selected, onChange }: { studentId: string; selected: string; onChange: (id: string, status: string) => void }) => (
+    <div className="status-toggle-group" style={{ display: 'inline-flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '4px', background: '#f8fafc', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-soft)' }}>
+        {(['PRESENT', 'ABSENT', 'LATE'] as const).map(s => {
+            const isSel = selected === s;
+            const c = STATUS_COLORS[s];
+            return (
+                <button key={s} onClick={() => onChange(studentId, s)}
+                    className="status-btn"
+                    style={{
+                        padding: '6px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700',
+                        border: isSel ? `1px solid ${c.border}` : '1px solid transparent',
+                        background: isSel ? c.bg : 'transparent',
+                        color: isSel ? c.text : 'var(--text-muted)',
+                        transition: 'all 0.2s', cursor: 'pointer'
+                    }}>
+                    {s.charAt(0) + s.slice(1).toLowerCase()}
+                </button>
+            );
+        })}
+    </div>
+);
 
 const TeacherAttendance = () => {
-    const [tab, setTab] = useState<'students' | 'self'>('students');
-    const [classes, setClasses] = useState([]);
-    const [students, setStudents] = useState([]);
-    const [selectedClass, setSelectedClass] = useState('');
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-    const [subject, setSubject] = useState('');
+    const { showToast } = useToast();
+    const [tab, setTab] = useState<'mark' | 'history' | 'self'>('mark');
+    const [classes, setClasses] = useState<any[]>([]);
+
+    // ── Mark Attendance tab ───────────────────────────────────────────────────
+    const [markClass, setMarkClass] = useState('');
+    const [markDate, setMarkDate] = useState(new Date().toISOString().split('T')[0]);
+    const [markSubject, setMarkSubject] = useState('');
+    const [students, setStudents] = useState<any[]>([]);
+    const [attendanceData, setAttendanceData] = useState<Record<string, string>>({});
+
+    // ── History tab ──────────────────────────────────────────────────────────
+    const [histClass, setHistClass] = useState('');
+    const [histDate, setHistDate] = useState(new Date().toISOString().split('T')[0]);
+    const [histSearch, setHistSearch] = useState('');
+    const [histRows, setHistRows] = useState<Array<{
+        id: string; name: string; studentId: string; rollNumber: string;
+        attendanceId: string | null; status: AttendanceStatus | null;
+    }>>([]);
+    const [histLoading, setHistLoading] = useState(false);
 
     useEffect(() => {
-        // Fetch classes assigned to this teacher (for simplicity, fetching all classes they has access to)
         api.get('/users/classes').then(res => setClasses(res.data)).catch(console.error);
     }, []);
 
+    // Load students for mark tab
     useEffect(() => {
-        if (selectedClass) {
-            api.get('/users/students').then(res => {
-                // Filter students by class (in real app, API should handle filtering)
-                const filtered = res.data.filter((s: any) => s.classId === selectedClass);
-                setStudents(filtered);
-            }).catch(console.error);
-        } else {
-            setStudents([]);
-        }
-    }, [selectedClass]);
+        if (!markClass) { setStudents([]); setAttendanceData({}); return; }
 
-    const markStudentAttendance = async (studentId: string, status: string) => {
+        const loadRegister = async () => {
+            try {
+                const [stuRes, attRes] = await Promise.all([
+                    api.get(`/users/students?classId=${markClass}`),
+                    api.get('/attendance/student', {
+                        params: { classId: markClass, startDate: markDate, endDate: markDate }
+                    })
+                ]);
+
+                setStudents(stuRes.data);
+
+                // Prefill existing attendance status
+                const init: Record<string, string> = {};
+                attRes.data.forEach((a: any) => {
+                    init[a.studentId] = a.status;
+                });
+
+                setAttendanceData(init);
+            } catch (err) {
+                console.error(err);
+                showToast('Failed to load class register.', 'error');
+            }
+        };
+
+        loadRegister();
+    }, [markClass, markDate]);
+
+    // Load history
+    const fetchHistory = useCallback(async () => {
+        if (!histClass) { setHistRows([]); return; }
+        setHistLoading(true);
+        try {
+            const [stuRes, attRes] = await Promise.all([
+                api.get(`/users/students?classId=${histClass}`),
+                api.get('/attendance/student', {
+                    params: { classId: histClass, startDate: histDate, endDate: histDate }
+                }),
+            ]);
+
+            const attMap: Record<string, any> = {};
+            attRes.data.forEach((a: any) => { attMap[a.studentId] = a; });
+
+            setHistRows(stuRes.data.map((s: any) => {
+                const att = attMap[s.id] || null;
+                return {
+                    id: s.id,
+                    name: s.name,
+                    studentId: s.studentId,
+                    rollNumber: s.rollNumber,
+                    attendanceId: att?.id || null,
+                    status: att?.status || null,
+                };
+            }));
+        } catch {
+            showToast('Failed to load attendance history.', 'error');
+        } finally {
+            setHistLoading(false);
+        }
+    }, [histClass, histDate]);
+
+    useEffect(() => { fetchHistory(); }, [fetchHistory]);
+
+    // Live: refresh history when attendance is updated
+    useServerEvents({ 'attendance:updated': fetchHistory });
+
+
+    const handleStatusChange = async (studentId: string, status: string) => {
+        setAttendanceData(prev => ({ ...prev, [studentId]: status }));
         try {
             await api.post('/attendance/student', {
-                date,
-                status,
-                studentId,
-                classId: selectedClass,
-                subject
+                date: markDate, status, studentId,
+                classId: markClass, subject: markSubject
             });
-            alert('Attendance marked!');
-        } catch (error) {
-            console.error('Failed to mark attendance', error);
+            showToast(`Attendance marked as ${status.charAt(0) + status.slice(1).toLowerCase()}`, 'success');
+            if (histClass === markClass && histDate === markDate) fetchHistory();
+        } catch {
+            showToast('Failed to save attendance. Please try again.', 'error');
         }
     };
 
     const handleSelfAttendance = async (status: string) => {
         try {
             await api.post('/attendance/teacher', {
-                date: new Date().toISOString().split('T')[0],
-                status
+                date: new Date().toISOString().split('T')[0], status
             });
-            alert(`Your attendance marked as ${status}`);
-        } catch (error) {
-            console.error('Failed to mark self attendance', error);
+            showToast(`Your attendance marked as ${status}`, 'info');
+        } catch {
+            showToast('Failed to mark attendance.', 'error');
         }
     };
 
+    // Summary for history tab
+    const filteredHist = histRows.filter(r =>
+        !histSearch ||
+        r.name.toLowerCase().includes(histSearch.toLowerCase()) ||
+        r.studentId.toLowerCase().includes(histSearch.toLowerCase()) ||
+        r.rollNumber.includes(histSearch)
+    );
+    const presentCount = filteredHist.filter(r => r.status === 'PRESENT').length;
+    const absentCount = filteredHist.filter(r => r.status === 'ABSENT').length;
+    const lateCount = filteredHist.filter(r => r.status === 'LATE').length;
+    const noRecordCount = filteredHist.filter(r => !r.status).length;
+
+    const tabBtn = (t: typeof tab, label: string, Icon: any) => (
+        <button onClick={() => setTab(t)} style={{
+            padding: '10px 18px', borderRadius: 'calc(var(--radius-md) - 4px)',
+            border: 'none', cursor: 'pointer', fontWeight: '700', fontSize: '0.85rem',
+            display: 'flex', alignItems: 'center', gap: '7px',
+            background: tab === t ? 'white' : 'transparent',
+            color: tab === t ? 'var(--primary)' : 'var(--text-muted)',
+            boxShadow: tab === t ? 'var(--shadow-sm)' : 'none',
+            transition: 'var(--transition-fast)',
+        }}>
+            <Icon size={16} /> {label}
+        </button>
+    );
+
     return (
         <div className="manage-section">
-            <div className="tabs">
-                <button className={`tab ${tab === 'students' ? 'active' : ''}`} onClick={() => setTab('students')}>Student Attendance</button>
-                <button className={`tab ${tab === 'self' ? 'active' : ''}`} onClick={() => setTab('self')}>My Attendance</button>
+            {/* Tab bar */}
+            <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '6px', borderRadius: 'var(--radius-md)', width: 'fit-content', marginBottom: '32px' }}>
+                {tabBtn('mark', 'Mark Attendance', ClipboardCheck)}
+                {tabBtn('history', 'View Class Roster', BarChart3)}
+                {tabBtn('self', 'Personal Check-in', UserCheck)}
             </div>
 
-            {tab === 'students' && (
-                <div className="card mt-4">
-                    <h3>Mark Class Attendance</h3>
-                    <div className="form-grid mb-4">
-                        <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
-                        <select value={subject} onChange={e => setSubject(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}>
-                            <option value="">Select Subject (Optional)</option>
-                            {MAIN_SUBJECTS.map(sub => <option key={sub} value={sub}>{sub}</option>)}
-                        </select>
-                        <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)}>
-                            <option value="">Select Class to Mark</option>
-                            {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
+            {/* ── MARK ATTENDANCE ──────────────────────────────────────────────── */}
+            {tab === 'mark' && (
+                <div className="card">
+                    <h3><ClipboardCheck size={20} color="var(--primary)" /> Mark Class Attendance</h3>
+                    <div className="form-grid">
+                        <div className="form-group">
+                            <label>Date</label>
+                            <div style={{ position: 'relative' }}>
+                                <Calendar size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                <input type="date" value={markDate} onChange={e => setMarkDate(e.target.value)} style={{ paddingLeft: '40px' }} />
+                            </div>
+                        </div>
+                        <div className="form-group">
+                            <label>Subject</label>
+                            <div style={{ position: 'relative' }}>
+                                <BookOpen size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                <select value={markSubject} onChange={e => setMarkSubject(e.target.value)} style={{ paddingLeft: '40px' }}>
+                                    <option value="">Full Day Record</option>
+                                    {MAIN_SUBJECTS.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="form-group">
+                            <label>Class</label>
+                            <select value={markClass} onChange={e => setMarkClass(e.target.value)}>
+                                <option value="">Select Class...</option>
+                                {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
                     </div>
 
-                    {selectedClass && students.length > 0 && (
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Roll Number</th>
-                                    <th>Name</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {students.map((s: any) => (
-                                    <tr key={s.id}>
-                                        <td>{s.rollNumber}</td>
-                                        <td>{s.name}</td>
-                                        <td>
-                                            <button onClick={() => markStudentAttendance(s.id, 'PRESENT')} className="btn-success btn-sm mr-2">Present</button>
-                                            <button onClick={() => markStudentAttendance(s.id, 'LATE')} className="btn-primary btn-sm mr-2" style={{ backgroundColor: '#f59e0b' }}>Late</button>
-                                            <button onClick={() => markStudentAttendance(s.id, 'ABSENT')} className="btn-danger btn-sm">Absent</button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    {markClass && students.length > 0 && (
+                        <div style={{ marginTop: '32px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                <h4 style={{ margin: 0, fontWeight: '800' }}>Student Register</h4>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: '700', padding: '4px 12px', background: 'var(--primary-soft)', borderRadius: '20px' }}>
+                                    {students.length} Students
+                                </span>
+                            </div>
+                            <div style={{ border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', overflowX: 'auto' }}>
+                                <table className="data-table" style={{ minWidth: '400px' }}>
+                                    <thead>
+                                        <tr>
+                                            <th>Student</th>
+                                            <th style={{ textAlign: 'center' }}>Roll #</th>
+                                            <th style={{ textAlign: 'right' }}>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {students.map((stu: any) => (
+                                            <tr key={stu.id}>
+                                                <td>
+                                                    <p style={{ margin: 0, fontWeight: '700' }}>{stu.name}</p>
+                                                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{stu.studentId}</p>
+                                                </td>
+                                                <td style={{ textAlign: 'center', fontWeight: '700', opacity: 0.6 }}>#{stu.rollNumber}</td>
+                                                <td style={{ textAlign: 'right' }}>
+                                                    <StatusToggle studentId={stu.id} selected={attendanceData[stu.id] || ''} onChange={handleStatusChange} />
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     )}
-                    {selectedClass && students.length === 0 && <p>No students found in this class.</p>}
+                    {markClass && students.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                            <AlertCircle size={32} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                            <p>No students enrolled in this class.</p>
+                        </div>
+                    )}
+                    {!markClass && (
+                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', background: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)', marginTop: '24px' }}>
+                            <Users size={32} style={{ opacity: 0.2, marginBottom: '12px' }} />
+                            <p style={{ fontWeight: '600' }}>Select a class above to begin marking attendance</p>
+                        </div>
+                    )}
                 </div>
             )}
 
-            {tab === 'self' && (
-                <div className="card mt-4">
-                    <h3>Mark My Daily Attendance</h3>
-                    <p>Date: {new Date().toLocaleDateString()}</p>
-                    <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-                        <button onClick={() => handleSelfAttendance('PRESENT')} className="btn-success">Mark Present</button>
-                        <button onClick={() => handleSelfAttendance('LATE')} className="btn-primary" style={{ backgroundColor: '#f59e0b' }}>Mark Late</button>
-                        <button onClick={() => handleSelfAttendance('ABSENT')} className="btn-danger">Mark Absent</button>
+            {/* ── HISTORY / ROSTER VIEW ─────────────────────────────────────────── */}
+            {tab === 'history' && (
+                <div className="card">
+                    <h3><BarChart3 size={20} color="var(--primary)" /> Class Attendance Roster</h3>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', margin: '0 0 20px' }}>
+                        Select a class and date to see the full attendance picture for every student.
+                    </p>
+
+                    {/* Filters */}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                        <select value={histClass} onChange={e => { setHistClass(e.target.value); setHistSearch(''); }}
+                            style={{ padding: '10px 14px', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', background: 'white', fontWeight: '600', cursor: 'pointer', flex: 1, minWidth: '160px' }}>
+                            <option value="">Select Class...</option>
+                            {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+
+                        <div style={{ position: 'relative' }}>
+                            <Calendar size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                            <input type="date" value={histDate} onChange={e => setHistDate(e.target.value)}
+                                style={{ padding: '10px 14px 10px 36px', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', background: 'white', cursor: 'pointer', outline: 'none' }} />
+                        </div>
+
+                        {histClass && (
+                            <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
+                                <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                <input type="text" placeholder="Search student..." value={histSearch} onChange={e => setHistSearch(e.target.value)}
+                                    style={{ width: '100%', padding: '10px 14px 10px 36px', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', background: 'white', outline: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                        )}
                     </div>
+
+                    {histClass && !histLoading && histRows.length > 0 && (
+                        <>
+                            {/* Summary bar */}
+                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                                {[
+                                    { label: 'Present', count: presentCount, color: '#15803d', bg: '#dcfce7' },
+                                    { label: 'Absent', count: absentCount, color: '#dc2626', bg: '#fee2e2' },
+                                    { label: 'Late', count: lateCount, color: '#d97706', bg: '#fef3c7' },
+                                    { label: 'No Record', count: noRecordCount, color: '#64748b', bg: '#f1f5f9' },
+                                ].map(b => (
+                                    <div key={b.label} style={{ padding: '6px 16px', borderRadius: '20px', background: b.bg, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontWeight: '800', fontSize: '1rem', color: b.color }}>{b.count}</span>
+                                        <span style={{ fontSize: '0.78rem', color: b.color, fontWeight: '600' }}>{b.label}</span>
+                                    </div>
+                                ))}
+                                <div style={{ padding: '6px 16px', borderRadius: '20px', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                                    <span style={{ fontWeight: '800', fontSize: '1rem', color: 'var(--primary)' }}>{histRows.length}</span>
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--primary)', fontWeight: '600' }}>Total Students</span>
+                                </div>
+                            </div>
+
+                            {/* Table */}
+                            <div style={{ border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ background: '#f8fafc', borderBottom: '2px solid var(--border-soft)' }}>
+                                            <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Student</th>
+                                            <th style={{ padding: '12px 20px', textAlign: 'center', fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Roll #</th>
+                                            <th style={{ padding: '12px 20px', textAlign: 'right', fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                                {histDate
+                                                    ? `Status on ${new Date(histDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`
+                                                    : 'Attendance Status'}
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredHist.map((row, idx) => (
+                                            <tr key={row.id}
+                                                style={{ borderBottom: idx < filteredHist.length - 1 ? '1px solid var(--border-soft)' : 'none', transition: 'background 0.15s' }}
+                                                onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                                                onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
+                                                <td style={{ padding: '13px 20px' }}>
+                                                    <p style={{ margin: 0, fontWeight: '700', fontSize: '0.9rem' }}>{row.name}</p>
+                                                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{row.studentId}</p>
+                                                </td>
+                                                <td style={{ padding: '13px 20px', textAlign: 'center', fontWeight: '700', color: 'var(--text-muted)' }}>#{row.rollNumber}</td>
+                                                <td style={{ padding: '13px 20px', textAlign: 'right' }}>
+                                                    <StatusBadge status={row.status} />
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    )}
+
+                    {histClass && histLoading && (
+                        <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-muted)' }}>
+                            <BarChart3 size={28} style={{ opacity: 0.3, marginBottom: '10px' }} />
+                            <p>Loading attendance data...</p>
+                        </div>
+                    )}
+
+                    {!histClass && (
+                        <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-muted)', background: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)' }}>
+                            <BarChart3 size={32} style={{ opacity: 0.2, marginBottom: '12px' }} />
+                            <p style={{ fontWeight: '600' }}>Select a class above to view the attendance roster</p>
+                            <p style={{ fontSize: '0.85rem' }}>Each student is shown — including those with no record for the selected date</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ── SELF CHECK-IN ─────────────────────────────────────────────────── */}
+            {tab === 'self' && (
+                <div className="card">
+                    <h3><UserCheck size={20} color="var(--success)" /> Faculty Daily Validation</h3>
+                    <div style={{ padding: '24px', background: 'var(--success-soft)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 800, color: 'var(--success)', marginBottom: '8px' }}>Today's Date</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)' }}>
+                            {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </div>
+                    </div>
+                    <div style={{ marginTop: '32px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
+                        <button onClick={() => handleSelfAttendance('PRESENT')} className="btn-primary" style={{ height: '100px', flexDirection: 'column', gap: '8px', background: 'var(--success)', boxShadow: '0 8px 16px rgba(16,185,129,0.2)' }}>
+                            <CheckCircle2 size={32} /> <span>Mark Present</span>
+                        </button>
+                        <button onClick={() => handleSelfAttendance('LATE')} className="btn-primary" style={{ height: '100px', flexDirection: 'column', gap: '8px', background: 'var(--accent)', boxShadow: '0 8px 16px rgba(245,158,11,0.2)' }}>
+                            <Clock size={32} /> <span>Mark Late</span>
+                        </button>
+                        <button onClick={() => handleSelfAttendance('ABSENT')} className="btn-primary" style={{ height: '100px', flexDirection: 'column', gap: '8px', background: 'var(--error)', boxShadow: '0 8px 16px rgba(239,68,68,0.2)' }}>
+                            <XCircle size={32} /> <span>Mark Absent</span>
+                        </button>
+                    </div>
+                    <p style={{ marginTop: '24px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        You can update your attendance for the day at any time — only one record per day is kept.
+                    </p>
                 </div>
             )}
         </div>
