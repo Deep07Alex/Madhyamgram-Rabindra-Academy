@@ -44,8 +44,8 @@ const Gallery = () => {
                         <div style={{ position: 'absolute', bottom: -2, right: -2, width: '12px', height: '12px', background: 'var(--success)', borderRadius: '50%', border: '2px solid white' }}></div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-main)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>Madhyamgram</span>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary)', letterSpacing: '0.5px' }}>Rabindra Academy</span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: '800', textTransform: 'uppercase', opacity: 0.6, color: 'var(--text-main)', lineHeight: 1 }}>Madhyamgram</span>
+                        <span style={{ fontWeight: 950, fontSize: '1.25rem', color: '#5d1717', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Rabindra Academy</span>
                     </div>
                 </div>
                 <Link to="/login" className="btn-primary" style={{
@@ -64,11 +64,11 @@ const Gallery = () => {
 
             {/* Hero Section */}
             <div style={{ padding: '80px 5% 40px', textAlign: 'center' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--primary-soft)', color: 'var(--primary)', padding: '6px 16px', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '20px' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--primary-soft)', color: 'var(--primary-bold)', padding: '6px 16px', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '20px' }}>
                     <ImageIcon size={14} /> Academic Archive
                 </div>
-                <h1 style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', fontWeight: 900, color: 'var(--text-main)', marginBottom: '16px', letterSpacing: '-2px' }}>Memory <span style={{ color: 'var(--primary)' }}>Gallery</span></h1>
-                <p style={{ maxWidth: '600px', margin: '0 auto', color: 'var(--text-muted)', fontSize: '1.1rem', lineHeight: 1.6 }}>Witness the vibrant life and excellence at Madhyamgram Rabindra Academy through our curated visual journey.</p>
+                <h1 style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', fontWeight: 900, color: 'var(--text-main)', marginBottom: '16px', letterSpacing: '-2px' }}>Memory <span style={{ color: 'var(--primary-bold)' }}>Gallery</span></h1>
+                <p style={{ maxWidth: '600px', margin: '0 auto', color: 'var(--text-muted)', fontSize: '1.1rem', lineHeight: 1.6 }}>Witness the vibrant life and excellence at MADHYAMGRAM RABINDRA ACADEMY through our curated visual journey.</p>
             </div>
 
             {/* Gallery Grid */}
@@ -107,7 +107,7 @@ const Gallery = () => {
 
                 {images.length === 0 && (
                     <div style={{ textAlign: 'center', padding: '100px 20px', background: 'rgba(255,255,255,0.5)', borderRadius: 'var(--radius-lg)', border: '2px dashed var(--border-soft)' }}>
-                        <div style={{ background: 'var(--primary-soft)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: 'var(--primary)' }}>
+                        <div style={{ background: 'var(--primary-soft)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: 'var(--primary-bold)' }}>
                             <ImageIcon size={32} />
                         </div>
                         <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>No moments captured yet.</h2>

@@ -15,7 +15,7 @@ import {
     AlertCircle
 } from 'lucide-react';
 
-type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE';
+type AttendanceStatus = 'PRESENT' | 'ABSENT';
 
 interface StudentRow {
     id: string;
@@ -44,7 +44,6 @@ interface TeacherRow {
 const STATUS_COLORS: Record<AttendanceStatus, string> = {
     PRESENT: '#22c55e',
     ABSENT: '#ef4444',
-    LATE: '#f59e0b',
 };
 
 const StatusBadge = ({ status }: { status: AttendanceStatus | null }) => {
@@ -144,7 +143,6 @@ const InlineStatusEdit = ({
                 <option value="" disabled>Select Status</option>
                 <option value="PRESENT">PRESENT</option>
                 <option value="ABSENT">ABSENT</option>
-                <option value="LATE">LATE</option>
             </select>
             <button onClick={save} style={{ background: '#22c55e', border: 'none', borderRadius: '6px', padding: '4px 6px', cursor: 'pointer', color: 'white', display: 'flex' }}>
                 <Check size={14} />
@@ -310,7 +308,7 @@ const ManageAttendance = () => {
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '28px' }}>
                 <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <ClipboardCheck size={22} color="var(--primary)" />
+                    <ClipboardCheck size={22} color="var(--primary-bold)" />
                 </div>
                 <div>
                     <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>Attendance Registry</h2>
@@ -321,7 +319,7 @@ const ManageAttendance = () => {
             {/* Summary badges */}
             <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
                 {[
-                    { label: 'Total', value: totalRows, color: 'var(--primary)' },
+                    { label: 'Total', value: totalRows, color: 'var(--primary-bold)' },
                     { label: 'Present', value: presentCount, color: '#22c55e' },
                     { label: 'No Record', value: noRecordCount, color: '#94a3b8' },
                 ].map(b => (
@@ -344,7 +342,7 @@ const ManageAttendance = () => {
                             padding: '8px 20px', borderRadius: 'calc(var(--radius-md) - 4px)',
                             border: 'none', cursor: 'pointer', fontWeight: '700', fontSize: '0.85rem',
                             background: tab === t ? 'white' : 'transparent',
-                            color: tab === t ? 'var(--primary)' : 'var(--text-muted)',
+                            color: tab === t ? 'var(--primary-bold)' : 'var(--text-muted)',
                             boxShadow: tab === t ? 'var(--shadow-sm)' : 'none',
                             display: 'flex', alignItems: 'center', gap: '6px'
                         }}>
@@ -397,7 +395,7 @@ const ManageAttendance = () => {
             </div>
 
             {/* Table */}
-            <div style={{ background: 'white', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-soft)', boxShadow: 'var(--shadow-sm)', overflow: 'hidden' }}>
+            <div style={{ background: 'white', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-soft)', boxShadow: 'var(--shadow-sm)', overflowX: 'auto' }}>
                 {loading ? (
                     <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
                         <ClipboardCheck size={32} style={{ marginBottom: '12px', opacity: 0.4 }} />
@@ -410,7 +408,7 @@ const ManageAttendance = () => {
                             <p style={{ fontWeight: '600' }}>No students found</p>
                         </div>
                     ) : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
                             <thead>
                                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid var(--border-soft)' }}>
                                     <th style={thStyle}>Student</th>
@@ -431,7 +429,7 @@ const ManageAttendance = () => {
                                         </td>
                                         <td style={{ padding: '14px 20px', fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: '600' }}>#{row.rollNumber}</td>
                                         <td style={{ padding: '14px 20px' }}>
-                                            <span style={{ padding: '3px 10px', background: 'var(--primary-soft)', color: 'var(--primary)', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '700' }}>
+                                            <span style={{ padding: '3px 10px', background: 'var(--primary-soft)', color: 'var(--primary-bold)', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '700' }}>
                                                 {row.className}
                                             </span>
                                         </td>
@@ -462,7 +460,7 @@ const ManageAttendance = () => {
                             <p style={{ fontWeight: '600' }}>No teachers found</p>
                         </div>
                     ) : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
                             <thead>
                                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid var(--border-soft)' }}>
                                     <th style={thStyle}>Teacher</th>

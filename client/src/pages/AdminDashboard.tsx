@@ -71,12 +71,15 @@ const AdminDashboard = () => {
             {/* Mobile Header */}
             <header className="mobile-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '50%', border: '2px solid white' }} />
-                    <span style={{ fontWeight: '800', fontSize: '1.1rem', letterSpacing: '-0.02em', background: 'white', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', opacity: 0.9 }}>Madhyamgram Rabindra Academy</span>
+                    <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '50%', border: '2px solid rgba(0,0,0,0.1)' }} />
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '0.6rem', fontWeight: '800', textTransform: 'uppercase', opacity: 0.8, color: '#1e293b', lineHeight: 1 }}>Madhyamgram</span>
+                        <span style={{ fontSize: '1.1rem', fontWeight: '1000', textTransform: 'uppercase', color: '#5d1717', letterSpacing: '0.02em' }}>Rabindra Academy</span>
+                    </div>
                 </div>
                 <button
                     onClick={toggleSidebar}
-                    style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: '4px' }}
+                    style={{ background: 'none', border: 'none', color: '#1e293b', cursor: 'pointer', padding: '4px' }}
                 >
                     {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
                 </button>
@@ -87,13 +90,35 @@ const AdminDashboard = () => {
 
             {/* Sidebar */}
             <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
-                <div className="sidebar-header" style={{ paddingBottom: '40px', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '24px' }}>
-                    <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '44px', height: '44px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', padding: '2px', background: 'white' }} />
+                <div className="sidebar-header" style={{ paddingBottom: '40px', borderBottom: '1px solid rgba(0,0,0,0.05)', marginBottom: '24px', position: 'relative' }}>
+                    <button
+                        className="sidebar-close-btn"
+                        onClick={closeSidebar}
+                        style={{
+                            position: 'absolute',
+                            top: '-10px',
+                            right: '0',
+                            background: 'none',
+                            border: 'none',
+                            color: '#1e293b',
+                            cursor: 'pointer',
+                            display: 'none' // Hidden by default, shown via CSS on mobile
+                        }}
+                    >
+                        <X size={24} />
+                    </button>
+                    <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '64px', height: '64px', borderRadius: '50%', border: '2px solid rgba(0,0,0,0.1)', padding: '2px', background: 'white' }} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '1.1rem', fontWeight: '900', lineHeight: 1.1, color: 'white' }}>Madhyamgram</span>
-                        <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--primary-light)', opacity: 0.8 }}>Rabindra Academy</span>
-                        <span style={{ fontSize: '0.65rem', fontWeight: '600', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '4px' }}>Administrative Portal</span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase', opacity: 0.8, color: '#1e293b', lineHeight: 1 }}>Madhyamgram</span>
+                        <span style={{ fontSize: '1.3rem', fontWeight: '1000', textTransform: 'uppercase', color: '#5d1717' }}>Rabindra Academy</span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: '600', color: '#1e293b', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '4px' }}>Administrative Portal</span>
                     </div>
+                </div>
+
+                <div className="sidebar-user-info">
+                    <span className="user-name">{user?.name}</span>
+                    <span className="user-id">ID: {user?.adminId || user?.username}</span>
+                    <span className="user-role">Super Admin</span>
                 </div>
 
                 <nav className="sidebar-nav">
@@ -124,12 +149,14 @@ const AdminDashboard = () => {
                         <p style={{ color: 'var(--text-muted)', fontWeight: '500' }}>Manage academy excellence and systems.</p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        <LiveClock />
+                        <div className="hide-on-mobile">
+                            <LiveClock />
+                        </div>
                         <button style={{ background: 'white', border: '1px solid var(--border-soft)', padding: '10px', borderRadius: '50%', cursor: 'pointer', color: 'var(--text-muted)' }}>
                             <Bell size={20} />
                         </button>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '6px 16px', borderRadius: 'var(--radius-full)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-soft)' }}>
-                            <UserCircle size={28} color="var(--primary)" />
+                        <div className="admin-info-pill hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '6px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-soft)' }}>
+                            <UserCircle size={28} color="var(--primary-bold)" />
                             <div style={{ textAlign: 'right' }}>
                                 <p style={{ fontSize: '0.85rem', fontWeight: '700', margin: 0 }}>{user?.name} <span style={{ opacity: 0.5, fontWeight: '500', marginLeft: '4px' }}>({user?.adminId || user?.username})</span></p>
                                 <p style={{ fontSize: '0.65rem', fontWeight: '600', color: 'var(--text-muted)', margin: 0, textTransform: 'uppercase' }}>Super Admin</p>
@@ -138,7 +165,7 @@ const AdminDashboard = () => {
                     </div>
                 </header>
 
-                <div className="page-view" style={{ minHeight: 'calc(100vh - 160px)' }}>
+                <div className="page-view">
                     <Routes>
                         <Route path="dashboard" element={
                             <div className="stats-grid">

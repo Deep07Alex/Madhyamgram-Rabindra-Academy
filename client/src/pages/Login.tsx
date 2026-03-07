@@ -58,7 +58,10 @@ const Login = () => {
                         </div>
                     </div>
                     <h2>Welcome Back</h2>
-                    <p>Madhyamgram Rabindra Academy</p>
+                    <div style={{ marginTop: '8px' }}>
+                        <p style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', opacity: 0.8, color: 'var(--text-main)', letterSpacing: '0.05em', margin: 0 }}>Madhyamgram</p>
+                        <p style={{ fontSize: '1.4rem', fontWeight: '1000', textTransform: 'uppercase', color: '#5d1717', margin: 0, letterSpacing: '-0.02em' }}>Rabindra Academy</p>
+                    </div>
                 </div>
 
                 <div className="login-tabs">
@@ -127,7 +130,7 @@ const Login = () => {
                         type="submit"
                         className="btn-primary login-button"
                         disabled={loading}
-                        style={{ width: '100%', height: '52px', marginTop: '32px', borderRadius: '12px', fontSize: '1rem', fontWeight: 700 }}
+                        style={{ width: '100%', height: '52px', marginTop: '32px', borderRadius: '12px', fontSize: '1rem', fontWeight: 700, color: '#1e293b' }}
                     >
                         {loading ? 'Authenticating...' : (
                             <>
@@ -138,7 +141,7 @@ const Login = () => {
                 </form>
 
                 <div className="login-footer" style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '24px' }}>
-                    <p>© {new Date().getFullYear()} Madhyamgram Rabindra Academy</p>
+                    <p>© {new Date().getFullYear()} MADHYAMGRAM RABINDRA ACADEMY</p>
                     <p style={{ fontSize: '11px', opacity: 0.6, marginTop: '4px' }}>Secured Academic Management System</p>
                 </div>
             </div>

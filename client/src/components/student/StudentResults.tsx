@@ -48,7 +48,7 @@ const StudentResults = () => {
         <div className="manage-section">
             <div className="card">
                 <h3>
-                    <Award size={20} color="var(--primary)" />
+                    <Award size={20} color="var(--primary-bold)" />
                     Academic Performance Transcript
                 </h3>
 
@@ -74,11 +74,11 @@ const StudentResults = () => {
                                     left: 0,
                                     width: '4px',
                                     height: '100%',
-                                    background: 'var(--primary)'
+                                    background: 'var(--primary-bold)'
                                 }}></div>
 
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--primary-soft)', color: 'var(--primary)', padding: '6px 16px', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase' }}>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--primary-soft)', color: 'var(--primary-bold)', padding: '6px 16px', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase' }}>
                                         <School size={14} /> {semester}
                                     </div>
                                     <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>
@@ -101,11 +101,11 @@ const StudentResults = () => {
                                                 <tr key={r.id}>
                                                     <td style={{ fontWeight: '600' }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <BookOpen size={14} color="var(--primary)" opacity={0.6} />
+                                                            <BookOpen size={14} color="var(--primary-bold)" opacity={0.6} />
                                                             {r.subject}
                                                         </div>
                                                     </td>
-                                                    <td style={{ textAlign: 'center', fontWeight: '800', color: 'var(--primary)' }}>{r.marks}</td>
+                                                    <td style={{ textAlign: 'center', fontWeight: '800', color: 'var(--primary-bold)' }}>{r.marks}</td>
                                                     <td style={{ textAlign: 'center', opacity: 0.5 }}>{r.totalMarks}</td>
                                                     <td style={{ textAlign: 'right' }}>
                                                         <span style={{
@@ -113,7 +113,7 @@ const StudentResults = () => {
                                                             borderRadius: 'var(--radius-sm)',
                                                             fontWeight: 900,
                                                             background: 'var(--primary-soft)',
-                                                            color: 'var(--primary)',
+                                                            color: 'var(--primary-bold)',
                                                             fontSize: '0.9rem',
                                                             display: 'inline-flex',
                                                             alignItems: 'center',
@@ -134,7 +134,7 @@ const StudentResults = () => {
             </div>
 
             <div style={{ marginTop: '32px', padding: '24px', background: 'rgba(255, 255, 255, 0.5)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-soft)', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}>
                     <CheckCircle2 size={24} />
                 </div>
                 <div>

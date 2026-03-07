@@ -7,7 +7,7 @@ const pool = new Pool({
 
 const createDb = async () => {
     try {
-        await pool.query(`CREATE DATABASE "Madhyamgram-Ravindra-Academy"`);
+        await pool.query(`CREATE DATABASE "Madhyamgram-Rabindra-Academy"`);
         console.log("Database created successfully");
     } catch (error: any) {
         if (error.code === '42P04') {

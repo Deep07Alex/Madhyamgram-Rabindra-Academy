@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import useServerEvents from '../../hooks/useServerEvents';
-import { Calendar, CheckCircle2, XCircle, Clock, BarChart3, List } from 'lucide-react';
+import { Calendar, CheckCircle2, XCircle, BarChart3, List } from 'lucide-react';
 
 const StudentAttendance = () => {
     const [attendance, setAttendance] = useState([]);
@@ -33,7 +33,7 @@ const StudentAttendance = () => {
                             <h3>{totalDays}</h3>
                             <p>Academic Days</p>
                         </div>
-                        <Calendar size={24} color="var(--primary)" opacity={0.5} />
+                        <Calendar size={24} color="var(--primary-bold)" opacity={0.5} />
                     </div>
                 </div>
                 <div className="stat-card" style={{ borderLeftColor: 'var(--success)' }}>
@@ -58,7 +58,7 @@ const StudentAttendance = () => {
 
             <div className="card">
                 <h3>
-                    <List size={20} color="var(--primary)" />
+                    <List size={20} color="var(--primary-bold)" />
                     Detailed Attendance History
                 </h3>
                 <div className="table-responsive">
@@ -85,11 +85,10 @@ const StudentAttendance = () => {
                                     </td>
                                     <td style={{ textAlign: 'center' }}>
                                         <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                            <span className={`badge ${record.status.toLowerCase()}`} style={{ minWidth: '100px', justifyContent: 'center', gap: '6px' }}>
-                                                {record.status === 'PRESENT' && <CheckCircle2 size={12} />}
+                                            <span className={`badge ${(record.status || 'PRESENT').toLowerCase()}`} style={{ minWidth: '100px', justifyContent: 'center', gap: '6px' }}>
+                                                {(record.status === 'PRESENT' || !record.status) && <CheckCircle2 size={12} />}
                                                 {record.status === 'ABSENT' && <XCircle size={12} />}
-                                                {record.status === 'LATE' && <Clock size={12} />}
-                                                {record.status}
+                                                {record.status || 'PRESENT'}
                                             </span>
                                         </div>
                                     </td>

@@ -48,7 +48,7 @@ const StudentFees = () => {
                             <h3 style={{ fontSize: '1.75rem', fontWeight: 900 }}>{fees.length}</h3>
                             <p style={{ fontWeight: 700, opacity: 0.7 }}>Historical Invoices</p>
                         </div>
-                        <ReceiptText size={24} color="var(--primary)" opacity={0.6} />
+                        <ReceiptText size={24} color="var(--primary-bold)" opacity={0.6} />
                     </div>
                 </div>
                 <div className="stat-card" style={{ borderLeft: '4px solid var(--success)' }}>
@@ -64,7 +64,7 @@ const StudentFees = () => {
 
             <div className="card">
                 <h3>
-                    <IndianRupee size={20} color="var(--primary)" />
+                    <IndianRupee size={20} color="var(--primary-bold)" />
                     Financial Ledger & Fee Details
                 </h3>
                 <div className="table-responsive">

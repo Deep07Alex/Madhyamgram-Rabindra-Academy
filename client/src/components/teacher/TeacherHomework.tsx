@@ -122,7 +122,7 @@ const TeacherHomework = () => {
         <div className="manage-section">
             <div className="card">
                 <h3>
-                    <BookPlus size={20} color="var(--primary)" />
+                    <BookPlus size={20} color="var(--primary-bold)" />
                     Establish New Academic Assignment
                 </h3>
                 <form onSubmit={handleCreateHomework} className="form-grid">
@@ -148,7 +148,7 @@ const TeacherHomework = () => {
                         <div style={{ position: 'relative' }}>
                             <Type size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)' }} />
                             <textarea
-                                placeholder="e.g. what is 2 + 2 ?"
+                                placeholder="e.g. Solve the first 10 problems of Chapter 3"
                                 value={newHomework.title}
                                 onChange={e => setNewHomework({ ...newHomework, title: e.target.value })}
                                 required
@@ -236,7 +236,7 @@ const TeacherHomework = () => {
 
             <div className="card" style={{ marginTop: '32px' }}>
                 <h3>
-                    <LayoutList size={20} color="var(--primary)" />
+                    <LayoutList size={20} color="var(--primary-bold)" />
                     Active Assignment Repository
                 </h3>
                 <div className="table-responsive">
@@ -253,7 +253,7 @@ const TeacherHomework = () => {
                         <tbody>
                             {homeworkList.map((hw: any) => (
                                 <tr key={hw.id}>
-                                    <td><span className="badge" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>{hw.class?.name}</span></td>
+                                    <td><span className="badge" style={{ background: 'var(--primary-soft)', color: 'var(--primary-bold)' }}>{hw.class?.name}</span></td>
                                     <td style={{ fontWeight: '500' }}>{hw.subject}</td>
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -261,7 +261,7 @@ const TeacherHomework = () => {
                                             {hw.fileUrl && (
                                                 <a href={`http://localhost:5000${hw.fileUrl}`} target="_blank" rel="noreferrer"
                                                     title="View attached file"
-                                                    style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center' }}>
+                                                    style={{ color: 'var(--primary-bold)', display: 'flex', alignItems: 'center' }}>
                                                     <Paperclip size={13} />
                                                 </a>
                                             )}
@@ -287,7 +287,7 @@ const TeacherHomework = () => {
 
             <div className="card" style={{ marginTop: '32px' }}>
                 <h3>
-                    <GraduationCap size={20} color="var(--primary)" />
+                    <GraduationCap size={20} color="var(--primary-bold)" />
                     Student Submission Review
                 </h3>
                 <div className="form-group" style={{ marginBottom: '24px', maxWidth: '400px' }}>
@@ -315,7 +315,7 @@ const TeacherHomework = () => {
                                         {/* Header row only */}
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.9rem', color: 'var(--primary)' }}>
+                                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.9rem', color: 'var(--primary-bold)' }}>
                                                     {s.student?.name?.charAt(0) || '?'}
                                                 </div>
                                                 <div>

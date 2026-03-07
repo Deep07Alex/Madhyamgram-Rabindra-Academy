@@ -118,7 +118,7 @@ const ManageUsers = () => {
                         alignItems: 'center',
                         gap: '8px',
                         background: tab === 'students' ? 'white' : 'transparent',
-                        color: tab === 'students' ? 'var(--primary)' : 'var(--text-muted)',
+                        color: tab === 'students' ? 'var(--primary-bold)' : 'var(--text-muted)',
                         boxShadow: tab === 'students' ? 'var(--shadow-sm)' : 'none',
                         transition: 'var(--transition-fast)'
                     }}
@@ -138,7 +138,7 @@ const ManageUsers = () => {
                         alignItems: 'center',
                         gap: '8px',
                         background: tab === 'teachers' ? 'white' : 'transparent',
-                        color: tab === 'teachers' ? 'var(--primary)' : 'var(--text-muted)',
+                        color: tab === 'teachers' ? 'var(--primary-bold)' : 'var(--text-muted)',
                         boxShadow: tab === 'teachers' ? 'var(--shadow-sm)' : 'none',
                         transition: 'var(--transition-fast)'
                     }}
@@ -149,7 +149,7 @@ const ManageUsers = () => {
 
             <div className="card" style={{ marginTop: '0' }}>
                 <h3>
-                    <UserPlus size={20} color="var(--primary)" />
+                    <UserPlus size={20} color="var(--primary-bold)" />
                     Enroll New {tab === 'students' ? 'Student' : 'Faculty'}
                 </h3>
                 <form onSubmit={handleCreateUser} className="form-grid">
@@ -199,7 +199,7 @@ const ManageUsers = () => {
 
             <div className="card" style={{ marginTop: '32px' }}>
                 <h3>
-                    <List size={20} color="var(--primary)" />
+                    <List size={20} color="var(--primary-bold)" />
                     Registered {tab === 'students' ? 'Students' : 'Faculty'}
                 </h3>
                 <div className="table-responsive">

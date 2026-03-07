@@ -34,14 +34,14 @@ const LiveClock = () => {
             animation: 'slideInRight 0.5s ease-out'
         }}>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Clock size={18} color="var(--primary)" />
+                <Clock size={18} color="var(--primary-bold)" />
                 {/* Subtle pulse ring */}
                 <span style={{
                     position: 'absolute',
                     width: '100%',
                     height: '100%',
                     borderRadius: '50%',
-                    border: '2px solid var(--primary)',
+                    border: '2px solid var(--primary-bold)',
                     animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                     opacity: 0.2
                 }}></span>
@@ -68,7 +68,7 @@ const LiveClock = () => {
                 <span style={{
                     fontSize: '0.75rem',
                     fontWeight: '800',
-                    color: 'var(--primary)',
+                    color: 'var(--primary-bold)',
                     marginLeft: '2px'
                 }}>
                     {ampm}

@@ -54,7 +54,7 @@ const ManageResults = () => {
         <div className="manage-section">
             <div className="card">
                 <h3>
-                    <FilePlus size={20} color="var(--primary)" />
+                    <FilePlus size={20} color="var(--primary-bold)" />
                     Update Academic Performance
                 </h3>
                 <form onSubmit={handleCreateResult} className="form-grid">
@@ -108,7 +108,7 @@ const ManageResults = () => {
 
             <div className="card" style={{ marginTop: '32px' }}>
                 <h3>
-                    <List size={20} color="var(--primary)" />
+                    <List size={20} color="var(--primary-bold)" />
                     Examination Ledger
                 </h3>
                 <div className="table-responsive">

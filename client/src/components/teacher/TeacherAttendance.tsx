@@ -8,7 +8,6 @@ import {
     UserCheck,
     Calendar,
     BookOpen,
-    Clock,
     ClipboardCheck,
     AlertCircle,
     CheckCircle2,
@@ -17,12 +16,11 @@ import {
     BarChart3
 } from 'lucide-react';
 
-type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE';
+type AttendanceStatus = 'PRESENT' | 'ABSENT';
 
 const STATUS_COLORS: Record<AttendanceStatus, { bg: string; text: string; border: string }> = {
     PRESENT: { bg: '#dcfce7', text: '#15803d', border: '#86efac' },
     ABSENT: { bg: '#fee2e2', text: '#dc2626', border: '#fca5a5' },
-    LATE: { bg: '#fef3c7', text: '#d97706', border: '#fcd34d' },
 };
 
 const StatusBadge = ({ status }: { status: AttendanceStatus | null }) => {
@@ -41,19 +39,20 @@ const StatusBadge = ({ status }: { status: AttendanceStatus | null }) => {
 
 // ── Inline status toggle buttons ──────────────────────────────────────────────
 const StatusToggle = ({ studentId, selected, onChange }: { studentId: string; selected: string; onChange: (id: string, status: string) => void }) => (
-    <div className="status-toggle-group" style={{ display: 'inline-flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '4px', background: '#f8fafc', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-soft)' }}>
-        {(['PRESENT', 'ABSENT', 'LATE'] as const).map(s => {
+    <div className="status-toggle-group" style={{ display: 'inline-flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '8px' }}>
+        {(['PRESENT', 'ABSENT'] as const).map(s => {
             const isSel = selected === s;
             const c = STATUS_COLORS[s];
             return (
                 <button key={s} onClick={() => onChange(studentId, s)}
                     className="status-btn"
                     style={{
-                        padding: '6px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700',
-                        border: isSel ? `1px solid ${c.border}` : '1px solid transparent',
-                        background: isSel ? c.bg : 'transparent',
+                        padding: '6px 14px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '800',
+                        border: isSel ? `1px solid ${c.border}` : '1px solid var(--border-soft)',
+                        background: isSel ? c.bg : 'white',
                         color: isSel ? c.text : 'var(--text-muted)',
-                        transition: 'all 0.2s', cursor: 'pointer'
+                        transition: 'all 0.2s', cursor: 'pointer',
+                        boxShadow: isSel ? 'var(--shadow-sm)' : 'none'
                     }}>
                     {s.charAt(0) + s.slice(1).toLowerCase()}
                 </button>
@@ -103,10 +102,15 @@ const TeacherAttendance = () => {
 
                 setStudents(stuRes.data);
 
-                // Prefill existing attendance status
+                // Prefill existing attendance status, default to PRESENT if none
                 const init: Record<string, string> = {};
+                const attMap: Record<string, string> = {};
                 attRes.data.forEach((a: any) => {
-                    init[a.studentId] = a.status;
+                    attMap[a.studentId] = a.status;
+                });
+
+                stuRes.data.forEach((s: any) => {
+                    init[s.id] = attMap[s.id] || 'PRESENT';
                 });
 
                 setAttendanceData(init);
@@ -142,7 +146,7 @@ const TeacherAttendance = () => {
                     studentId: s.studentId,
                     rollNumber: s.rollNumber,
                     attendanceId: att?.id || null,
-                    status: att?.status || null,
+                    status: att?.status || 'PRESENT',
                 };
             }));
         } catch {
@@ -160,17 +164,22 @@ const TeacherAttendance = () => {
 
     const handleStatusChange = async (studentId: string, status: string) => {
         setAttendanceData(prev => ({ ...prev, [studentId]: status }));
+
         try {
             await api.post('/attendance/student', {
-                date: markDate, status, studentId,
-                classId: markClass, subject: markSubject
+                date: markDate,
+                status: status,
+                studentId,
+                classId: markClass,
+                subject: markSubject
             });
-            showToast(`Attendance marked as ${status.charAt(0) + status.slice(1).toLowerCase()}`, 'success');
+            showToast(`Status updated to ${status.charAt(0) + status.slice(1).toLowerCase()}`, 'success');
             if (histClass === markClass && histDate === markDate) fetchHistory();
         } catch {
-            showToast('Failed to save attendance. Please try again.', 'error');
+            showToast('Failed to update attendance.', 'error');
         }
     };
+
 
     const handleSelfAttendance = async (status: string) => {
         try {
@@ -192,7 +201,6 @@ const TeacherAttendance = () => {
     );
     const presentCount = filteredHist.filter(r => r.status === 'PRESENT').length;
     const absentCount = filteredHist.filter(r => r.status === 'ABSENT').length;
-    const lateCount = filteredHist.filter(r => r.status === 'LATE').length;
     const noRecordCount = filteredHist.filter(r => !r.status).length;
 
     const tabBtn = (t: typeof tab, label: string, Icon: any) => (
@@ -201,7 +209,7 @@ const TeacherAttendance = () => {
             border: 'none', cursor: 'pointer', fontWeight: '700', fontSize: '0.85rem',
             display: 'flex', alignItems: 'center', gap: '7px',
             background: tab === t ? 'white' : 'transparent',
-            color: tab === t ? 'var(--primary)' : 'var(--text-muted)',
+            color: tab === t ? 'var(--primary-bold)' : 'var(--text-muted)',
             boxShadow: tab === t ? 'var(--shadow-sm)' : 'none',
             transition: 'var(--transition-fast)',
         }}>
@@ -221,7 +229,7 @@ const TeacherAttendance = () => {
             {/* ── MARK ATTENDANCE ──────────────────────────────────────────────── */}
             {tab === 'mark' && (
                 <div className="card">
-                    <h3><ClipboardCheck size={20} color="var(--primary)" /> Mark Class Attendance</h3>
+                    <h3><ClipboardCheck size={20} color="var(--primary-bold)" /> Mark Class Attendance</h3>
                     <div className="form-grid">
                         <div className="form-group">
                             <label>Date</label>
@@ -253,7 +261,7 @@ const TeacherAttendance = () => {
                         <div style={{ marginTop: '32px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                                 <h4 style={{ margin: 0, fontWeight: '800' }}>Student Register</h4>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: '700', padding: '4px 12px', background: 'var(--primary-soft)', borderRadius: '20px' }}>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--primary-bold)', fontWeight: '700', padding: '4px 12px', background: 'var(--primary-soft)', borderRadius: '20px' }}>
                                     {students.length} Students
                                 </span>
                             </div>
@@ -302,7 +310,7 @@ const TeacherAttendance = () => {
             {/* ── HISTORY / ROSTER VIEW ─────────────────────────────────────────── */}
             {tab === 'history' && (
                 <div className="card">
-                    <h3><BarChart3 size={20} color="var(--primary)" /> Class Attendance Roster</h3>
+                    <h3><BarChart3 size={20} color="var(--primary-bold)" /> Class Attendance Roster</h3>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', margin: '0 0 20px' }}>
                         Select a class and date to see the full attendance picture for every student.
                     </p>
@@ -337,7 +345,6 @@ const TeacherAttendance = () => {
                                 {[
                                     { label: 'Present', count: presentCount, color: '#15803d', bg: '#dcfce7' },
                                     { label: 'Absent', count: absentCount, color: '#dc2626', bg: '#fee2e2' },
-                                    { label: 'Late', count: lateCount, color: '#d97706', bg: '#fef3c7' },
                                     { label: 'No Record', count: noRecordCount, color: '#64748b', bg: '#f1f5f9' },
                                 ].map(b => (
                                     <div key={b.label} style={{ padding: '6px 16px', borderRadius: '20px', background: b.bg, display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -346,8 +353,8 @@ const TeacherAttendance = () => {
                                     </div>
                                 ))}
                                 <div style={{ padding: '6px 16px', borderRadius: '20px', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
-                                    <span style={{ fontWeight: '800', fontSize: '1rem', color: 'var(--primary)' }}>{histRows.length}</span>
-                                    <span style={{ fontSize: '0.78rem', color: 'var(--primary)', fontWeight: '600' }}>Total Students</span>
+                                    <span style={{ fontWeight: '800', fontSize: '1rem', color: 'var(--primary-bold)' }}>{histRows.length}</span>
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--primary-bold)', fontWeight: '600' }}>Total Students</span>
                                 </div>
                             </div>
 
@@ -377,7 +384,7 @@ const TeacherAttendance = () => {
                                                 </td>
                                                 <td style={{ padding: '13px 20px', textAlign: 'center', fontWeight: '700', color: 'var(--text-muted)' }}>#{row.rollNumber}</td>
                                                 <td style={{ padding: '13px 20px', textAlign: 'right' }}>
-                                                    <StatusBadge status={row.status} />
+                                                    <StatusBadge status={row.status || 'PRESENT'} />
                                                 </td>
                                             </tr>
                                         ))}
@@ -417,9 +424,6 @@ const TeacherAttendance = () => {
                     <div style={{ marginTop: '32px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
                         <button onClick={() => handleSelfAttendance('PRESENT')} className="btn-primary" style={{ height: '100px', flexDirection: 'column', gap: '8px', background: 'var(--success)', boxShadow: '0 8px 16px rgba(16,185,129,0.2)' }}>
                             <CheckCircle2 size={32} /> <span>Mark Present</span>
-                        </button>
-                        <button onClick={() => handleSelfAttendance('LATE')} className="btn-primary" style={{ height: '100px', flexDirection: 'column', gap: '8px', background: 'var(--accent)', boxShadow: '0 8px 16px rgba(245,158,11,0.2)' }}>
-                            <Clock size={32} /> <span>Mark Late</span>
                         </button>
                         <button onClick={() => handleSelfAttendance('ABSENT')} className="btn-primary" style={{ height: '100px', flexDirection: 'column', gap: '8px', background: 'var(--error)', boxShadow: '0 8px 16px rgba(239,68,68,0.2)' }}>
                             <XCircle size={32} /> <span>Mark Absent</span>

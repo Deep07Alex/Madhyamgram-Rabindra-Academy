@@ -73,7 +73,7 @@ const ManageFees = () => {
         <div className="manage-section">
             <div className="card">
                 <h3>
-                    <PlusCircle size={20} color="var(--primary)" />
+                    <PlusCircle size={20} color="var(--primary-bold)" />
                     Generate Academic Fee Requirement
                 </h3>
                 <form onSubmit={handleCreateFee} className="form-grid">
@@ -114,7 +114,7 @@ const ManageFees = () => {
 
             <div className="card" style={{ marginTop: '32px' }}>
                 <h3>
-                    <CreditCard size={20} color="var(--primary)" />
+                    <CreditCard size={20} color="var(--primary-bold)" />
                     Process Manual Collection
                 </h3>
                 <form onSubmit={handleRecordPayment} className="form-grid">

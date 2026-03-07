@@ -152,7 +152,7 @@ export const updateStudentAttendance = async (req: AuthRequest, res: Response) =
     const { id } = req.params;
     const { status } = req.body;
 
-    if (!['PRESENT', 'ABSENT', 'LATE'].includes(status)) {
+    if (!['PRESENT', 'ABSENT'].includes(status)) {
         return res.status(400).json({ message: 'Invalid status value' });
     }
 
@@ -175,7 +175,7 @@ export const updateTeacherAttendance = async (req: AuthRequest, res: Response) =
     const { id } = req.params;
     const { status } = req.body;
 
-    if (!['PRESENT', 'ABSENT', 'LATE'].includes(status)) {
+    if (!['PRESENT', 'ABSENT'].includes(status)) {
         return res.status(400).json({ message: 'Invalid status value' });
     }
 

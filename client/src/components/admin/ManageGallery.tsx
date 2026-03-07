@@ -62,7 +62,7 @@ const ManageGallery = () => {
         <div className="manage-section">
             <div className="card">
                 <h3>
-                    <FilePlus size={20} color="var(--primary)" />
+                    <FilePlus size={20} color="var(--primary-bold)" />
                     Upload Academic Artifact
                 </h3>
                 <form onSubmit={handleUpload} className="form-grid">
@@ -94,7 +94,7 @@ const ManageGallery = () => {
                                 background: 'white',
                                 color: file ? 'var(--text-main)' : 'var(--text-muted)'
                             }}>
-                                <Upload size={18} color="var(--primary)" />
+                                <Upload size={18} color="var(--primary-bold)" />
                                 <span style={{ fontSize: '0.85rem' }}>{file ? file.name : 'Select JPG, PNG or WebP'}</span>
                             </div>
                         </div>
@@ -110,7 +110,7 @@ const ManageGallery = () => {
 
             <div className="card" style={{ marginTop: '32px' }}>
                 <h3>
-                    <List size={20} color="var(--primary)" />
+                    <List size={20} color="var(--primary-bold)" />
                     Active Gallery Assets
                 </h3>
                 <div className="table-responsive">

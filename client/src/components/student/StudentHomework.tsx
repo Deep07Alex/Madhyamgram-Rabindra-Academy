@@ -76,7 +76,7 @@ const StudentHomework = () => {
         <div className="manage-section">
             <div className="card">
                 <h3>
-                    <BookOpen size={20} color="var(--primary)" />
+                    <BookOpen size={20} color="var(--primary-bold)" />
                     Academic Tasks & Assignments
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', marginTop: '24px' }}>
@@ -100,7 +100,7 @@ const StudentHomework = () => {
                             }} className="assignment-card">
                                 <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                                        <span className="badge" style={{ background: 'var(--primary-soft)', color: 'var(--primary)', fontWeight: 800, fontSize: '0.7rem' }}>
+                                        <span className="badge" style={{ background: 'var(--primary-soft)', color: 'var(--primary-bold)', fontWeight: 800, fontSize: '0.7rem' }}>
                                             {hw.subject || 'Core Study'}
                                         </span>
                                         {hasSubmitted ? (
@@ -127,7 +127,7 @@ const StudentHomework = () => {
                                 <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid var(--border-soft)' }}>
                                     {hw.fileUrl ? (
                                         <a href={`http://localhost:5000${hw.fileUrl}`} target="_blank" rel="noreferrer" style={{
-                                            fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700,
+                                            fontSize: '0.75rem', color: 'var(--primary-bold)', fontWeight: 700,
                                             textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px'
                                         }}>
                                             <Paperclip size={14} /> Teacher's Resource
@@ -188,7 +188,7 @@ const StudentHomework = () => {
                             <XCircle size={24} />
                         </button>
 
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--primary-soft)', color: 'var(--primary)', padding: '6px 16px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '16px' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--primary-soft)', color: 'var(--primary-bold)', padding: '6px 16px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '16px' }}>
                             <Upload size={14} /> submission Gateway
                         </div>
                         <h3 style={{ marginBottom: '8px' }}>{selectedAssignment.title}</h3>
@@ -197,7 +197,7 @@ const StudentHomework = () => {
                                 background: '#f8fafc', border: '1px solid var(--border-soft)',
                                 borderRadius: 'var(--radius-md)', padding: '12px 16px', marginBottom: '20px'
                             }}>
-                                <p style={{ margin: '0 0 4px', fontSize: '0.72rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--primary)' }}>
+                                <p style={{ margin: '0 0 4px', fontSize: '0.72rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--primary-bold)' }}>
                                     Teacher's Instructions
                                 </p>
                                 <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-main)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
