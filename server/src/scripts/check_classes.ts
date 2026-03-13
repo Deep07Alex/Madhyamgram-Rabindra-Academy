@@ -13,15 +13,14 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
 
-async function check() {
+async function checkDb() {
     try {
-        const res = await pool.query('SELECT * FROM "Class"');
-        console.log(JSON.stringify(res.rows, null, 2));
-        await pool.end();
+        const res = await pool.query('SELECT name, grade, id FROM "Class" ORDER BY grade');
+        console.log(res.rows);
     } catch (e) {
         console.error(e);
-        process.exit(1);
+    } finally {
+        await pool.end();
     }
 }
-
-check();
+checkDb();

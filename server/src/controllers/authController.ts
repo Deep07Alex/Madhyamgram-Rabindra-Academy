@@ -120,6 +120,16 @@ export const register = async (req: Request, res: Response) => {
                 [newUserId, hashedPassword, password, name, safeEmail, uniqueId]
             );
         } else if (role === 'STUDENT') {
+            // Check if roll number already exists for this class
+            const duplicateCheck = await db.query(
+                `SELECT id FROM "Student" WHERE "rollNumber" = $1 AND "classId" = $2 LIMIT 1`,
+                [rollNumber, classId]
+            );
+
+            if (duplicateCheck.rows.length > 0) {
+                return res.status(400).json({ message: 'Roll number already exists in this class' });
+            }
+
             let uniqueId = '';
             let isUnique = false;
             while (!isUnique) {

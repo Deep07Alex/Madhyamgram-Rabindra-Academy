@@ -60,9 +60,10 @@ const ManageUsers = () => {
             await api.post(endpoint, payload);
             setNewUser({ password: '', name: '', email: '', rollNumber: '', classId: '' });
             fetchData();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to create user:', error);
-            showToast('Failed to create user. Please check the details.', 'error');
+            const errorMessage = error.response?.data?.message || 'Failed to create user. Please check the details.';
+            showToast(errorMessage, 'error');
         }
     };
 

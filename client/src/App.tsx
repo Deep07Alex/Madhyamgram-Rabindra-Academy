@@ -5,6 +5,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import Gallery from './pages/Gallery';
+import MainPage from './pages/MainPage';
 import { ToastProvider } from './context/ToastContext';
 
 const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) => {
@@ -58,7 +59,7 @@ function App() {
           />
 
           <Route path="/gallery" element={<Gallery />} />
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<MainPage />} />
         </Routes>
       </Router>
     </ToastProvider>

@@ -59,7 +59,7 @@ const AdminDashboard = () => {
     const navItems = [
         { path: '/admin/dashboard', icon: <LayoutDashboard size={20} />, label: 'Overview' },
         { path: '/admin/users', icon: <Users size={20} />, label: 'Manage Users' },
-        { path: '/admin/classes', icon: <BookOpen size={20} />, label: 'Manage Classes' },
+        { path: '/admin/classes', icon: <BookOpen size={20} />, label: 'See Classes' },
         { path: '/admin/attendance', icon: <ClipboardCheck size={20} />, label: 'Attendance' },
         { path: '/admin/fees', icon: <CreditCard size={20} />, label: 'Fee Records' },
         { path: '/admin/results', icon: <FileText size={20} />, label: 'Results' },
