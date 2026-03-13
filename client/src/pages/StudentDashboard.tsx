@@ -6,6 +6,7 @@ import StudentAttendance from '../components/student/StudentAttendance';
 import StudentFees from '../components/student/StudentFees';
 import StudentHomework from '../components/student/StudentHomework';
 import StudentResults from '../components/student/StudentResults';
+import NoticeBoard from '../components/common/NoticeBoard';
 import LiveClock from '../components/common/LiveClock';
 import {
     LayoutDashboard,
@@ -16,7 +17,7 @@ import {
     LogOut,
     Menu,
     X,
-    Bell,
+    BellRing,
     UserCircle
 } from 'lucide-react';
 
@@ -70,6 +71,7 @@ const StudentDashboard = () => {
         { path: '/student/fees', icon: <Wallet size={20} />, label: 'Fee Portal' },
         { path: '/student/homework', icon: <BookOpenCheck size={20} />, label: 'Class Tasks' },
         { path: '/student/results', icon: <GraduationCap size={20} />, label: 'My Academic Record' },
+        { path: '/student/notices', icon: <BellRing size={20} />, label: 'Notices' },
     ];
 
     return (
@@ -155,8 +157,11 @@ const StudentDashboard = () => {
                         <div className="hide-on-mobile">
                             <LiveClock />
                         </div>
-                        <button style={{ background: 'white', border: '1px solid var(--border-soft)', padding: '10px', borderRadius: '50%', cursor: 'pointer', color: 'var(--text-muted)' }}>
-                            <Bell size={20} />
+                        <button 
+                            onClick={() => navigate('/student/notices')}
+                            style={{ background: 'white', border: '1px solid var(--border-soft)', padding: '10px', borderRadius: '50%', cursor: 'pointer', color: 'var(--primary-bold)' }}
+                        >
+                            <BellRing size={20} />
                         </button>
                         <div className="student-info-pill hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '6px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-soft)' }}>
                             <UserCircle size={28} color="var(--primary-bold)" />
@@ -240,6 +245,7 @@ const StudentDashboard = () => {
                         <Route path="fees" element={<StudentFees />} />
                         <Route path="homework" element={<StudentHomework />} />
                         <Route path="results" element={<StudentResults />} />
+                        <Route path="notices" element={<NoticeBoard />} />
                         <Route path="/" element={<Navigate to="/student/dashboard" />} />
                     </Routes>
                 </div>

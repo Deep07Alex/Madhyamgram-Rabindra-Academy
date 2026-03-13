@@ -12,6 +12,7 @@ import feeRoutes from './routes/feeRoutes.js';
 import resultRoutes from './routes/resultRoutes.js';
 import galleryRoutes from './routes/galleryRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
+import noticeRoutes from './routes/noticeRoutes.js';
 import { db } from './lib/db.js';
 import { initDb } from './lib/initDb.js';
 
@@ -42,6 +43,7 @@ app.use('/api/fees', feeRoutes);
 app.use('/api/results', resultRoutes);
 app.use('/api/gallery', galleryRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/notices', noticeRoutes);
 
 // --- Server-Sent Events (SSE) endpoint ---
 import { addClient, removeClient } from './lib/sseManager.js';

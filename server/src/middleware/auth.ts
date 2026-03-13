@@ -26,6 +26,25 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
     }
 };
 
+export const optionalAuthenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+        return next();
+    }
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET) as { id: string; role: string };
+        req.user = decoded;
+        next();
+    } catch (error) {
+        // Even if token is invalid, we proceed, but without req.user populated.
+        // Or we could return 401. Typically if a token is provided but invalid, 401 is better.
+        // But for safe fallback, let's just not set req.user.
+        return next();
+    }
+};
+
 export const authorize = (roles: string[]) => {
     return (req: AuthRequest, res: Response, next: NextFunction) => {
         if (!req.user || !roles.includes(req.user.role)) {

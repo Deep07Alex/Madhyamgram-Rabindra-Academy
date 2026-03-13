@@ -8,6 +8,7 @@ import ManageFees from '../components/admin/ManageFees';
 import ManageResults from '../components/admin/ManageResults';
 import ManageGallery from '../components/admin/ManageGallery';
 import ManageAttendance from '../components/admin/ManageAttendance';
+import ManageNotices from '../components/admin/ManageNotices';
 import LiveClock from '../components/common/LiveClock';
 import {
     LayoutDashboard,
@@ -17,10 +18,10 @@ import {
     FileText,
     Image as ImageIcon,
     ClipboardCheck,
+    BellRing,
     LogOut,
     Menu,
     X,
-    Bell,
     UserCircle
 } from 'lucide-react';
 
@@ -63,6 +64,7 @@ const AdminDashboard = () => {
         { path: '/admin/attendance', icon: <ClipboardCheck size={20} />, label: 'Attendance' },
         { path: '/admin/fees', icon: <CreditCard size={20} />, label: 'Fee Records' },
         { path: '/admin/results', icon: <FileText size={20} />, label: 'Results' },
+        { path: '/admin/notices', icon: <BellRing size={20} />, label: 'Notices' },
         { path: '/admin/gallery', icon: <ImageIcon size={20} />, label: 'Manage Gallery' },
     ];
 
@@ -152,8 +154,11 @@ const AdminDashboard = () => {
                         <div className="hide-on-mobile">
                             <LiveClock />
                         </div>
-                        <button style={{ background: 'white', border: '1px solid var(--border-soft)', padding: '10px', borderRadius: '50%', cursor: 'pointer', color: 'var(--text-muted)' }}>
-                            <Bell size={20} />
+                        <button 
+                            onClick={() => navigate('/admin/notices')}
+                            style={{ background: 'white', border: '1px solid var(--border-soft)', padding: '10px', borderRadius: '50%', cursor: 'pointer', color: 'var(--primary-bold)' }}
+                        >
+                            <BellRing size={20} />
                         </button>
                         <div className="admin-info-pill hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '6px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-soft)' }}>
                             <UserCircle size={28} color="var(--primary-bold)" />
@@ -196,6 +201,7 @@ const AdminDashboard = () => {
                         <Route path="attendance" element={<ManageAttendance />} />
                         <Route path="fees" element={<ManageFees />} />
                         <Route path="results" element={<ManageResults />} />
+                        <Route path="notices" element={<ManageNotices />} />
                         <Route path="gallery" element={<ManageGallery />} />
                         <Route path="/" element={<Navigate to="/admin/dashboard" />} />
                     </Routes>

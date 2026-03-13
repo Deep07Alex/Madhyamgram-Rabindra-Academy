@@ -156,6 +156,18 @@ export const initDb = async () => {
                 "description" TEXT,
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+
+            -- Notice Table
+            CREATE TABLE IF NOT EXISTS "Notice" (
+                "id" TEXT PRIMARY KEY,
+                "title" TEXT NOT NULL,
+                "content" TEXT NOT NULL,
+                "type" TEXT NOT NULL CHECK ("type" IN ('PUBLIC', 'INTERNAL')),
+                "targetAudience" TEXT DEFAULT 'ALL' CHECK ("targetAudience" IN ('ALL', 'TEACHER', 'STUDENT')),
+                "targetClassId" TEXT REFERENCES "Class"("id") ON DELETE CASCADE,
+                "targetStudentId" TEXT REFERENCES "Student"("id") ON DELETE CASCADE,
+                "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
         `);
 
         console.log('Database tables verified/initialized successfully.');

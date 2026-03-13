@@ -1,17 +1,41 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./MainPage.css";
 // Adjusting path from App.tsx (../photos) to pages/MainPage.tsx (../../photos)
 type GalleryItem = { src: string; caption: string };
 
 function MainPage() {
   const [navOpen, setNavOpen] = useState(false);
+  const [notices, setNotices] = useState<string[]>([]);
 
-  const notices = [
-    "📢 Annual Sports Day – 25 March",
-    "📢 Saraswati Puja Celebration",
-    "📢 Admission Open For 2026",
-    "📢 Parent Teacher Meeting – Sunday",
-  ];
+  useEffect(() => {
+    // Fetch public notices from API
+    fetch('http://localhost:5000/api/notices')
+        .then(res => res.json())
+        .then(data => {
+            if (Array.isArray(data) && data.length > 0) {
+                // If API returns notices, format them
+                setNotices(data.map((n: any) => `📢 ${n.title} - ${n.content}`));
+            } else {
+                // Fallback to static if none exist
+                setNotices([
+                    "📢 Annual Sports Day – 25 March",
+                    "📢 Saraswati Puja Celebration",
+                    "📢 Admission Open For 2026",
+                    "📢 Parent Teacher Meeting – Sunday",
+                ]);
+            }
+        })
+        .catch(err => {
+            console.error('Failed to fetch notices:', err);
+            // Fallback
+            setNotices([
+                "📢 Annual Sports Day – 25 March",
+                "📢 Saraswati Puja Celebration",
+                "📢 Admission Open For 2026",
+                "📢 Parent Teacher Meeting – Sunday",
+            ]);
+        });
+  }, []);
 
   const galleryItems: GalleryItem[] = [
     {
@@ -98,7 +122,7 @@ function AdmissionSection() {
     <section id="admission" className="landing-section admission">
       <h2>Admission Form</h2>
       <p>Click the button below to download the admission application form.</p>
-      <a href="/admission-form.pdf" download className="download-btn">
+      <a href="/form 2025.pdf" download className="download-btn">
         Download PDF
       </a>
     </section>
