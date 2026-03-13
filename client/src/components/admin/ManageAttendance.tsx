@@ -39,6 +39,7 @@ interface TeacherRow {
     status: AttendanceStatus | null;
     date: string | null;
     reason: string | null;
+    designation?: string;
 }
 
 const STATUS_COLORS: Record<AttendanceStatus, string> = {
@@ -218,7 +219,7 @@ const thStyle: React.CSSProperties = {
 
 const ManageAttendance = () => {
     const { showToast } = useToast();
-    const [tab, setTab] = useState<'students' | 'teachers'>('students');
+    const [tab, setTab] = useState<'students' | 'teachers' | 'staff'>('students');
     const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
     const [loading, setLoading] = useState(false);
 
@@ -311,6 +312,7 @@ const ManageAttendance = () => {
                     status: att?.status || 'PRESENT',
                     date: att?.date || null,
                     reason: att?.reason || null,
+                    designation: t.designation
                 };
             });
 
@@ -380,7 +382,7 @@ const ManageAttendance = () => {
 
                 setMonthlyDataMap(matrix);
                 setTeacherRows(teachRes.data.map((t: any) => ({
-                    id: t.id, name: t.name, teacherId: t.teacherId, attendanceId: null, status: null, date: null, reason: null
+                    id: t.id, name: t.name, teacherId: t.teacherId, attendanceId: null, status: null, date: null, reason: null, designation: t.designation
                 })));
             }
         } catch {
@@ -421,11 +423,16 @@ const ManageAttendance = () => {
         return matchClass && matchSearch;
     });
 
-    const filteredTeachers = teacherRows.filter(r =>
-        !search ||
-        r.name.toLowerCase().includes(search.toLowerCase()) ||
-        r.teacherId.toLowerCase().includes(search.toLowerCase())
-    );
+    const filteredTeachers = teacherRows.filter(r => {
+        const isStaffCategory = ['NON-TEACHING STAFF', 'KARATE TEACHER', 'DANCE TEACHER'].includes(r.designation || '');
+        
+        if (tab === 'teachers' && isStaffCategory) return false;
+        if (tab === 'staff' && !isStaffCategory) return false;
+
+        return !search ||
+            r.name.toLowerCase().includes(search.toLowerCase()) ||
+            r.teacherId.toLowerCase().includes(search.toLowerCase());
+    });
 
     const totalRows = tab === 'students' ? filteredStudents.length : filteredTeachers.length;
     const presentCount = tab === 'students'
@@ -475,7 +482,7 @@ const ManageAttendance = () => {
             {/* Tabs & View Mode */}
             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '24px' }}>
                 <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-main)', padding: '6px', borderRadius: 'var(--radius-md)' }}>
-                    {(['students', 'teachers'] as const).map(t => (
+                    {(['students', 'teachers', 'staff'] as const).map(t => (
                         <button key={t} onClick={() => { setTab(t); setSearch(''); setSelectedClass(''); }}
                             style={{
                                 padding: '8px 20px', borderRadius: 'calc(var(--radius-md) - 4px)',
@@ -486,7 +493,7 @@ const ManageAttendance = () => {
                                 display: 'flex', alignItems: 'center', gap: '6px'
                             }}>
                             {t === 'students' ? <Users size={15} /> : <UserCheck size={15} />}
-                            {t === 'students' ? 'Students' : 'Teachers'}
+                            {t === 'students' ? 'Students' : t === 'teachers' ? 'Teachers' : 'Staff'}
                         </button>
                     ))}
                 </div>
@@ -661,8 +668,12 @@ const ManageAttendance = () => {
                                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-main)')}
                                         onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-card)')}>
                                         <td style={{ padding: '14px 20px' }}>
-                                            <p style={{ margin: 0, fontWeight: '700', fontSize: '0.9rem', color: 'var(--text-main)' }}>{row.name}</p>
-                                            <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{row.teacherId}</p>
+                                            <p style={{ margin: 0, fontWeight: '700', fontSize: '0.9rem', color: 'var(--text-main)' }}>
+                                                {row.name} <span style={{ fontSize: '0.75rem', color: 'var(--primary-bold)', opacity: 0.8 }}>({row.designation})</span>
+                                            </p>
+                                            {tab === 'teachers' && (
+                                                <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{row.teacherId}</p>
+                                            )}
                                         </td>
                                         <td style={{ padding: '14px 20px' }}>
                                             {viewMode === 'daily' ? (

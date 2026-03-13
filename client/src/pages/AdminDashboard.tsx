@@ -56,7 +56,7 @@ const AdminDashboard = () => {
 
     const handleLogout = () => {
         logout();
-        navigate('/login');
+        navigate('/');
     };
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);

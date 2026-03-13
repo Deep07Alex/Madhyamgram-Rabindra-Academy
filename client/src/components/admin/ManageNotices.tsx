@@ -1,5 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Users as UsersIcon, GraduationCap } from 'lucide-react';
+import { 
+    Plus, 
+    Trash2, 
+    Users as UsersIcon, 
+    GraduationCap, 
+    Megaphone, 
+    X, 
+    Send, 
+    Globe, 
+    Lock,
+    Calendar,
+    Target,
+    User
+} from 'lucide-react';
 import api from '../../services/api';
 
 interface Notice {
@@ -31,7 +44,6 @@ const ManageNotices = () => {
     const [loading, setLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
     
-    // Form state
     const [formData, setFormData] = useState({
         title: '',
         content: '',
@@ -42,39 +54,24 @@ const ManageNotices = () => {
     });
 
     useEffect(() => {
-        fetchNotices();
-        fetchClasses();
-        fetchStudents();
+        const loadInitialData = async () => {
+            try {
+                const [noticesRes, classesRes, studentsRes] = await Promise.all([
+                    api.get('/notices'),
+                    api.get('/dashboard/classes'),
+                    api.get('/dashboard/users?role=student')
+                ]);
+                setNotices(noticesRes.data);
+                setClasses(classesRes.data);
+                setStudents(studentsRes.data);
+            } catch (error) {
+                console.error('Failed to fetch initial data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadInitialData();
     }, []);
-
-    const fetchNotices = async () => {
-        try {
-            const res = await api.get('/notices');
-            setNotices(res.data);
-        } catch (error) {
-            console.error('Failed to fetch notices:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchClasses = async () => {
-        try {
-            const res = await api.get('/dashboard/classes');
-            setClasses(res.data);
-        } catch (error) {
-            console.error('Failed to fetch classes:', error);
-        }
-    };
-
-    const fetchStudents = async () => {
-        try {
-            const res = await api.get('/dashboard/users?role=student');
-            setStudents(res.data);
-        } catch (error) {
-            console.error('Failed to fetch students:', error);
-        }
-    };
 
     const handleDelete = async (id: string) => {
         if (!confirm('Are you sure you want to delete this notice?')) return;
@@ -83,7 +80,6 @@ const ManageNotices = () => {
             setNotices(notices.filter(n => n.id !== id));
         } catch (error) {
             console.error('Failed to delete notice:', error);
-            alert('Failed to delete notice.');
         }
     };
 
@@ -114,67 +110,134 @@ const ManageNotices = () => {
             });
         } catch (error) {
             console.error('Failed to create notice:', error);
-            alert('Failed to create notice.');
         }
     };
 
-    // Filter students if a class is selected
     const filteredStudents = formData.targetClassId 
         ? students.filter(s => s.classId === formData.targetClassId)
         : students;
 
-    if (loading) return <div className="loading-state">Loading notices...</div>;
+    if (loading) {
+        return (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px' }}>
+                <div style={{ textAlign: 'center' }}>
+                    <Megaphone size={40} className="animate-pulse" style={{ color: 'var(--primary-bold)', opacity: 0.5 }} />
+                    <p style={{ marginTop: '16px', color: 'var(--text-muted)', fontWeight: '600' }}>Loading announcements...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="component-container fade-in">
-            <div className="component-header">
-                <h3>Notice Board Management</h3>
-                <button className="primary-btn" onClick={() => setIsFormOpen(!isFormOpen)}>
-                    <Plus size={18} /> {isFormOpen ? 'Cancel' : 'New Notice'}
-                </button>
+        <div className="manage-section fade-in">
+            {/* Header Section */}
+            <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: '40px',
+                background: 'var(--bg-card)',
+                padding: '24px',
+                borderRadius: 'var(--radius-lg)',
+                boxShadow: 'var(--shadow-sm)',
+                border: '1px solid var(--border-soft)'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ 
+                        width: '48px', 
+                        height: '48px', 
+                        borderRadius: '12px', 
+                        background: 'var(--primary-soft)', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center' 
+                    }}>
+                        <Megaphone size={24} color="var(--primary-bold)" />
+                    </div>
+                    <div>
+                        <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '800', fontFamily: 'Outfit' }}>Notice Board</h2>
+                        <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>Broadcast announcements to your academy community</p>
+                    </div>
+                </div>
+                {!isFormOpen && (
+                    <button 
+                        className="btn-primary" 
+                        onClick={() => setIsFormOpen(true)}
+                        style={{ padding: '12px 24px', gap: '10px' }}
+                    >
+                        <Plus size={18} /> New Announcement
+                    </button>
+                )}
             </div>
 
+            {/* Creation Form Section */}
             {isFormOpen && (
-                <div className="form-card mb-4">
-                    <h4>Create New Notice</h4>
-                    <form onSubmit={handleSubmit} className="standard-form">
-                        <div className="form-group">
+                <div className="card" style={{ 
+                    animation: 'fadeIn 0.3s ease-out',
+                    background: 'var(--glass-bg)',
+                    backdropFilter: 'var(--glass-blur)',
+                    border: '1px solid var(--glass-border)',
+                    boxShadow: 'var(--shadow-premium)',
+                    position: 'relative',
+                    overflow: 'hidden'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+                        <h3 style={{ margin: 0 }}>Create New Announcement</h3>
+                        <button 
+                            onClick={() => setIsFormOpen(false)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="form-grid">
+                        <div className="form-group" style={{ gridColumn: 'span 2' }}>
                             <label>Notice Title</label>
                             <input 
                                 type="text" 
                                 required 
                                 value={formData.title}
                                 onChange={e => setFormData({...formData, title: e.target.value})}
-                                placeholder="E.g., Holiday Announcement"
+                                placeholder="E.g., Special Holiday Announcement"
                             />
                         </div>
 
-                        <div className="form-group">
-                            <label>Notice Content</label>
+                        <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                            <label>Announcement Details</label>
                             <textarea 
                                 required 
                                 rows={4}
                                 value={formData.content}
                                 onChange={e => setFormData({...formData, content: e.target.value})}
-                                placeholder="Write the notice details here..."
+                                placeholder="Provide the detailed content of the notice..."
+                                style={{ minHeight: '120px' }}
                             />
                         </div>
 
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label>Notice Type</label>
+                        <div className="form-group">
+                            <label>Visibility Type</label>
+                            <div style={{ position: 'relative' }}>
                                 <select 
                                     value={formData.type}
                                     onChange={e => setFormData({...formData, type: e.target.value as 'PUBLIC' | 'INTERNAL'})}
+                                    style={{ paddingLeft: '40px' }}
                                 >
                                     <option value="PUBLIC">Public (Landing Page)</option>
                                     <option value="INTERNAL">Internal (Dashboard Only)</option>
                                 </select>
+                                {formData.type === 'PUBLIC' ? (
+                                    <Globe size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-bold)' }} />
+                                ) : (
+                                    <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-bold)' }} />
+                                )}
                             </div>
+                        </div>
 
-                            {formData.type === 'INTERNAL' && (
-                                <div className="form-group">
-                                    <label>Target Audience</label>
+                        {formData.type === 'INTERNAL' && (
+                            <div className="form-group">
+                                <label>Target Audience</label>
+                                <div style={{ position: 'relative' }}>
                                     <select 
                                         value={formData.targetAudience}
                                         onChange={e => setFormData({
@@ -183,19 +246,21 @@ const ManageNotices = () => {
                                             targetClassId: '',
                                             targetStudentId: ''
                                         })}
+                                        style={{ paddingLeft: '40px' }}
                                     >
-                                        <option value="ALL">All Staff & Students</option>
-                                        <option value="TEACHER">All Teachers</option>
+                                        <option value="ALL">Everyone</option>
+                                        <option value="TEACHER">Teaching Staff</option>
                                         <option value="STUDENT">Students</option>
                                     </select>
+                                    <Target size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-bold)' }} />
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
 
                         {formData.type === 'INTERNAL' && formData.targetAudience === 'STUDENT' && (
-                            <div className="form-row mt-2">
+                            <>
                                 <div className="form-group">
-                                    <label>Specific Class (Optional)</label>
+                                    <label>Filter by Class (Optional)</label>
                                     <select 
                                         value={formData.targetClassId}
                                         onChange={e => setFormData({...formData, targetClassId: e.target.value, targetStudentId: ''})}
@@ -207,86 +272,142 @@ const ManageNotices = () => {
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label>Specific Student (Optional)</label>
+                                    <label>Individual Student (Optional)</label>
                                     <select 
                                         value={formData.targetStudentId}
                                         onChange={e => setFormData({...formData, targetStudentId: e.target.value})}
-                                        disabled={!formData.targetClassId} // Often helpful to filter by class first, but not strictly required
+                                        disabled={!formData.targetClassId}
                                     >
-                                        <option value="">All Students in selection</option>
+                                        <option value="">All Students in Class</option>
                                         {filteredStudents.map(s => (
                                             <option key={s.id} value={s.id}>{s.name}</option>
                                         ))}
                                     </select>
-                                    {!formData.targetClassId && <small style={{color:'var(--text-muted)'}}>Select a class first to pick a student</small>}
                                 </div>
-                            </div>
+                            </>
                         )}
 
-                        <div className="form-actions mt-4">
-                            <button type="button" className="secondary-btn" onClick={() => setIsFormOpen(false)}>Cancel</button>
-                            <button type="submit" className="primary-btn">Publish Notice</button>
+                        <div style={{ gridColumn: 'span 2', display: 'flex', gap: '16px', marginTop: '16px', justifyContent: 'flex-end' }}>
+                            <button 
+                                type="button" 
+                                className="btn-danger" 
+                                style={{ background: 'var(--bg-main)', border: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}
+                                onClick={() => setIsFormOpen(false)}
+                            >
+                                <X size={16} /> Discard Draft
+                            </button>
+                            <button type="submit" className="btn-primary" style={{ minWidth: '180px' }}>
+                                <Send size={16} /> Broadcast Notice
+                            </button>
                         </div>
                     </form>
                 </div>
             )}
 
-            <div className="data-table-container">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Title / Type</th>
-                            <th>Target</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {notices.length === 0 ? (
+            {/* Notices Table Section */}
+            <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
+                <div style={{ padding: '24px 32px', borderBottom: '1px solid var(--border-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Archived Announcements</h3>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <span className="badge" style={{ background: 'var(--bg-main)', color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                            {notices.length} Total
+                        </span>
+                    </div>
+                </div>
+
+                <div className="table-responsive">
+                    <table className="data-table">
+                        <thead>
                             <tr>
-                                <td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>No notices found.</td>
+                                <th style={{ paddingLeft: '32px' }}>Broadcast Date</th>
+                                <th>Subject & Access</th>
+                                <th>Destination</th>
+                                <th style={{ textAlign: 'right', paddingRight: '32px' }}>Actions</th>
                             </tr>
-                        ) : (
-                            notices.map(notice => (
-                                <tr key={notice.id}>
-                                    <td>{new Date(notice.createdAt).toLocaleDateString('en-IN')}</td>
-                                    <td>
-                                        <div style={{fontWeight: 600}}>{notice.title}</div>
-                                        <div style={{fontSize: '0.8rem', color: notice.type==='PUBLIC' ? 'var(--primary)' : 'var(--accent)'}}>
-                                            {notice.type}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem'}}>
-                                            {notice.targetAudience === 'ALL' && <UsersIcon size={14}/>}
-                                            {notice.targetAudience === 'TEACHER' && <GraduationCap size={14}/>}
-                                            {notice.targetAudience === 'STUDENT' && <UsersIcon size={14}/>}
-                                            
-                                            {notice.targetAudience === 'ALL' && 'Everyone'}
-                                            {notice.targetAudience === 'TEACHER' && 'Teachers Only'}
-                                            {notice.targetAudience === 'STUDENT' && (
-                                                <span>
-                                                    Students 
-                                                    {notice.targetClassId && ` > ${classes.find(c => c.id === notice.targetClassId)?.name || 'Class'}`}
-                                                    {notice.targetStudentId && ` > Spec. Student`}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <button 
-                                            className="action-btn text-danger" 
-                                            onClick={() => handleDelete(notice.id)}
-                                            title="Delete Notice"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                        </thead>
+                        <tbody>
+                            {notices.length === 0 ? (
+                                <tr>
+                                    <td colSpan={4} style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
+                                        <Megaphone size={40} style={{ opacity: 0.2, marginBottom: '16px' }} />
+                                        <p style={{ fontWeight: 600 }}>No announcements found in the database.</p>
                                     </td>
                                 </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                            ) : (
+                                notices.map((notice, idx) => (
+                                    <tr key={notice.id} style={{ animation: `fadeIn 0.4s ease-out ${idx * 0.05}s` }}>
+                                        <td style={{ paddingLeft: '32px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                                                <Calendar size={14} />
+                                                {new Date(notice.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style={{ fontWeight: '700', fontSize: '1rem', color: 'var(--text-main)', marginBottom: '4px' }}>{notice.title}</div>
+                                            <span style={{ 
+                                                display: 'inline-flex', 
+                                                alignItems: 'center', 
+                                                gap: '6px', 
+                                                fontSize: '0.7rem', 
+                                                fontWeight: '700',
+                                                padding: '2px 8px',
+                                                borderRadius: '20px',
+                                                background: notice.type === 'PUBLIC' ? 'var(--primary-soft)' : '#fef3c7',
+                                                color: notice.type === 'PUBLIC' ? 'var(--primary-bold)' : '#b45309'
+                                            }}>
+                                                {notice.type === 'PUBLIC' ? <Globe size={10} /> : <Lock size={10} />}
+                                                {notice.type === 'PUBLIC' ? 'PUBLIC DOMAIN' : 'INTERNAL NETWORK'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <div style={{ 
+                                                    width: '32px', 
+                                                    height: '32px', 
+                                                    borderRadius: '8px', 
+                                                    background: 'var(--bg-main)', 
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    justifyContent: 'center',
+                                                    color: 'var(--primary-bold)'
+                                                }}>
+                                                    {notice.targetAudience === 'ALL' && <UsersIcon size={16}/>}
+                                                    {notice.targetAudience === 'TEACHER' && <GraduationCap size={16}/>}
+                                                    {notice.targetAudience === 'STUDENT' && <User size={16}/>}
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>
+                                                        {notice.targetAudience === 'ALL' && 'Academy-wide'}
+                                                        {notice.targetAudience === 'TEACHER' && 'Faculty Members'}
+                                                        {notice.targetAudience === 'STUDENT' && 'Students Portfolio'}
+                                                    </div>
+                                                    {notice.targetAudience === 'STUDENT' && (
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                            {notice.targetClassId 
+                                                                ? `${classes.find(c => c.id === notice.targetClassId)?.name || 'Class'}` 
+                                                                : 'All Classes'}
+                                                            {notice.targetStudentId && ` • Individual Alert`}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td style={{ textAlign: 'right', paddingRight: '32px' }}>
+                                            <button 
+                                                className="btn-danger btn-sm" 
+                                                onClick={() => handleDelete(notice.id)}
+                                                style={{ padding: '8px', borderRadius: '8px' }}
+                                                title="Remove Announcement"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

@@ -34,11 +34,16 @@ export const login = async (req: Request, res: Response) => {
                 if (teacherRes.rows.length > 0) userData = teacherRes.rows[0];
             }
         } else if (role === 'TEACHER') {
-            const teacherRes = await db.query(
-                `SELECT * FROM "Teacher" WHERE "teacherId" = $1 LIMIT 1`,
-                [loginId]
-            );
-            if (teacherRes.rows.length > 0) userData = teacherRes.rows[0];
+                const teacherRes = await db.query(
+                    `SELECT * FROM "Teacher" WHERE "teacherId" = $1 LIMIT 1`,
+                    [loginId]
+                );
+                if (teacherRes.rows.length > 0) {
+                    userData = teacherRes.rows[0];
+                    if (userData.isTeaching === false) {
+                        return res.status(403).json({ message: 'Login access is disabled for this account type' });
+                    }
+                }
         } else if (role === 'STUDENT') {
             let studentLoginId = loginId;
             // Add S- prefix logic for student loginId
@@ -132,41 +137,45 @@ export const register = async (req: Request, res: Response) => {
             let uniqueId = teacherId;
             let hashedPassword = null;
             
-            // Only require ID and Password if it's teaching staff
-            if (isTeaching !== false) {
-                if (['PRINCIPAL', 'HEAD MISTRESS'].includes(designation) && phone) {
-                    uniqueId = `A-${phone}`;
-                }
+            // Ensure ID and Password for all staff (Teaching or Non-Teaching)
+            // to satisfy DB constraints. The isTeaching flag will control login access.
+            if (['PRINCIPAL', 'HEAD MISTRESS'].includes(designation) && phone && !aadhar) {
+                uniqueId = `A-${phone}`;
+            } else if (aadhar && aadhar.length >= 8) {
+                const prefix = ['PRINCIPAL', 'HEAD MISTRESS'].includes(designation) ? 'A-' : 'T-';
+                uniqueId = `${prefix}${aadhar.slice(-8)}`;
+            }
 
-                if (!uniqueId) {
-                    let isUnique = false;
-                    const prefix = ['PRINCIPAL', 'HEAD MISTRESS'].includes(designation) ? 'A-' : 'T-';
-                    while (!isUnique) {
-                        uniqueId = prefix + generate8DigitId();
-                        const existingRes = await db.query(`SELECT id FROM "Teacher" WHERE "teacherId" = $1`, [uniqueId]);
-                        if (existingRes.rows.length === 0) isUnique = true;
-                    }
-                } else if (['PRINCIPAL', 'HEAD MISTRESS'].includes(designation) && !uniqueId.toUpperCase().startsWith('A-')) {
-                    uniqueId = `A-${uniqueId}`;
-                } else if (!['PRINCIPAL', 'HEAD MISTRESS'].includes(designation) && !uniqueId.toUpperCase().startsWith('T-')) {
-                    uniqueId = `T-${uniqueId}`;
+            if (!uniqueId) {
+                let isUnique = false;
+                const prefix = (['PRINCIPAL', 'HEAD MISTRESS'].includes(designation)) ? 'A-' : 'T-';
+                while (!isUnique) {
+                    uniqueId = prefix + generate8DigitId();
+                    const existingRes = await db.query(`SELECT id FROM "Teacher" WHERE "teacherId" = $1`, [uniqueId]);
+                    if (existingRes.rows.length === 0) isUnique = true;
                 }
-                if (password) {
-                    hashedPassword = await bcrypt.hash(password, 10);
-                } else {
-                    // Auto-generate password if empty for teaching staff
-                    const cleanName = name.trim().toLowerCase().replace(/\s+/g, '');
-                    const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-                    const numericId = uniqueId.replace(/\D/g, '');
-                    const finalPassword = `${capitalizedName}@${numericId}`;
-                    hashedPassword = await bcrypt.hash(finalPassword, 10);
-                }
+            } else if (['PRINCIPAL', 'HEAD MISTRESS'].includes(designation) && !uniqueId.toUpperCase().startsWith('A-')) {
+                uniqueId = `A-${uniqueId}`;
+            } else if (!uniqueId.toUpperCase().startsWith('T-') && !uniqueId.toUpperCase().startsWith('A-')) {
+                uniqueId = `T-${uniqueId}`;
+            }
+
+            if (password) {
+                hashedPassword = await bcrypt.hash(password, 10);
+            } else {
+                // Auto-generate password if empty
+                const cleanName = name.trim().toLowerCase().replace(/\s+/g, '');
+                const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+                const suffixDigits = (aadhar && aadhar.length >= 4) ? aadhar.slice(-4) : uniqueId.replace(/\D/g, '').slice(-4);
+                const finalPassword = `${capitalizedName}@${suffixDigits || '0000'}`;
+                hashedPassword = await bcrypt.hash(finalPassword, 10);
+                req.body.password = finalPassword; // Update request body for DB insert
             }
 
             await db.query(
                 `INSERT INTO "Teacher" (id, password, "plainPassword", name, email, "teacherId", phone, aadhar, designation, "joiningDate", "isTeaching") 
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-                [newUserId, hashedPassword, password, name, safeEmail, uniqueId, phone, aadhar, designation, joiningDate, isTeaching ?? true]
+                [newUserId, hashedPassword, req.body.password || password, name, safeEmail, uniqueId, phone, aadhar, designation, joiningDate, isTeaching ?? true]
             );
         } else if (role === 'STUDENT') {
             const { studentId: manualStudentId, banglarSikkhaId } = req.body;

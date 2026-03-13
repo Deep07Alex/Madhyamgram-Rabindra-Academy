@@ -15,11 +15,11 @@ const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, a
   const token = localStorage.getItem('token');
 
   if (!token || !user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   if (!allowedRoles.includes(user.role)) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return children;

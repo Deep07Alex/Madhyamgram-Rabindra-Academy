@@ -11,7 +11,6 @@ const ManageTeachers = () => {
     const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null);
     const [editData, setEditData] = useState<any>({});
 
-    const generate8DigitId = () => Math.floor(10000000 + Math.random() * 90000000).toString();
 
     const [newUser, setNewUser] = useState({
         name: '', email: '', teacherId: '', password: '',
@@ -110,22 +109,29 @@ const ManageTeachers = () => {
                         <select value={newUser.designation} onChange={e => {
                             const val = e.target.value;
                             const isAdminRole = ['PRINCIPAL', 'HEAD MISTRESS'].includes(val);
-                            const isTeacherRole = ['A. TEACHER', 'KARATE TEACHER', 'DANCE TEACHER'].includes(val);
+                            const isCoreTeacher = val === 'A. TEACHER';
                             const isNonTeaching = val === 'NON-TEACHING STAFF';
 
-                            let newTeacherId = newUser.teacherId;
-                            if (isTeacherRole) {
-                                newTeacherId = `T-${generate8DigitId()}`;
-                            } else if (isAdminRole) {
-                                newTeacherId = newUser.phone ? `A-${newUser.phone}` : '';
-                            } else if (isNonTeaching) {
-                                newTeacherId = '';
+                            // Logic: Admin and Core Teachers get login access by default. 
+                            // Specialist and Non-Teaching do NOT.
+                            const shouldHaveLogin = isAdminRole || isCoreTeacher;
+
+                            let newTeacherId = '';
+                            
+                            // Only preserve or update ID if we have enough info
+                            if (isAdminRole && newUser.phone) {
+                                newTeacherId = `A-${newUser.phone}`;
+                            } else if (!isAdminRole && newUser.aadhar && newUser.aadhar.length >= 8) {
+                                const prefix = isNonTeaching ? '' : 'T-';
+                                if (prefix) {
+                                    newTeacherId = `${prefix}${newUser.aadhar.slice(-8)}`;
+                                }
                             }
 
                             setNewUser({
                                 ...newUser,
                                 designation: val,
-                                isTeaching: !isNonTeaching,
+                                isTeaching: shouldHaveLogin,
                                 teacherId: newTeacherId
                             });
                         }} required>
@@ -156,20 +162,41 @@ const ManageTeachers = () => {
                     </div>
                     <div className="form-group">
                         <label>Aadhar Number</label>
-                        <input type="text" placeholder="12-digit Aadhar" value={newUser.aadhar} onChange={e => setNewUser({ ...newUser, aadhar: e.target.value })} />
+                        <input 
+                            type="text" 
+                            placeholder="12-digit Aadhar" 
+                            value={newUser.aadhar} 
+                            onChange={e => {
+                                const aadhar = e.target.value;
+                                const isAdminRole = ['PRINCIPAL', 'HEAD MISTRESS'].includes(newUser.designation);
+                                const isNonTeaching = newUser.designation === 'NON-TEACHING STAFF';
+                                let teacherId = '';
+                                
+                                if (aadhar.length >= 8 && !isNonTeaching) {
+                                    const prefix = isAdminRole ? 'A-' : 'T-';
+                                    teacherId = `${prefix}${aadhar.slice(-8)}`;
+                                }
+                                
+                                setNewUser({ 
+                                    ...newUser, 
+                                    aadhar: aadhar,
+                                    teacherId: teacherId
+                                });
+                            }} 
+                        />
                     </div>
                     <div className="form-group">
                         <label>Date of Joining</label>
                         <input type="date" value={newUser.joiningDate} onChange={e => setNewUser({ ...newUser, joiningDate: e.target.value })} />
                     </div>
-                    {!['PRINCIPAL', 'HEAD MISTRESS'].includes(newUser.designation) && (
+                    {!['NON-TEACHING STAFF', 'KARATE TEACHER', 'DANCE TEACHER'].includes(newUser.designation) && (
                         <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '10px' }}>
                             <input type="checkbox" id="isTeaching" checked={newUser.isTeaching} onChange={e => setNewUser({ ...newUser, isTeaching: e.target.checked })} />
                             <label htmlFor="isTeaching" style={{ margin: 0 }}>Teaching Staff (Login Access)</label>
                         </div>
                     )}
 
-                    {newUser.isTeaching && (
+                    {newUser.isTeaching && !['NON-TEACHING STAFF', 'KARATE TEACHER', 'DANCE TEACHER'].includes(newUser.designation) && (
                         <>
                             <div className="form-group">
                                 <label>{['PRINCIPAL', 'HEAD MISTRESS'].includes(newUser.designation) ? 'Admin ID (Login ID)' : 'Teacher ID (Login ID)'}</label>
@@ -243,7 +270,9 @@ const ManageTeachers = () => {
                                         {editingTeacherId === user.id ? (
                                             <input type="text" value={editData.name || user.name} onChange={e => setEditData({ ...editData, name: e.target.value })} style={{ padding: '4px', width: '120px' }} />
                                         ) : (
-                                            <div style={{ fontWeight: '600', color: 'var(--text-main)' }}>{user.name}</div>
+                                            <div style={{ fontWeight: '600', color: 'var(--text-main)' }}>
+                                                {user.name} <span style={{ fontSize: '0.8rem', color: 'var(--primary-bold)', opacity: 0.8 }}>({user.designation})</span>
+                                            </div>
                                         )}
                                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user.email}</div>
                                     </td>
