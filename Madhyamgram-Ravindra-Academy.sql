@@ -20,7 +20,6 @@ CREATE TABLE IF NOT EXISTS "Admin" (
     "adminId" TEXT UNIQUE NOT NULL,
     "username" TEXT UNIQUE,
     "password" TEXT NOT NULL,
-    "plainPassword" TEXT,
     "name" TEXT NOT NULL,
     "email" TEXT UNIQUE,
     "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -37,7 +36,6 @@ CREATE TABLE IF NOT EXISTS "Teacher" (
     "id" TEXT PRIMARY KEY,
     "teacherId" TEXT UNIQUE NOT NULL,
     "password" TEXT NOT NULL,
-    "plainPassword" TEXT,
     "name" TEXT NOT NULL,
     "email" TEXT UNIQUE,
     "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -52,6 +50,7 @@ CREATE TABLE IF NOT EXISTS "Student" (
     "name" TEXT NOT NULL,
     "email" TEXT UNIQUE,
     "rollNumber" TEXT NOT NULL,
+    "banglarSikkhaId" TEXT,
     "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -59,7 +58,7 @@ CREATE TABLE IF NOT EXISTS "Student" (
 
 CREATE TABLE IF NOT EXISTS "Attendance" (
     "id" TEXT PRIMARY KEY,
-    "date" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "date" DATE DEFAULT CURRENT_DATE NOT NULL,
     "status" "AttendanceStatus" NOT NULL,
     "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE,
@@ -69,8 +68,9 @@ CREATE TABLE IF NOT EXISTS "Attendance" (
 
 CREATE TABLE IF NOT EXISTS "TeacherAttendance" (
     "id" TEXT PRIMARY KEY,
-    "date" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "date" DATE DEFAULT CURRENT_DATE NOT NULL,
     "status" "AttendanceStatus" NOT NULL,
+    "reason" TEXT,
     "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -128,6 +128,17 @@ CREATE TABLE IF NOT EXISTS "Gallery" (
     "createdAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS "Notice" (
+    "id" TEXT PRIMARY KEY,
+    "title" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "type" TEXT NOT NULL CHECK ("type" IN ('PUBLIC', 'INTERNAL')),
+    "targetAudience" TEXT DEFAULT 'ALL' CHECK ("targetAudience" IN ('ALL', 'TEACHER', 'STUDENT')),
+    "targetClassId" TEXT REFERENCES "Class"("id") ON DELETE CASCADE,
+    "targetStudentId" TEXT REFERENCES "Student"("id") ON DELETE CASCADE,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS "_ClassToTeacher" (
     "A" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     "B" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -136,6 +147,8 @@ CREATE TABLE IF NOT EXISTS "_ClassToTeacher" (
 -- 3. Create Indexes (Safe Check)
 CREATE UNIQUE INDEX IF NOT EXISTS "_ClassToTeacher_AB_unique" ON "_ClassToTeacher"("A", "B");
 CREATE INDEX IF NOT EXISTS "_ClassToTeacher_B_index" ON "_ClassToTeacher"("B");
+CREATE UNIQUE INDEX IF NOT EXISTS "Attendance_student_date_unique" ON "Attendance"("studentId", "date");
+CREATE UNIQUE INDEX IF NOT EXISTS "TeacherAttendance_teacher_date_unique" ON "TeacherAttendance"("teacherId", "date");
 
 -- 4. Initial Seed Data (Safe Injection)
 INSERT INTO "Admin" (id, "adminId", username, password, name, email, "createdAt", "updatedAt") 
@@ -143,11 +156,12 @@ VALUES ('28bf7bb7-9fe1-45a5-9352-eec9bdf00d24', '8100474669', 'aritrada420', '$2
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO "Class" (id, name, grade) VALUES 
-('class-1', 'Class 1', 1),
-('class-2', 'Class 2', 2),
-('class-3', 'Class 3', 3),
-('class-4', 'Class 4', 4),
-('class-5', 'Class 5', 5),
-('class-6', 'Class 6', 6),
-('class-7', 'Class 7', 7)
-ON CONFLICT (id) DO NOTHING;
+('class-nursery', 'Nursery', 0),
+('class-kg1', 'KG-I', 1),
+('class-kg2-a', 'KG-II A', 2),
+('class-kg2-b', 'KG-II B', 3),
+('class-1', 'STD-I', 4),
+('class-2', 'STD-II', 5),
+('class-3', 'STD-III', 6),
+('class-4', 'STD-IV', 7)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, grade = EXCLUDED.grade;

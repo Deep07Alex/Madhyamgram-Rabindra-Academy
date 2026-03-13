@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import "./MainPage.css";
+import ThemeToggle from "../components/common/ThemeToggle";
 // Adjusting path from App.tsx (../photos) to pages/MainPage.tsx (../../photos)
 type GalleryItem = { src: string; caption: string };
 
@@ -92,6 +93,9 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
         <a href="#notice">Notice</a>
         <a href="#gallery">Gallery</a>
         <a href="#contact">Contact</a>
+        <div style={{ marginLeft: '12px', display: 'flex', alignItems: 'center' }}>
+          <ThemeToggle />
+        </div>
         <a href="/login" className="login-btn">Login</a>
       </div>
     </nav>

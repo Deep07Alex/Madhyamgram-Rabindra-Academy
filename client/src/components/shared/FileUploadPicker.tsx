@@ -42,7 +42,7 @@ const getFileBg = (file: File) => {
     if (t.includes('word')) return '#eff6ff';
     if (t.includes('excel') || t.includes('spreadsheet')) return '#f0fdf4';
     if (t.includes('powerpoint') || t.includes('presentation')) return '#fff7ed';
-    return '#f8fafc';
+    return 'var(--bg-main)';
 };
 
 const formatBytes = (bytes: number) => {
@@ -107,7 +107,7 @@ const FileUploadPicker = ({ file, onChange, label = 'Attach File (Optional)', hi
                         padding: '28px 16px',
                         textAlign: 'center',
                         cursor: 'pointer',
-                        background: dragging ? 'var(--primary-soft)' : '#f8fafc',
+                        background: dragging ? 'var(--primary-soft)' : 'var(--bg-main)',
                         transition: 'all 0.2s ease',
                     }}
                 >
@@ -125,7 +125,7 @@ const FileUploadPicker = ({ file, onChange, label = 'Attach File (Optional)', hi
                             { label: '📝 Word', color: '#eff6ff', text: '#1d4ed8' },
                             { label: '📊 Excel', color: '#f0fdf4', text: '#15803d' },
                             { label: '📑 PPT', color: '#fff7ed', text: '#c2410c' },
-                            { label: '🗜 ZIP', color: '#fafafa', text: '#475569' },
+                            { label: '🗜 ZIP', color: 'var(--bg-main)', text: 'var(--text-muted)' },
                         ].map(b => (
                             <span key={b.label} style={{
                                 padding: '2px 8px', borderRadius: '12px',

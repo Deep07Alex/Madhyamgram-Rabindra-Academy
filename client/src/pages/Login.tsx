@@ -14,9 +14,9 @@ const Login = () => {
     const [activeRole, setActiveRole] = useState<'STUDENT' | 'TEACHER' | 'ADMIN'>('STUDENT');
 
     const roleConfigs = {
-        STUDENT: { label: 'Scholar ID', placeholder: 'e.g. S-1302487085', icon: <GraduationCap size={20} className="input-icon" /> },
-        TEACHER: { label: 'Faculty ID', placeholder: 'e.g. T-8100474669', icon: <User className="input-icon" size={20} /> },
-        ADMIN: { label: 'Admin Identifier', placeholder: 'Username or Admin ID', icon: <Lock className="input-icon" size={20} /> }
+        STUDENT: { label: 'School ID', placeholder: 'e.g. S-1001', icon: <GraduationCap size={20} className="input-icon" /> },
+        TEACHER: { label: 'Faculty ID', placeholder: 'e.g. T-10922265', icon: <User className="input-icon" size={20} /> },
+        ADMIN: { label: 'Admin Identifier', placeholder: 'e.g. A-7228273901 or Username', icon: <Lock className="input-icon" size={20} /> }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -49,7 +49,7 @@ const Login = () => {
                             bottom: '24px',
                             right: '-10px',
                             background: 'var(--primary)',
-                            color: 'white',
+                            color: 'var(--bg-card)',
                             padding: '6px',
                             borderRadius: '50%',
                             boxShadow: '0 4px 10px rgba(0,0,0,0.2)'
@@ -104,7 +104,7 @@ const Login = () => {
                     </div>
 
                     <div className="form-group" style={{ marginTop: '16px' }}>
-                        <label htmlFor="password">Security Password</label>
+                        <label htmlFor="password">Password</label>
                         <div className="input-with-icon">
                             <Lock className="input-icon" size={20} />
                             <input

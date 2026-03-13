@@ -8,6 +8,7 @@ import StudentHomework from '../components/student/StudentHomework';
 import StudentResults from '../components/student/StudentResults';
 import NoticeBoard from '../components/common/NoticeBoard';
 import LiveClock from '../components/common/LiveClock';
+import ThemeToggle from '../components/common/ThemeToggle';
 import {
     LayoutDashboard,
     CalendarCheck,
@@ -54,7 +55,10 @@ const StudentDashboard = () => {
                 console.error('Failed to fetch stats:', error);
             }
         };
+
         fetchStats();
+        const interval = setInterval(fetchStats, 30000); // Polling every 30s
+        return () => clearInterval(interval);
     }, []);
 
     const handleLogout = () => {
@@ -79,15 +83,18 @@ const StudentDashboard = () => {
             {/* Mobile Header */}
             <header className="mobile-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '50%', border: '2px solid rgba(0,0,0,0.1)' }} />
+                    <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '50%', border: '2px solid var(--border-soft)' }} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '0.6rem', fontWeight: '800', textTransform: 'uppercase', opacity: 0.8, color: '#1e293b', lineHeight: 1 }}>Madhyamgram</span>
+                        <span style={{ fontSize: '0.6rem', fontWeight: '800', textTransform: 'uppercase', opacity: 0.8, color: 'var(--text-main)', lineHeight: 1 }}>Madhyamgram</span>
                         <span style={{ fontSize: '1.1rem', fontWeight: '1000', textTransform: 'uppercase', color: '#5d1717', letterSpacing: '0.02em' }}>Rabindra Academy</span>
                     </div>
                 </div>
-                <button onClick={toggleSidebar} style={{ background: 'none', border: 'none', color: '#1e293b' }}>
-                    {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ThemeToggle />
+                    <button onClick={toggleSidebar} style={{ background: 'none', border: 'none', color: 'var(--text-main)' }}>
+                        {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
+                    </button>
+                </div>
             </header>
 
             {/* Sidebar Overlay */}
@@ -105,18 +112,18 @@ const StudentDashboard = () => {
                             right: '0',
                             background: 'none',
                             border: 'none',
-                            color: '#1e293b',
+                            color: 'var(--text-main)',
                             cursor: 'pointer',
                             display: 'none'
                         }}
                     >
                         <X size={24} />
                     </button>
-                    <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '64px', height: '64px', borderRadius: '50%', border: '2px solid rgba(0,0,0,0.1)', padding: '2px', background: 'white' }} />
+                    <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '64px', height: '64px', borderRadius: '50%', border: '2px solid var(--border-soft)', padding: '2px', background: 'var(--primary-soft)' }} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase', opacity: 0.8, color: '#1e293b', lineHeight: 1 }}>Madhyamgram</span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase', opacity: 0.8, color: 'var(--text-main)', lineHeight: 1 }}>Madhyamgram</span>
                         <span style={{ fontSize: '1.3rem', fontWeight: '1000', textTransform: 'uppercase', color: '#5d1717' }}>Rabindra Academy</span>
-                        <span style={{ fontSize: '0.65rem', fontWeight: '600', color: '#1e293b', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '4px' }}>Student Learning Hub</span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: '600', color: 'var(--text-muted)', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '4px' }}>Student Learning Hub</span>
                     </div>
                 </div>
 
@@ -157,13 +164,14 @@ const StudentDashboard = () => {
                         <div className="hide-on-mobile">
                             <LiveClock />
                         </div>
+                        <ThemeToggle />
                         <button 
                             onClick={() => navigate('/student/notices')}
-                            style={{ background: 'white', border: '1px solid var(--border-soft)', padding: '10px', borderRadius: '50%', cursor: 'pointer', color: 'var(--primary-bold)' }}
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', padding: '10px', borderRadius: '50%', cursor: 'pointer', color: 'var(--primary-bold)' }}
                         >
                             <BellRing size={20} />
                         </button>
-                        <div className="student-info-pill hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'white', padding: '6px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-soft)' }}>
+                        <div className="student-info-pill hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-card)', padding: '6px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-soft)' }}>
                             <UserCircle size={28} color="var(--primary-bold)" />
                             <div style={{ textAlign: 'right' }}>
                                 <p style={{ fontSize: '0.85rem', fontWeight: '700', margin: 0 }}>{user?.name} <span style={{ opacity: 0.5, fontWeight: '500', marginLeft: '4px' }}>({user?.studentId})</span></p>
@@ -178,7 +186,7 @@ const StudentDashboard = () => {
                         <Route path="dashboard" element={
                             <>
                                 <div style={{
-                                    background: 'white',
+                                    background: 'var(--bg-card)',
                                     borderRadius: 'var(--radius-lg)',
                                     padding: '24px 28px',
                                     marginBottom: '24px',

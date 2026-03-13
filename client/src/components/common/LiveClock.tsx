@@ -26,7 +26,7 @@ const LiveClock = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            background: 'white',
+            background: 'var(--bg-card)',
             padding: '8px 16px',
             borderRadius: 'var(--radius-full)',
             boxShadow: 'var(--shadow-sm)',

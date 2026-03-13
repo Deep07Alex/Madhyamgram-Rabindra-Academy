@@ -197,7 +197,7 @@ const TeacherHomework = () => {
                                 display: 'flex', alignItems: 'center', gap: '12px',
                                 padding: '14px 18px', borderRadius: 'var(--radius-md)',
                                 border: `2px solid ${newHomework.allowFileUpload ? 'var(--primary)' : 'var(--border-soft)'}`,
-                                background: newHomework.allowFileUpload ? 'var(--primary-soft)' : '#f8fafc',
+                                background: newHomework.allowFileUpload ? 'var(--primary-soft)' : 'var(--bg-main)',
                                 cursor: 'pointer', transition: 'all 0.2s',
                             }}
                         >
@@ -210,7 +210,7 @@ const TeacherHomework = () => {
                                     position: 'absolute', top: '3px',
                                     left: newHomework.allowFileUpload ? '21px' : '3px',
                                     width: '18px', height: '18px', borderRadius: '50%',
-                                    background: 'white', transition: 'left 0.2s',
+                                    background: 'var(--bg-card)', transition: 'left 0.2s',
                                     boxShadow: '0 1px 4px rgba(0,0,0,0.2)'
                                 }} />
                             </div>
@@ -300,7 +300,7 @@ const TeacherHomework = () => {
 
                 {selectedHomework && (
                     submissions.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '50px', background: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)' }}>
+                        <div style={{ textAlign: 'center', padding: '50px', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)' }}>
                             <GraduationCap size={32} style={{ opacity: 0.2, marginBottom: '12px' }} />
                             <p style={{ color: 'var(--text-muted)', fontWeight: 600 }}>No submissions recorded yet for this assignment.</p>
                         </div>
@@ -310,7 +310,7 @@ const TeacherHomework = () => {
                                 return (
                                     <div key={s.id} style={{
                                         border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)',
-                                        padding: '20px', background: 'white'
+                                        padding: '20px', background: 'var(--bg-card)'
                                     }}>
                                         {/* Header row only */}
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
@@ -345,7 +345,7 @@ const TeacherHomework = () => {
                     )
                 )}
                 {!selectedHomework && (
-                    <div style={{ textAlign: 'center', padding: '60px 20px', background: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)' }}>
+                    <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)' }}>
                         <FileText size={32} style={{ opacity: 0.2, marginBottom: '12px' }} />
                         <p style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Select an assignment profile to begin performance audit.</p>
                     </div>
@@ -368,11 +368,11 @@ const TeacherHomework = () => {
                     xlsx: { bg: '#f0fdf4', text: '#15803d', label: '📊 Excel' },
                     ppt: { bg: '#fff7ed', text: '#c2410c', label: '📑 PPT' },
                     pptx: { bg: '#fff7ed', text: '#c2410c', label: '📑 PPT' },
-                    zip: { bg: '#f8fafc', text: '#475569', label: '🗜 ZIP' },
-                    txt: { bg: '#f8fafc', text: '#475569', label: '📃 Text' },
+                    zip: { bg: 'var(--bg-main)', text: 'var(--text-muted)', label: '🗜 ZIP' },
+                    txt: { bg: 'var(--bg-main)', text: 'var(--text-muted)', label: '📃 Text' },
                     csv: { bg: '#f0fdf4', text: '#15803d', label: '📊 CSV' },
                 };
-                const fc = extColors[ext] || { bg: '#f8fafc', text: '#475569', label: `📎 ${ext.toUpperCase() || 'File'}` };
+                const fc = extColors[ext] || { bg: 'var(--bg-main)', text: 'var(--text-muted)', label: `📎 ${ext.toUpperCase() || 'File'}` };
 
                 return (
                     <div style={{
@@ -419,7 +419,7 @@ const TeacherHomework = () => {
                                         Written Answer
                                     </p>
                                     <div style={{
-                                        background: '#f8fafc', border: '1px solid var(--border-soft)',
+                                        background: 'var(--bg-main)', border: '1px solid var(--border-soft)',
                                         borderRadius: 'var(--radius-md)', padding: '20px',
                                         fontSize: '0.95rem', color: 'var(--text-main)', lineHeight: '1.7',
                                         whiteSpace: 'pre-wrap'
@@ -435,7 +435,7 @@ const TeacherHomework = () => {
                                         Attached File
                                     </p>
                                     {isImage ? (
-                                        <div style={{ background: '#f8fafc', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-soft)', textAlign: 'center' }}>
+                                        <div style={{ background: 'var(--bg-main)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-soft)', textAlign: 'center' }}>
                                             <a href={fileUrl} target="_blank" rel="noreferrer">
                                                 <img src={fileUrl} alt="student submission" style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: 'var(--radius-sm)', objectFit: 'contain' }} />
                                             </a>
@@ -452,8 +452,8 @@ const TeacherHomework = () => {
                                                     style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', fontWeight: '700', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     <ExternalLink size={14} /> Open
                                                 </a>
-                                                <a href={fileUrl} download
-                                                    style={{ padding: '8px 16px', background: 'white', border: '1px solid var(--border-soft)', color: 'var(--text-main)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', fontWeight: '700', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                 <a href={fileUrl} download
+                                                    style={{ padding: '8px 16px', background: 'var(--bg-card)', border: '1px solid var(--border-soft)', color: 'var(--text-main)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', fontWeight: '700', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     Download
                                                 </a>
                                             </div>
@@ -463,7 +463,7 @@ const TeacherHomework = () => {
                             )}
 
                             {!s.content && !s.fileUrl && (
-                                <div style={{ padding: '40px', textAlign: 'center', background: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)' }}>
+                                <div style={{ padding: '40px', textAlign: 'center', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)' }}>
                                     <FileText size={32} style={{ opacity: 0.2, marginBottom: '12px' }} />
                                     <p style={{ margin: 0, color: 'var(--text-muted)' }}>Student submitted without providing text or file attachments.</p>
                                 </div>

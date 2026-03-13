@@ -40,13 +40,13 @@ const NoticeBoard = () => {
 
             <div className="notice-list mt-4" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {notices.length === 0 ? (
-                    <div className="empty-state" style={{ padding: '2rem', textAlign: 'center', background: 'white', borderRadius: '12px' }}>
+                    <div className="empty-state" style={{ padding: '2rem', textAlign: 'center', background: 'var(--bg-main)', borderRadius: '12px' }}>
                         No notices available at this time.
                     </div>
                 ) : (
                     notices.map(notice => (
                         <div key={notice.id} style={{ 
-                            background: 'white', 
+                            background: 'var(--bg-card)', 
                             padding: '1.5rem', 
                             borderRadius: '12px',
                             borderLeft: `4px solid ${notice.type === 'PUBLIC' ? 'var(--primary)' : 'var(--accent)'}`,
@@ -58,7 +58,7 @@ const NoticeBoard = () => {
                                     {new Date(notice.createdAt).toLocaleDateString('en-IN')}
                                 </span>
                             </div>
-                            <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', backgroundColor: 'rgba(0,0,0,0.02)', padding: '4px 8px', borderRadius: '4px', display: 'inline-block', marginBottom: '12px' }}>
+                            <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', backgroundColor: 'var(--bg-main)', padding: '4px 8px', borderRadius: '4px', display: 'inline-block', marginBottom: '12px' }}>
                                 {notice.type === 'PUBLIC' ? 'Public Announcement' : 'Internal Circular'}
                             </div>
                             <p style={{ margin: 0, color: 'var(--text-medium)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>

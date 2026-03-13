@@ -162,7 +162,7 @@
   padding: 4rem 2rem;
   margin-bottom: 2rem;
   border-radius: var(--radius-lg);
-  background: white;
+  background: var(--bg-card);
   box-shadow: var(--shadow-sm);
 }
 
@@ -242,7 +242,7 @@
 .notice-board {
   max-width: 800px;
   margin: 0 auto;
-  background: white;
+  background: var(--bg-card);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
   overflow: hidden;
@@ -264,7 +264,7 @@
 }
 
 .notice-item:hover {
-  background-color: #f8fafc;
+  background-color: var(--bg-main);
 }
 
 /* Gallery */
@@ -275,7 +275,7 @@
 }
 
 .gallery-card {
-  background: white;
+  background: var(--bg-card);
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-md);

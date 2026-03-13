@@ -21,12 +21,13 @@ async function replaceClasses() {
         // Note: grade is arbitrary but used for sorting in getClasses
         const newClasses = [
             { id: 'class-nursery', name: 'Nursery', grade: 0 },
-            { id: 'class-kg1', name: 'KG1', grade: 1 },
-            { id: 'class-kg2', name: 'KG2', grade: 2 },
-            { id: 'class-1', name: 'Class 1', grade: 3 },
-            { id: 'class-2', name: 'Class 2', grade: 4 },
-            { id: 'class-3', name: 'Class 3', grade: 5 },
-            { id: 'class-4', name: 'Class 4', grade: 6 },
+            { id: 'class-kg1', name: 'KG-I', grade: 1 },
+            { id: 'class-kg2-a', name: 'KG-II A', grade: 2 },
+            { id: 'class-kg2-b', name: 'KG-II B', grade: 3 },
+            { id: 'class-1', name: 'STD-I', grade: 4 },
+            { id: 'class-2', name: 'STD-II', grade: 5 },
+            { id: 'class-3', name: 'STD-III', grade: 6 },
+            { id: 'class-4', name: 'STD-IV', grade: 7 },
         ];
 
         console.log('Starting class replacement migration...');

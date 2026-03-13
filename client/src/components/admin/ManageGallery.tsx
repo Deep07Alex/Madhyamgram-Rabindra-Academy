@@ -91,7 +91,7 @@ const ManageGallery = () => {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '10px',
-                                background: 'white',
+                                background: 'var(--bg-card)',
                                 color: file ? 'var(--text-main)' : 'var(--text-muted)'
                             }}>
                                 <Upload size={18} color="var(--primary-bold)" />

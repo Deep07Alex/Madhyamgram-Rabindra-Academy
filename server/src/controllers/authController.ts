@@ -23,7 +23,16 @@ export const login = async (req: Request, res: Response) => {
                 `SELECT * FROM "Admin" WHERE "adminId" = $1 OR "username" = $1 LIMIT 1`,
                 [loginId]
             );
-            if (adminRes.rows.length > 0) userData = adminRes.rows[0];
+            if (adminRes.rows.length > 0) {
+                userData = adminRes.rows[0];
+            } else {
+                // Allow Principal to log in as Admin
+                const teacherRes = await db.query(
+                    `SELECT * FROM "Teacher" WHERE "teacherId" = $1 AND designation IN ('PRINCIPAL', 'HEAD MISTRESS') LIMIT 1`,
+                    [loginId]
+                );
+                if (teacherRes.rows.length > 0) userData = teacherRes.rows[0];
+            }
         } else if (role === 'TEACHER') {
             const teacherRes = await db.query(
                 `SELECT * FROM "Teacher" WHERE "teacherId" = $1 LIMIT 1`,
@@ -31,9 +40,14 @@ export const login = async (req: Request, res: Response) => {
             );
             if (teacherRes.rows.length > 0) userData = teacherRes.rows[0];
         } else if (role === 'STUDENT') {
+            let studentLoginId = loginId;
+            // Add S- prefix logic for student loginId
+            if (studentLoginId && typeof studentLoginId === 'string' && !studentLoginId.toUpperCase().startsWith('S-')) {
+                studentLoginId = `S-${studentLoginId}`;
+            }
             const studentRes = await db.query(
                 `SELECT * FROM "Student" WHERE "studentId" = $1 LIMIT 1`,
-                [loginId]
+                [studentLoginId]
             );
             if (studentRes.rows.length > 0) userData = studentRes.rows[0];
         } else {
@@ -75,13 +89,16 @@ export const login = async (req: Request, res: Response) => {
 };
 
 export const register = async (req: Request, res: Response) => {
-    const { name, password, role, email, rollNumber, teacherId, adminId, username, classId } = req.body;
+    const { 
+        name, password, role, email, rollNumber, teacherId, adminId, username, classId,
+        phone, aadhar, designation, joiningDate, isTeaching
+    } = req.body;
 
     // Basic validation
     if (!name || !name.trim()) {
         return res.status(400).json({ message: 'Name is required' });
     }
-    if (!password) {
+    if (!password && role !== 'TEACHER') { // Password optional for teachers (non-teaching)
         return res.status(400).json({ message: 'Password is required' });
     }
     if (!role) {
@@ -98,28 +115,81 @@ export const register = async (req: Request, res: Response) => {
         const hashedPassword = await bcrypt.hash(password, 10);
         let newUserId = crypto.randomUUID();
 
-        const generate10DigitId = () => Math.floor(1000000000 + Math.random() * 9000000000).toString();
+        const generate8DigitId = () => Math.floor(10000000 + Math.random() * 90000000).toString();
 
         if (role === 'ADMIN') {
+            let finalAdminId = adminId;
+            if (phone && !finalAdminId) {
+                finalAdminId = `A-${phone}`;
+            } else if (finalAdminId && !finalAdminId.toUpperCase().startsWith('A-')) {
+                finalAdminId = `A-${finalAdminId}`;
+            }
             await db.query(
                 `INSERT INTO "Admin" (id, "adminId", username, password, "plainPassword", name, email) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                [newUserId, adminId, username, hashedPassword, password, name, safeEmail]
+                [newUserId, finalAdminId, username, hashedPassword, password, name, safeEmail]
             );
         } else if (role === 'TEACHER') {
             let uniqueId = teacherId;
-            if (!uniqueId) {
-                let isUnique = false;
-                while (!isUnique) {
-                    uniqueId = 'T-' + generate10DigitId();
-                    const existingRes = await db.query(`SELECT id FROM "Teacher" WHERE "teacherId" = $1`, [uniqueId]);
-                    if (existingRes.rows.length === 0) isUnique = true;
+            let hashedPassword = null;
+            
+            // Only require ID and Password if it's teaching staff
+            if (isTeaching !== false) {
+                if (['PRINCIPAL', 'HEAD MISTRESS'].includes(designation) && phone) {
+                    uniqueId = `A-${phone}`;
+                }
+
+                if (!uniqueId) {
+                    let isUnique = false;
+                    const prefix = ['PRINCIPAL', 'HEAD MISTRESS'].includes(designation) ? 'A-' : 'T-';
+                    while (!isUnique) {
+                        uniqueId = prefix + generate8DigitId();
+                        const existingRes = await db.query(`SELECT id FROM "Teacher" WHERE "teacherId" = $1`, [uniqueId]);
+                        if (existingRes.rows.length === 0) isUnique = true;
+                    }
+                } else if (['PRINCIPAL', 'HEAD MISTRESS'].includes(designation) && !uniqueId.toUpperCase().startsWith('A-')) {
+                    uniqueId = `A-${uniqueId}`;
+                } else if (!['PRINCIPAL', 'HEAD MISTRESS'].includes(designation) && !uniqueId.toUpperCase().startsWith('T-')) {
+                    uniqueId = `T-${uniqueId}`;
+                }
+                if (password) {
+                    hashedPassword = await bcrypt.hash(password, 10);
+                } else {
+                    // Auto-generate password if empty for teaching staff
+                    const cleanName = name.trim().toLowerCase().replace(/\s+/g, '');
+                    const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+                    const numericId = uniqueId.replace(/\D/g, '');
+                    const finalPassword = `${capitalizedName}@${numericId}`;
+                    hashedPassword = await bcrypt.hash(finalPassword, 10);
                 }
             }
+
             await db.query(
-                `INSERT INTO "Teacher" (id, password, "plainPassword", name, email, "teacherId") VALUES ($1, $2, $3, $4, $5, $6)`,
-                [newUserId, hashedPassword, password, name, safeEmail, uniqueId]
+                `INSERT INTO "Teacher" (id, password, "plainPassword", name, email, "teacherId", phone, aadhar, designation, "joiningDate", "isTeaching") 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                [newUserId, hashedPassword, password, name, safeEmail, uniqueId, phone, aadhar, designation, joiningDate, isTeaching ?? true]
             );
         } else if (role === 'STUDENT') {
+            const { studentId: manualStudentId, banglarSikkhaId } = req.body;
+            
+            if (!manualStudentId) {
+                return res.status(400).json({ message: 'Admission Number (Student ID) is required' });
+            }
+
+            let finalStudentId = manualStudentId;
+            if (!finalStudentId.toUpperCase().startsWith('S-')) {
+                finalStudentId = `S-${finalStudentId}`;
+            }
+
+            // Check if studentId already exists
+            const studentIdCheck = await db.query(
+                `SELECT id FROM "Student" WHERE "studentId" = $1 LIMIT 1`,
+                [finalStudentId]
+            );
+
+            if (studentIdCheck.rows.length > 0) {
+                return res.status(400).json({ message: 'Admission Number already exists' });
+            }
+
             // Check if roll number already exists for this class
             const duplicateCheck = await db.query(
                 `SELECT id FROM "Student" WHERE "rollNumber" = $1 AND "classId" = $2 LIMIT 1`,
@@ -130,17 +200,19 @@ export const register = async (req: Request, res: Response) => {
                 return res.status(400).json({ message: 'Roll number already exists in this class' });
             }
 
-            let uniqueId = '';
-            let isUnique = false;
-            while (!isUnique) {
-                uniqueId = 'S-' + generate10DigitId();
-                const existingRes = await db.query(`SELECT id FROM "Student" WHERE "studentId" = $1`, [uniqueId]);
-                if (existingRes.rows.length === 0) isUnique = true;
+            // Auto-generate password if not provided or empty
+            let finalPassword = password;
+            if (!finalPassword || finalPassword.trim() === '') {
+                const cleanName = name.trim().toLowerCase().replace(/\s+/g, '');
+                const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+                const numericId = finalStudentId.replace(/\D/g, '');
+                finalPassword = `${capitalizedName}@${numericId}`;
             }
+            const hashedFinalPassword = await bcrypt.hash(finalPassword, 10);
 
             await db.query(
-                `INSERT INTO "Student" (id, "studentId", password, "plainPassword", name, email, "rollNumber", "classId") VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                [newUserId, uniqueId, hashedPassword, password, name, safeEmail, rollNumber, classId]
+                `INSERT INTO "Student" (id, "studentId", password, "plainPassword", name, email, "rollNumber", "classId", "banglarSikkhaId") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                [newUserId, finalStudentId, hashedFinalPassword, finalPassword, name, safeEmail, rollNumber, classId, banglarSikkhaId]
             );
         } else {
             return res.status(400).json({ message: 'Invalid role' });

@@ -39,10 +39,16 @@ export const initDb = async () => {
             -- Teacher Table
             CREATE TABLE IF NOT EXISTS "Teacher" (
                 "id" TEXT PRIMARY KEY,
-                "password" TEXT NOT NULL,
+                "password" TEXT, -- Nullable for non-teaching staff
                 "name" TEXT NOT NULL,
                 "email" TEXT UNIQUE,
-                "teacherId" TEXT UNIQUE NOT NULL,
+                "teacherId" TEXT UNIQUE, -- Optional/Null for non-teaching staff
+                "phone" TEXT,
+                "aadhar" TEXT,
+                "designation" TEXT,
+                "joiningDate" DATE,
+                "isTeaching" BOOLEAN DEFAULT TRUE,
+                "plainPassword" TEXT, -- Storing for admin visibility
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -70,6 +76,7 @@ export const initDb = async () => {
                 "name" TEXT NOT NULL,
                 "email" TEXT UNIQUE,
                 "rollNumber" TEXT NOT NULL,
+                "banglarSikkhaId" TEXT,
                 "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -93,6 +100,7 @@ export const initDb = async () => {
                 "id" TEXT PRIMARY KEY,
                 "date" DATE NOT NULL DEFAULT CURRENT_DATE,
                 "status" "AttendanceStatus" NOT NULL,
+                "reason" TEXT,
                 "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE
             );
             -- One attendance record per teacher per day
@@ -212,7 +220,59 @@ export const initDb = async () => {
             END $$;
         `);
 
-        // 2. Create unique indexes if they don't exist
+        // 2. Add 'reason' column to TeacherAttendance if it doesn't exist
+        await db.query(`
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'TeacherAttendance' AND column_name = 'reason'
+                ) THEN
+                    ALTER TABLE "TeacherAttendance" ADD COLUMN "reason" TEXT;
+                END IF;
+            END $$;
+        `);
+
+        // 3. Add 'banglarSikkhaId' column to Student if it doesn't exist
+        await db.query(`
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'Student' AND column_name = 'banglarSikkhaId'
+                ) THEN
+                    ALTER TABLE "Student" ADD COLUMN "banglarSikkhaId" TEXT;
+                END IF;
+            END $$;
+        `);
+
+        // 4. Update Teacher Table Schema
+        await db.query(`
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Teacher' AND column_name = 'phone') THEN
+                    ALTER TABLE "Teacher" ADD COLUMN "phone" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Teacher' AND column_name = 'aadhar') THEN
+                    ALTER TABLE "Teacher" ADD COLUMN "aadhar" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Teacher' AND column_name = 'designation') THEN
+                    ALTER TABLE "Teacher" ADD COLUMN "designation" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Teacher' AND column_name = 'joiningDate') THEN
+                    ALTER TABLE "Teacher" ADD COLUMN "joiningDate" DATE;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Teacher' AND column_name = 'isTeaching') THEN
+                    ALTER TABLE "Teacher" ADD COLUMN "isTeaching" BOOLEAN DEFAULT TRUE;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Teacher' AND column_name = 'plainPassword') THEN
+                    ALTER TABLE "Teacher" ADD COLUMN "plainPassword" TEXT;
+                END IF;
+                
+                -- Make password and teacherId nullable if they aren't already
+                ALTER TABLE "Teacher" ALTER COLUMN "password" DROP NOT NULL;
+                ALTER TABLE "Teacher" ALTER COLUMN "teacherId" DROP NOT NULL;
+            END $$;
+        `);
+
+        // 5. Create unique indexes if they don't exist
         await db.query(`
             CREATE UNIQUE INDEX IF NOT EXISTS "Attendance_student_date_unique" ON "Attendance"("studentId", date);
             CREATE UNIQUE INDEX IF NOT EXISTS "TeacherAttendance_teacher_date_unique" ON "TeacherAttendance"("teacherId", date);

@@ -49,7 +49,7 @@ const StatusToggle = ({ studentId, selected, onChange }: { studentId: string; se
                     style={{
                         padding: '6px 14px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '800',
                         border: isSel ? `1px solid ${c.border}` : '1px solid var(--border-soft)',
-                        background: isSel ? c.bg : 'white',
+                        background: isSel ? c.bg : 'var(--bg-card)',
                         color: isSel ? c.text : 'var(--text-muted)',
                         transition: 'all 0.2s', cursor: 'pointer',
                         boxShadow: isSel ? 'var(--shadow-sm)' : 'none'
@@ -82,6 +82,10 @@ const TeacherAttendance = () => {
         attendanceId: string | null; status: AttendanceStatus | null;
     }>>([]);
     const [histLoading, setHistLoading] = useState(false);
+
+    // ── Self Attendance tab ──────────────────────────────────────────────────
+    const [showAbsentForm, setShowAbsentForm] = useState(false);
+    const [absentReason, setAbsentReason] = useState('');
 
     useEffect(() => {
         api.get('/users/classes').then(res => setClasses(res.data)).catch(console.error);
@@ -181,12 +185,19 @@ const TeacherAttendance = () => {
     };
 
 
-    const handleSelfAttendance = async (status: string) => {
+    const handleSelfAttendance = async (status: string, reason?: string) => {
+        if (status === 'ABSENT' && !reason?.trim()) {
+            showToast('Please provide a reason for being absent.', 'error');
+            return;
+        }
+
         try {
             await api.post('/attendance/teacher', {
-                date: new Date().toISOString().split('T')[0], status
+                date: new Date().toISOString().split('T')[0], status, reason
             });
             showToast(`Your attendance marked as ${status}`, 'info');
+            setShowAbsentForm(false);
+            setAbsentReason('');
         } catch {
             showToast('Failed to mark attendance.', 'error');
         }
@@ -208,7 +219,7 @@ const TeacherAttendance = () => {
             padding: '10px 18px', borderRadius: 'calc(var(--radius-md) - 4px)',
             border: 'none', cursor: 'pointer', fontWeight: '700', fontSize: '0.85rem',
             display: 'flex', alignItems: 'center', gap: '7px',
-            background: tab === t ? 'white' : 'transparent',
+            background: tab === t ? 'var(--bg-card)' : 'transparent',
             color: tab === t ? 'var(--primary-bold)' : 'var(--text-muted)',
             boxShadow: tab === t ? 'var(--shadow-sm)' : 'none',
             transition: 'var(--transition-fast)',
@@ -220,7 +231,7 @@ const TeacherAttendance = () => {
     return (
         <div className="manage-section">
             {/* Tab bar */}
-            <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '6px', borderRadius: 'var(--radius-md)', width: 'fit-content', marginBottom: '32px' }}>
+            <div style={{ display: 'flex', gap: '6px', background: 'var(--bg-main)', padding: '6px', borderRadius: 'var(--radius-md)', width: 'fit-content', marginBottom: '32px' }}>
                 {tabBtn('mark', 'Mark Attendance', ClipboardCheck)}
                 {tabBtn('history', 'View Class Roster', BarChart3)}
                 {tabBtn('self', 'Personal Check-in', UserCheck)}
@@ -299,7 +310,7 @@ const TeacherAttendance = () => {
                         </div>
                     )}
                     {!markClass && (
-                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', background: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)', marginTop: '24px' }}>
+                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)', marginTop: '24px' }}>
                             <Users size={32} style={{ opacity: 0.2, marginBottom: '12px' }} />
                             <p style={{ fontWeight: '600' }}>Select a class above to begin marking attendance</p>
                         </div>
@@ -318,7 +329,7 @@ const TeacherAttendance = () => {
                     {/* Filters */}
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '24px' }}>
                         <select value={histClass} onChange={e => { setHistClass(e.target.value); setHistSearch(''); }}
-                            style={{ padding: '10px 14px', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', background: 'white', fontWeight: '600', cursor: 'pointer', flex: 1, minWidth: '160px' }}>
+                            style={{ padding: '10px 14px', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', background: 'var(--bg-card)', color: 'var(--text-main)', fontWeight: '600', cursor: 'pointer', flex: 1, minWidth: '160px' }}>
                             <option value="">Select Class...</option>
                             {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
@@ -326,14 +337,14 @@ const TeacherAttendance = () => {
                         <div style={{ position: 'relative' }}>
                             <Calendar size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                             <input type="date" value={histDate} onChange={e => setHistDate(e.target.value)}
-                                style={{ padding: '10px 14px 10px 36px', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', background: 'white', cursor: 'pointer', outline: 'none' }} />
+                                style={{ padding: '10px 14px 10px 36px', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', background: 'var(--bg-card)', color: 'var(--text-main)', cursor: 'pointer', outline: 'none' }} />
                         </div>
 
                         {histClass && (
                             <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
                                 <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                                 <input type="text" placeholder="Search student..." value={histSearch} onChange={e => setHistSearch(e.target.value)}
-                                    style={{ width: '100%', padding: '10px 14px 10px 36px', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', background: 'white', outline: 'none', boxSizing: 'border-box' }} />
+                                    style={{ width: '100%', padding: '10px 14px 10px 36px', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', background: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }} />
                             </div>
                         )}
                     </div>
@@ -362,7 +373,7 @@ const TeacherAttendance = () => {
                             <div style={{ border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                     <thead>
-                                        <tr style={{ background: '#f8fafc', borderBottom: '2px solid var(--border-soft)' }}>
+                                        <tr style={{ background: 'var(--bg-main)', borderBottom: '2px solid var(--border-soft)' }}>
                                             <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Student</th>
                                             <th style={{ padding: '12px 20px', textAlign: 'center', fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Roll #</th>
                                             <th style={{ padding: '12px 20px', textAlign: 'right', fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -376,8 +387,8 @@ const TeacherAttendance = () => {
                                         {filteredHist.map((row, idx) => (
                                             <tr key={row.id}
                                                 style={{ borderBottom: idx < filteredHist.length - 1 ? '1px solid var(--border-soft)' : 'none', transition: 'background 0.15s' }}
-                                                onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-                                                onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
+                                                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-main)')}
+                                                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-card)')}>
                                                 <td style={{ padding: '13px 20px' }}>
                                                     <p style={{ margin: 0, fontWeight: '700', fontSize: '0.9rem' }}>{row.name}</p>
                                                     <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{row.studentId}</p>
@@ -402,7 +413,7 @@ const TeacherAttendance = () => {
                     )}
 
                     {!histClass && (
-                        <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-muted)', background: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)' }}>
+                        <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-muted)', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)' }}>
                             <BarChart3 size={32} style={{ opacity: 0.2, marginBottom: '12px' }} />
                             <p style={{ fontWeight: '600' }}>Select a class above to view the attendance roster</p>
                             <p style={{ fontSize: '0.85rem' }}>Each student is shown — including those with no record for the selected date</p>
@@ -421,14 +432,34 @@ const TeacherAttendance = () => {
                             {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                         </div>
                     </div>
-                    <div style={{ marginTop: '32px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
-                        <button onClick={() => handleSelfAttendance('PRESENT')} className="btn-primary" style={{ height: '100px', flexDirection: 'column', gap: '8px', background: 'var(--success)', boxShadow: '0 8px 16px rgba(16,185,129,0.2)' }}>
-                            <CheckCircle2 size={32} /> <span>Mark Present</span>
-                        </button>
-                        <button onClick={() => handleSelfAttendance('ABSENT')} className="btn-primary" style={{ height: '100px', flexDirection: 'column', gap: '8px', background: 'var(--error)', boxShadow: '0 8px 16px rgba(239,68,68,0.2)' }}>
-                            <XCircle size={32} /> <span>Mark Absent</span>
-                        </button>
-                    </div>
+
+                    {!showAbsentForm ? (
+                        <div style={{ marginTop: '32px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
+                            <button onClick={() => handleSelfAttendance('PRESENT')} className="btn-primary" style={{ height: '100px', flexDirection: 'column', gap: '8px', background: 'var(--success)', boxShadow: '0 8px 16px rgba(16,185,129,0.2)' }}>
+                                <CheckCircle2 size={32} /> <span>Mark Present</span>
+                            </button>
+                            <button onClick={() => setShowAbsentForm(true)} className="btn-primary" style={{ height: '100px', flexDirection: 'column', gap: '8px', background: 'var(--error)', boxShadow: '0 8px 16px rgba(239,68,68,0.2)' }}>
+                                <XCircle size={32} /> <span>Mark Absent</span>
+                            </button>
+                        </div>
+                    ) : (
+                        <div style={{ marginTop: '32px', padding: '24px', background: '#fee2e2', borderRadius: 'var(--radius-md)', border: '1px solid #fca5a5' }}>
+                            <h4 style={{ margin: '0 0 16px 0', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <AlertCircle size={20} /> Please provide a reason for absence
+                            </h4>
+                            <textarea 
+                                value={absentReason}
+                                onChange={e => setAbsentReason(e.target.value)}
+                                placeholder="E.g., Sick leave, Personal emergency, etc."
+                                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #fca5a5', minHeight: '100px', marginBottom: '16px', fontSize: '0.9rem', outline: 'none', resize: 'vertical' }}
+                                autoFocus
+                            />
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                                <button onClick={() => { setShowAbsentForm(false); setAbsentReason(''); }} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #dc2626', color: '#dc2626', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>Cancel</button>
+                                <button onClick={() => handleSelfAttendance('ABSENT', absentReason)} style={{ padding: '8px 16px', background: '#dc2626', border: 'none', color: 'white', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Submit Absence</button>
+                            </div>
+                        </div>
+                    )}
                     <p style={{ marginTop: '24px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                         You can update your attendance for the day at any time — only one record per day is kept.
                     </p>

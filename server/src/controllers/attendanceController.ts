@@ -99,7 +99,7 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
 // --- Teacher Attendance ---
 
 export const markTeacherAttendance = async (req: AuthRequest, res: Response) => {
-    const { date, status } = req.body;
+    const { date, status, reason } = req.body;
     const teacherId = req.user?.id;
 
     if (!teacherId || req.user?.role !== 'TEACHER') {
@@ -122,19 +122,19 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
             // Update existing record
             attendanceRes = await db.query(
                 `UPDATE "TeacherAttendance"
-                 SET status = $1
-                 WHERE id = $2
+                 SET status = $1, reason = $2
+                 WHERE id = $3
                  RETURNING *`,
-                [status, existingCheck.rows[0].id]
+                [status, status === 'ABSENT' ? reason : null, existingCheck.rows[0].id]
             );
         } else {
             // Insert new record
             const id = crypto.randomUUID();
             attendanceRes = await db.query(
-                `INSERT INTO "TeacherAttendance" (id, date, status, "teacherId") 
-                 VALUES ($1, $2, $3, $4)
+                `INSERT INTO "TeacherAttendance" (id, date, status, reason, "teacherId") 
+                 VALUES ($1, $2, $3, $4, $5)
                  RETURNING *`,
-                [id, attendanceDateStr, status, teacherId]
+                [id, attendanceDateStr, status, status === 'ABSENT' ? reason : null, teacherId]
             );
         }
 
@@ -173,7 +173,7 @@ export const updateStudentAttendance = async (req: AuthRequest, res: Response) =
 
 export const updateTeacherAttendance = async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, reason } = req.body;
 
     if (!['PRESENT', 'ABSENT'].includes(status)) {
         return res.status(400).json({ message: 'Invalid status value' });
@@ -181,8 +181,8 @@ export const updateTeacherAttendance = async (req: AuthRequest, res: Response) =
 
     try {
         const result = await db.query(
-            `UPDATE "TeacherAttendance" SET status = $1 WHERE id = $2 RETURNING *`,
-            [status, id]
+            `UPDATE "TeacherAttendance" SET status = $1, reason = $2 WHERE id = $3 RETURNING *`,
+            [status, status === 'ABSENT' ? reason : null, id]
         );
         if (result.rowCount === 0) {
             return res.status(404).json({ message: 'Attendance record not found' });

@@ -41,7 +41,6 @@ const ManageClasses = () => {
                         <tr>
                             <th>Name</th>
                             <th style={{ textAlign: 'center' }}>Total Students</th>
-                            <th style={{ textAlign: 'center' }}>Teacher</th>
                             <th style={{ textAlign: 'right' }}>Actions</th>
                         </tr>
                     </thead>
@@ -54,9 +53,6 @@ const ManageClasses = () => {
                                 </td>
                                 <td style={{ textAlign: 'center' }}>
                                     <span style={{ fontWeight: '700' }}>{c._count?.students || 0}</span>
-                                </td>
-                                <td style={{ textAlign: 'center' }}>
-                                    <span style={{ fontWeight: '700' }}>{c.teachers?.length || 0}</span>
                                 </td>
                                 <td style={{ textAlign: 'right' }}>
                                     <button onClick={() => handleDeleteClass(c.id)} className="btn-danger btn-sm" style={{ padding: '6px 12px' }}>

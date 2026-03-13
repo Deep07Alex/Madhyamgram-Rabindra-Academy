@@ -91,7 +91,7 @@ const StudentHomework = () => {
                                 border: '1px solid var(--border-soft)',
                                 padding: '24px',
                                 borderRadius: 'var(--radius-md)',
-                                background: 'white',
+                                background: 'var(--bg-card)',
                                 transition: 'var(--transition-base)',
                                 position: 'relative',
                                 display: 'flex',
@@ -150,7 +150,7 @@ const StudentHomework = () => {
                                                 setSelectedAssignment(hw);
                                                 setContent(submission.content || '');
                                                 setFile(null);
-                                            }} style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', background: 'white', color: 'var(--text-main)', border: '1px solid var(--border-soft)', fontWeight: 600 }}>
+                                            }} style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-soft)', fontWeight: 600 }}>
                                                 Edit Submission <Send size={14} />
                                             </button>
                                         ) : null}
@@ -160,7 +160,7 @@ const StudentHomework = () => {
                         );
                     })}
                     {assignments.length === 0 && (
-                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px', background: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)' }}>
+                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)' }}>
                             <FileText size={32} style={{ opacity: 0.2, marginBottom: '12px' }} />
                             <p style={{ color: 'var(--text-muted)', fontWeight: 600 }}>No academic tasks assigned to your profile yet.</p>
                         </div>
@@ -194,7 +194,7 @@ const StudentHomework = () => {
                         <h3 style={{ marginBottom: '8px' }}>{selectedAssignment.title}</h3>
                         {selectedAssignment.description && (
                             <div style={{
-                                background: '#f8fafc', border: '1px solid var(--border-soft)',
+                                background: 'var(--bg-main)', border: '1px solid var(--border-soft)',
                                 borderRadius: 'var(--radius-md)', padding: '12px 16px', marginBottom: '20px'
                             }}>
                                 <p style={{ margin: '0 0 4px', fontSize: '0.72rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--primary-bold)' }}>
@@ -237,7 +237,7 @@ const StudentHomework = () => {
                                 ) : (
                                     <div style={{
                                         padding: '10px 14px', borderRadius: 'var(--radius-sm)',
-                                        background: '#f8fafc', border: '1px dashed var(--border-soft)',
+                                        background: 'var(--bg-main)', border: '1px dashed var(--border-soft)',
                                         fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px'
                                     }}>
                                         <span>📝</span>

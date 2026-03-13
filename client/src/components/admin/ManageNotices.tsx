@@ -218,7 +218,7 @@ const ManageNotices = () => {
                                             <option key={s.id} value={s.id}>{s.name}</option>
                                         ))}
                                     </select>
-                                    {!formData.targetClassId && <small style={{color:'gray'}}>Select a class first to pick a student</small>}
+                                    {!formData.targetClassId && <small style={{color:'var(--text-muted)'}}>Select a class first to pick a student</small>}
                                 </div>
                             </div>
                         )}

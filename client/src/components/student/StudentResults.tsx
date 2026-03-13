@@ -53,7 +53,7 @@ const StudentResults = () => {
                 </h3>
 
                 {semesters.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '64px 20px', background: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)', marginTop: '24px' }}>
+                    <div style={{ textAlign: 'center', padding: '64px 20px', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)', marginTop: '24px' }}>
                         <TrendingUp size={32} style={{ opacity: 0.1, marginBottom: '12px' }} />
                         <p style={{ color: 'var(--text-muted)', fontWeight: 600 }}>No academic results have been published for your profile yet.</p>
                     </div>
@@ -61,7 +61,7 @@ const StudentResults = () => {
                     <div style={{ display: 'grid', gap: '32px', marginTop: '24px' }}>
                         {semesters.map(semester => (
                             <div key={semester} style={{
-                                background: 'white',
+                                background: 'var(--bg-card)',
                                 border: '1px solid var(--border-soft)',
                                 padding: '24px',
                                 borderRadius: 'var(--radius-md)',
@@ -133,7 +133,7 @@ const StudentResults = () => {
                 )}
             </div>
 
-            <div style={{ marginTop: '32px', padding: '24px', background: 'rgba(255, 255, 255, 0.5)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-soft)', display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ marginTop: '32px', padding: '24px', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-soft)', display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}>
                     <CheckCircle2 size={24} />
                 </div>

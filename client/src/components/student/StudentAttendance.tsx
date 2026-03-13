@@ -78,7 +78,7 @@ const StudentAttendance = () => {
                                     </td>
                                     <td>
                                         {record.subject ? (
-                                            <span className="badge" style={{ background: '#f1f5f9', color: 'var(--text-main)' }}>{record.subject}</span>
+                                            <span className="badge" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>{record.subject}</span>
                                         ) : (
                                             <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Full Day Session</span>
                                         )}

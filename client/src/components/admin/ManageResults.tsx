@@ -128,7 +128,7 @@ const ManageResults = () => {
                                 <tr key={r.id}>
                                     <td style={{ fontWeight: '500' }}>{r.student?.name}</td>
                                     <td>
-                                        <span className="badge" style={{ background: '#f1f5f9', color: 'var(--text-main)', border: '1px solid var(--border-soft)' }}>{r.subject}</span>
+                                        <span className="badge" style={{ background: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border-soft)' }}>{r.subject}</span>
                                     </td>
                                     <td>{r.semester}</td>
                                     <td style={{ textAlign: 'center', fontWeight: '700' }}>{r.marks} <span style={{ fontWeight: '400', color: 'var(--text-muted)', fontSize: '0.8rem' }}>/ {r.totalMarks}</span></td>
