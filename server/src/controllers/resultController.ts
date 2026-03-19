@@ -3,6 +3,7 @@ import { db } from '../lib/db.js';
 import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.js';
 import { broadcast } from '../lib/sseManager.js';
+import { emitEvent } from '../lib/socket.js';
 
 export const createResult = async (req: Request, res: Response) => {
     try {
@@ -16,6 +17,8 @@ export const createResult = async (req: Request, res: Response) => {
         );
 
         broadcast('result:created', { studentId: resultRes.rows[0].studentId });
+        emitEvent('result_published', resultRes.rows[0], `student:${studentId}`);
+        
         res.status(201).json(resultRes.rows[0]);
     } catch (error) {
         res.status(500).json({ message: 'Error creating result' });

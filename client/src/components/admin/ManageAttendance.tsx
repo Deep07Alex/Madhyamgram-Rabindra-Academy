@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import { socket } from '../../services/socket';
 import useServerEvents from '../../hooks/useServerEvents';
 import {
     ClipboardCheck,
@@ -118,7 +119,7 @@ const InlineStatusEdit = ({
                         classId: classId || '', subject: 'Full Day Record'
                     });
                 } else {
-                    await api.post('/attendance/teacher', { date, status, reason });
+                    await api.post('/attendance/teacher', { date, status, reason, teacherId: personId });
                 }
             }
             showToast('Attendance updated!', 'success');
@@ -237,23 +238,25 @@ const ManageAttendance = () => {
     const [search, setSearch] = useState('');
 
     // ── Fetch students + attendance for date ──────────────────────────────
-    const fetchStudentData = useCallback(async () => {
+    const fetchStudentData = useCallback(async (signal?: AbortSignal) => {
         if (viewMode !== 'daily') return;
         setLoading(true);
         try {
             const [stuRes, attRes, clsRes] = await Promise.all([
-                api.get('/users/students'),
+                api.get('/users/students', { signal }),
                 api.get('/attendance/student', {
-                    params: dateFilter ? { startDate: dateFilter, endDate: dateFilter } : {}
+                    params: dateFilter ? { startDate: dateFilter, endDate: dateFilter } : {},
+                    signal
                 }),
-                api.get('/users/classes'),
+                api.get('/users/classes', { signal }),
             ]);
 
             setClasses(clsRes.data);
 
             // Build a map: studentId → attendance record for the selected date
             const attMap: Record<string, any> = {};
-            attRes.data.forEach((a: any) => {
+            const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
+            attRecords.forEach((a: any) => {
                 attMap[a.studentId] = a;
             });
 
@@ -278,22 +281,24 @@ const ManageAttendance = () => {
             });
 
             setStudentRows(rows);
-        } catch {
+        } catch (err: any) {
+            if (err.name === 'CanceledError') return;
             showToast('Failed to load student data.', 'error');
         } finally {
             setLoading(false);
         }
-    }, [dateFilter, viewMode]);
+    }, [dateFilter, viewMode, showToast]);
 
     // ── Fetch teachers + attendance for date ──────────────────────────────
-    const fetchTeacherData = useCallback(async () => {
+    const fetchTeacherData = useCallback(async (signal?: AbortSignal) => {
         if (viewMode !== 'daily') return;
         setLoading(true);
         try {
             const [teachRes, attRes] = await Promise.all([
-                api.get('/users/teachers'),
+                api.get('/users/teachers', { signal }),
                 api.get('/attendance/teacher', {
-                    params: dateFilter ? { startDate: dateFilter, endDate: dateFilter } : {}
+                    params: dateFilter ? { startDate: dateFilter, endDate: dateFilter } : {},
+                    signal
                 }),
             ]);
 
@@ -317,23 +322,26 @@ const ManageAttendance = () => {
             });
 
             setTeacherRows(rows);
-        } catch {
+        } catch (err: any) {
+            if (err.name === 'CanceledError') return;
             showToast('Failed to load teacher data.', 'error');
         } finally {
             setLoading(false);
         }
-    }, [dateFilter, viewMode]);
+    }, [dateFilter, viewMode, showToast]);
 
     // ── Fetch Monthly Data ────────────────────────────────────────────────────
     const [monthlyDataMap, setMonthlyDataMap] = useState<Record<string, Record<string, any>>>({}); // personId -> { dateStr -> record }
 
-    const fetchMonthlyData = useCallback(async () => {
+    const fetchMonthlyData = useCallback(async (signal?: AbortSignal) => {
         if (viewMode !== 'monthly' || !monthFilter) return;
 
         // If students tab but no class selected, we only fetch classes list if needed and return
         if (tab === 'students' && !selectedClass) {
             if (classes.length === 0) {
-                api.get('/users/classes').then(res => setClasses(res.data)).catch(console.error);
+                api.get('/users/classes', { signal }).then(res => setClasses(res.data)).catch(err => {
+                    if (err.name !== 'CanceledError') console.error(err);
+                });
             }
             setMonthlyDataMap({});
             setStudentRows([]);
@@ -350,13 +358,14 @@ const ManageAttendance = () => {
 
             if (tab === 'students') {
                 const [stuRes, attRes] = await Promise.all([
-                    api.get(`/users/students?classId=${selectedClass}`),
-                    api.get('/attendance/student', { params: { classId: selectedClass, startDate, endDate } })
+                    api.get(`/users/students?classId=${selectedClass}`, { signal }),
+                    api.get('/attendance/student', { params: { classId: selectedClass, startDate, endDate }, signal })
                 ]);
 
                 // Map records
                 const matrix: Record<string, Record<string, any>> = {};
-                attRes.data.forEach((a: any) => {
+                const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
+                attRecords.forEach((a: any) => {
                     const d = a.date.split('T')[0];
                     if (!matrix[a.studentId]) matrix[a.studentId] = {};
                     matrix[a.studentId][d] = a;
@@ -369,8 +378,8 @@ const ManageAttendance = () => {
                 })));
             } else {
                 const [teachRes, attRes] = await Promise.all([
-                    api.get('/users/teachers'),
-                    api.get('/attendance/teacher', { params: { startDate, endDate } })
+                    api.get('/users/teachers', { signal }),
+                    api.get('/attendance/teacher', { params: { startDate, endDate }, signal })
                 ]);
 
                 const matrix: Record<string, Record<string, any>> = {};
@@ -385,33 +394,49 @@ const ManageAttendance = () => {
                     id: t.id, name: t.name, teacherId: t.teacherId, attendanceId: null, status: null, date: null, reason: null, designation: t.designation
                 })));
             }
-        } catch {
+        } catch (err: any) {
+            if (err.name === 'CanceledError') return;
             showToast('Failed to load monthly data.', 'error');
         } finally {
             setLoading(false);
         }
-    }, [viewMode, tab, monthFilter, selectedClass, classes.length]);
+    }, [viewMode, tab, monthFilter, selectedClass, classes.length, showToast]);
 
     useEffect(() => {
+        const controller = new AbortController();
+        
         if (viewMode === 'daily') {
-            if (tab === 'students') fetchStudentData();
-            else fetchTeacherData();
+            if (tab === 'students') fetchStudentData(controller.signal);
+            else fetchTeacherData(controller.signal);
         } else {
-            fetchMonthlyData();
+            fetchMonthlyData(controller.signal);
         }
+
+        return () => controller.abort();
     }, [tab, viewMode, dateFilter, monthFilter, selectedClass, fetchStudentData, fetchTeacherData, fetchMonthlyData]);
 
-    // Live SSE updates
+    // Live real-time updates
     useServerEvents({
         'attendance:updated': () => {
+            fetchMonthlyData();
             if (viewMode === 'daily') {
                 if (tab === 'students') fetchStudentData();
                 else fetchTeacherData();
-            } else {
-                fetchMonthlyData();
             }
         }
     });
+
+    useEffect(() => {
+        const handleUpdate = () => {
+            fetchMonthlyData();
+            if (viewMode === 'daily') {
+                if (tab === 'students') fetchStudentData();
+                else fetchTeacherData();
+            }
+        };
+        socket.on('attendance_marked', handleUpdate);
+        return () => { socket.off('attendance_marked', handleUpdate); };
+    }, [fetchMonthlyData, fetchStudentData, fetchTeacherData, tab, viewMode]);
 
     // Filtered rows
     const filteredStudents = studentRows.filter(r => {
@@ -425,7 +450,7 @@ const ManageAttendance = () => {
 
     const filteredTeachers = teacherRows.filter(r => {
         const isStaffCategory = ['NON-TEACHING STAFF', 'KARATE TEACHER', 'DANCE TEACHER'].includes(r.designation || '');
-        
+
         if (tab === 'teachers' && isStaffCategory) return false;
         if (tab === 'staff' && !isStaffCategory) return false;
 
@@ -555,8 +580,8 @@ const ManageAttendance = () => {
                 {tab === 'students' && (
                     <div style={{ position: 'relative' }}>
                         <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)}
-                            style={{ ...inputStyle, paddingRight: '32px', appearance: 'none', fontWeight: '600', color: selectedClass ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                            <option value="">{viewMode === 'monthly' ? 'Select Class (Required)' : 'All Classes'}</option>
+                            style={{ ...inputStyle, paddingRight: '32px', appearance: 'none', fontWeight: '600', color: 'var(--text-main)' }}>
+                            {viewMode === 'daily' && <option value="">All Classes</option>}
                             {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
                         <ChevronDown size={14} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)' }} />

@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import { v4 as uuidv4 } from 'uuid';
+import { emitEvent } from '../lib/socket.js';
 
 export const createNotice = async (req: Request, res: Response) => {
     try {
-        const { title, content, type, targetAudience, targetClassId, targetStudentId } = req.body;
+        const { title, content, type, targetAudience, targetClassId, targetStudentId, expiresAt } = req.body;
 
         if (!title || !content || !type) {
             return res.status(400).json({ message: 'Title, content, and type are required' });
@@ -14,13 +15,18 @@ export const createNotice = async (req: Request, res: Response) => {
         
         await db.query(
             `INSERT INTO "Notice" 
-            ("id", "title", "content", "type", "targetAudience", "targetClassId", "targetStudentId") 
-            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [id, title, content, type, targetAudience || 'ALL', targetClassId || null, targetStudentId || null]
+            ("id", "title", "content", "type", "targetAudience", "targetClassId", "targetStudentId", "expiresAt") 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [id, title, content, type, targetAudience || 'ALL', targetClassId || null, targetStudentId || null, expiresAt || null]
         );
 
         const result = await db.query('SELECT * FROM "Notice" WHERE id = $1', [id]);
-        res.status(201).json(result.rows[0]);
+        const newNotice = result.rows[0];
+        
+        // Emit real-time event
+        emitEvent('new_notice', newNotice);
+
+        res.status(201).json(newNotice);
     } catch (error) {
         console.error('Error creating notice:', error);
         res.status(500).json({ message: 'Internal server error' });
@@ -32,9 +38,12 @@ export const getNotices = async (req: Request, res: Response) => {
         const user = (req as any).user;
 
         if (!user) {
-            // Unauthenticated user -> Public notices only
+            // Unauthenticated user -> Public notices only, not expired
             const result = await db.query(
-                `SELECT * FROM "Notice" WHERE "type" = 'PUBLIC' ORDER BY "createdAt" DESC`
+                `SELECT * FROM "Notice" 
+                 WHERE "type" = 'PUBLIC' 
+                 AND ("expiresAt" IS NULL OR "expiresAt" > CURRENT_TIMESTAMP)
+                 ORDER BY "createdAt" DESC`
             );
             return res.json(result.rows);
         }
@@ -46,11 +55,11 @@ export const getNotices = async (req: Request, res: Response) => {
         }
 
         if (user.role === 'TEACHER') {
-            // Teacher -> Public OR (Internal and (ALL or TEACHER))
+            // Teacher -> Public OR (Internal and (ALL or TEACHER)) AND not expired
             const result = await db.query(
                 `SELECT * FROM "Notice" 
-                 WHERE "type" = 'PUBLIC' 
-                 OR ("type" = 'INTERNAL' AND "targetAudience" IN ('ALL', 'TEACHER')) 
+                 WHERE ("type" = 'PUBLIC' OR ("type" = 'INTERNAL' AND "targetAudience" IN ('ALL', 'TEACHER')))
+                 AND ("expiresAt" IS NULL OR "expiresAt" > CURRENT_TIMESTAMP)
                  ORDER BY "createdAt" DESC`
             );
             return res.json(result.rows);
@@ -69,13 +78,16 @@ export const getNotices = async (req: Request, res: Response) => {
 
             const result = await db.query(
                 `SELECT * FROM "Notice" 
-                 WHERE "type" = 'PUBLIC' 
-                 OR (
-                    "type" = 'INTERNAL' 
-                    AND "targetAudience" IN ('ALL', 'STUDENT')
-                    AND ("targetClassId" IS NULL OR "targetClassId" = $1)
-                    AND ("targetStudentId" IS NULL OR "targetStudentId" = $2)
-                 ) 
+                 WHERE (
+                    "type" = 'PUBLIC' 
+                    OR (
+                        "type" = 'INTERNAL' 
+                        AND "targetAudience" IN ('ALL', 'STUDENT')
+                        AND ("targetClassId" IS NULL OR "targetClassId" = $1)
+                        AND ("targetStudentId" IS NULL OR "targetStudentId" = $2)
+                    )
+                 )
+                 AND ("expiresAt" IS NULL OR "expiresAt" > CURRENT_TIMESTAMP)
                  ORDER BY "createdAt" DESC`,
                  [classId, user.id]
             );

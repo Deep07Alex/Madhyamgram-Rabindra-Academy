@@ -109,7 +109,9 @@ const TeacherAttendance = () => {
                 // Prefill existing attendance status, default to PRESENT if none
                 const init: Record<string, string> = {};
                 const attMap: Record<string, string> = {};
-                attRes.data.forEach((a: any) => {
+                const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
+                
+                attRecords.forEach((a: any) => {
                     attMap[a.studentId] = a.status;
                 });
 
@@ -140,7 +142,8 @@ const TeacherAttendance = () => {
             ]);
 
             const attMap: Record<string, any> = {};
-            attRes.data.forEach((a: any) => { attMap[a.studentId] = a; });
+            const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
+            attRecords.forEach((a: any) => { attMap[a.studentId] = a; });
 
             setHistRows(stuRes.data.map((s: any) => {
                 const att = attMap[s.id] || null;

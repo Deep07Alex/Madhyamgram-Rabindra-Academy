@@ -4,15 +4,17 @@ import { useEffect, useCallback, useRef } from 'react';
 export type SSEEventType =
     | 'connected'
     | 'attendance:updated'
-    | 'homework:created'
-    | 'homework:deleted'
-    | 'homework:submitted'
+    | 'homework_created'
+    | 'homework_deleted'
+    | 'homework_submitted'
+    | 'homework_graded'
     | 'result:created'
     | 'fee:created'
     | 'fee:paid'
     | 'user:created'
     | 'user:deleted'
-    | 'class:updated';
+    | 'class:updated'
+    | 'profile_updated';
 
 type EventHandlers = Partial<Record<SSEEventType, (data: any) => void>>;
 

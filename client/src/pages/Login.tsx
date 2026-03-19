@@ -59,8 +59,12 @@ const Login = () => {
                     </div>
                     <h2>Welcome Back</h2>
                     <div style={{ marginTop: '8px' }}>
-                        <p style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', opacity: 0.8, color: 'var(--text-main)', letterSpacing: '0.05em', margin: 0 }}>Madhyamgram</p>
-                        <p style={{ fontSize: '1.4rem', fontWeight: '1000', textTransform: 'uppercase', color: '#5d1717', margin: 0, letterSpacing: '-0.02em' }}>Rabindra Academy</p>
+                        <p className="login-subtitle-text">Madhyamgram</p>
+                        <p style={{ fontSize: '1.4rem', fontWeight: '1000', textTransform: 'uppercase', color: 'var(--primary-rich)', margin: 0, letterSpacing: '-0.02em' }} className="login-academy-text">Rabindra Academy</p>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '6px' }}>
+                            <p className="login-identity-text">UDISE: 19112601311</p>
+                            <p className="login-identity-text">ESTD: 2005</p>
+                        </div>
                     </div>
                 </div>
 
@@ -121,7 +125,7 @@ const Login = () => {
                                 onClick={() => setShowPassword(!showPassword)}
                                 tabIndex={-1}
                             >
-                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
                             </button>
                         </div>
                     </div>

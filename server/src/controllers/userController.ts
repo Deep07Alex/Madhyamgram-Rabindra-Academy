@@ -162,7 +162,7 @@ export const deleteClass = async (req: Request, res: Response) => {
 // Update a student (general update)
 export const updateStudent = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { name, studentId, rollNumber, banglarSikkhaId, password } = req.body;
+    const { name, studentId, rollNumber, banglarSikkhaId, email, password, photo } = req.body;
 
     try {
         let updateQuery = 'UPDATE "Student" SET ';
@@ -173,9 +173,19 @@ export const updateStudent = async (req: Request, res: Response) => {
             updateQuery += `"name" = $${paramCount++}, `;
             params.push(name);
         }
+        if (email !== undefined) {
+             const safeEmail = (email && email.trim()) ? email.trim() : null;
+             updateQuery += `"email" = $${paramCount++}, `;
+             params.push(safeEmail);
+        }
         if (studentId) {
-            // Ensure prefix
-            const finalId = studentId.toUpperCase().startsWith('S-') ? studentId : `S-${studentId}`;
+            // Ensure uppercase S- prefix and trim
+            let finalId = studentId.trim();
+            if (!finalId.toUpperCase().startsWith('S-')) {
+                finalId = `S-${finalId}`;
+            } else {
+                finalId = `S-${finalId.slice(2)}`;
+            }
             updateQuery += `"studentId" = $${paramCount++}, `;
             params.push(finalId);
         }
@@ -184,13 +194,27 @@ export const updateStudent = async (req: Request, res: Response) => {
             params.push(rollNumber);
         }
         if (banglarSikkhaId !== undefined) {
+            const safeBanglarSikkhaId = (banglarSikkhaId && banglarSikkhaId.trim()) ? banglarSikkhaId.trim() : null;
+            if (safeBanglarSikkhaId) {
+                const banglarCheck = await db.query(
+                    `SELECT id FROM "Student" WHERE "banglarSikkhaId" = $1 AND id != $2 LIMIT 1`,
+                    [safeBanglarSikkhaId, id]
+                );
+                if (banglarCheck.rows.length > 0) {
+                    return res.status(400).json({ message: 'Cannot be updated as this Banglar Sikkha ID is already allotted to another student' });
+                }
+            }
             updateQuery += `"banglarSikkhaId" = $${paramCount++}, `;
-            params.push(banglarSikkhaId);
+            params.push(safeBanglarSikkhaId);
         }
         if (password) {
             const hashedPassword = await bcrypt.hash(password, 10);
             updateQuery += `password = $${paramCount++}, "plainPassword" = $${paramCount++}, `;
             params.push(hashedPassword, password);
+        }
+        if (photo !== undefined) {
+            updateQuery += `"photo" = $${paramCount++}, `;
+            params.push(photo);
         }
 
         // Remove trailing comma and space
@@ -204,7 +228,13 @@ export const updateStudent = async (req: Request, res: Response) => {
             return res.status(404).json({ message: 'Student not found' });
         }
 
-        res.json({ message: 'Student updated successfully', student: result.rows[0] });
+        const updatedStudent = result.rows[0];
+        // Emit live update event
+        import('../lib/socket.js').then(({ emitEvent }) => {
+            emitEvent('profile_updated', { studentId: id }, `student:${id}`);
+        }).catch(err => console.error('Socket emission error:', err));
+
+        res.json({ message: 'Student updated successfully', student: updatedStudent });
     } catch (error: any) {
         console.error('Update student error:', error);
         if (error.code === '23505') { // Unique constraint violation
@@ -217,7 +247,10 @@ export const updateStudent = async (req: Request, res: Response) => {
 // Update a teacher/faculty (general update)
 export const updateTeacher = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { name, teacherId, phone, aadhar, designation, joiningDate, isTeaching, password } = req.body;
+    const { 
+        name, teacherId, phone, aadhar, designation, joiningDate, isTeaching, password,
+        photo, address, dob, qualification, extraQualification, caste, email
+    } = req.body;
 
     try {
         let updateQuery = 'UPDATE "Teacher" SET ';
@@ -228,17 +261,25 @@ export const updateTeacher = async (req: Request, res: Response) => {
             updateQuery += `"name" = $${paramCount++}, `;
             params.push(name);
         }
+        if (email !== undefined) {
+             const safeEmail = (email && email.trim()) ? email.trim() : null;
+             updateQuery += `"email" = $${paramCount++}, `;
+             params.push(safeEmail);
+        }
         if (teacherId !== undefined) {
+             const safeTeacherId = (teacherId && teacherId.trim()) ? teacherId.trim() : null;
              updateQuery += `"teacherId" = $${paramCount++}, `;
-             params.push(teacherId);
+             params.push(safeTeacherId);
         }
         if (phone !== undefined) {
+            const safePhone = (phone && phone.trim()) ? phone.trim() : null;
             updateQuery += `"phone" = $${paramCount++}, `;
-            params.push(phone);
+            params.push(safePhone);
         }
         if (aadhar !== undefined) {
+            const safeAadhar = (aadhar && aadhar.trim()) ? aadhar.trim() : null;
             updateQuery += `"aadhar" = $${paramCount++}, `;
-            params.push(aadhar);
+            params.push(safeAadhar);
         }
         if (designation !== undefined) {
             updateQuery += `"designation" = $${paramCount++}, `;
@@ -251,6 +292,30 @@ export const updateTeacher = async (req: Request, res: Response) => {
         if (isTeaching !== undefined) {
             updateQuery += `"isTeaching" = $${paramCount++}, `;
             params.push(isTeaching);
+        }
+        if (photo !== undefined) {
+            updateQuery += `"photo" = $${paramCount++}, `;
+            params.push(photo);
+        }
+        if (address !== undefined) {
+            updateQuery += `"address" = $${paramCount++}, `;
+            params.push(address);
+        }
+        if (dob !== undefined) {
+            updateQuery += `"dob" = $${paramCount++}, `;
+            params.push(dob);
+        }
+        if (qualification !== undefined) {
+            updateQuery += `"qualification" = $${paramCount++}, `;
+            params.push(qualification);
+        }
+        if (extraQualification !== undefined) {
+            updateQuery += `"extraQualification" = $${paramCount++}, `;
+            params.push(extraQualification);
+        }
+        if (caste !== undefined) {
+            updateQuery += `"caste" = $${paramCount++}, `;
+            params.push(caste);
         }
         if (password) {
             const hashedPassword = await bcrypt.hash(password, 10);
@@ -269,7 +334,14 @@ export const updateTeacher = async (req: Request, res: Response) => {
             return res.status(404).json({ message: 'Faculty not found' });
         }
 
-        res.json({ message: 'Faculty updated successfully', teacher: result.rows[0] });
+
+        const updatedTeacher = result.rows[0];
+        // Emit live update event
+        import('../lib/socket.js').then(({ emitEvent }) => {
+            emitEvent('profile_updated', { teacherId: id }, `teacher:${id}`);
+        }).catch(err => console.error('Socket emission error:', err));
+
+        res.json({ message: 'Faculty updated successfully', teacher: updatedTeacher });
     } catch (error: any) {
         console.error('Update teacher error:', error);
         if (error.code === '23505') {
@@ -317,117 +389,136 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
         return res.status(400).json({ message: 'No file uploaded' });
     }
 
+    const client = await db.connect();
     try {
         const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
         const sheetName = workbook.SheetNames[0];
-        if (!sheetName) {
-            return res.status(400).json({ message: 'Excel file is empty (no sheets found)' });
-        }
+        if (!sheetName) return res.status(400).json({ message: 'Excel file is empty' });
+        
         const worksheet = workbook.Sheets[sheetName];
-        if (!worksheet) {
-            return res.status(400).json({ message: 'Sheet not found' });
-        }
+        if (!worksheet) return res.status(400).json({ message: 'Sheet not found' });
         const data = XLSX.utils.sheet_to_json(worksheet);
 
-        const results = {
-            success: 0,
-            failed: 0,
-            errors: [] as string[]
-        };
+        const results = { success: 0, failed: 0, errors: [] as string[] };
+        const validStudents: any[] = [];
 
-        // Class Mapping Helper
-        const getMappedClassId = (rawName: string, classes: any[]) => {
-            const name = rawName.toUpperCase();
-            if (name === 'NURSERY') return classes.find(c => c.name === 'Nursery')?.id;
-            if (name === 'KG-I') return classes.find(c => c.name === 'KG-I')?.id;
-            if (name === 'KG-II A') return classes.find(c => c.name === 'KG-II A')?.id;
-            if (name === 'KG-II B') return classes.find(c => c.name === 'KG-II B')?.id;
-            if (name === 'STD-I') return classes.find(c => c.name === 'STD-I')?.id;
-            if (name === 'STD-II') return classes.find(c => c.name === 'STD-II')?.id;
-            if (name === 'STD-III') return classes.find(c => c.name === 'STD-III')?.id;
-            if (name === 'STD-IV') return classes.find(c => c.name === 'STD-IV')?.id;
-            
-            // Fallbacks
-            if (name.includes('NURSERY')) return classes.find(c => c.id === 'class-nursery')?.id;
-            if (name.includes('KG-I') || name.includes('KG1')) return classes.find(c => c.id === 'class-kg1')?.id;
-            if (name.includes('KG-II A') || name.includes('KG2 A')) return classes.find(c => c.id === 'class-kg2-a')?.id;
-            if (name.includes('KG-II B') || name.includes('KG2 B')) return classes.find(c => c.id === 'class-kg2-b')?.id;
-            if (name.includes('KG-II') || name.includes('KG2')) return classes.find(c => c.id === 'class-kg2-a')?.id;
-            if (name.includes('STD-I') || name === 'CLASS 1' || name === 'CLASS I') return classes.find(c => c.id === 'class-1')?.id;
-            if (name.includes('STD-II') || name === 'CLASS 2' || name === 'CLASS II') return classes.find(c => c.id === 'class-2')?.id;
-            if (name.includes('STD-III') || name === 'CLASS 3' || name === 'CLASS III') return classes.find(c => c.id === 'class-3')?.id;
-            if (name.includes('STD-IV') || name === 'CLASS 4' || name === 'CLASS IV') return classes.find(c => c.id === 'class-4')?.id;
-            return classes.find(c => name.includes(c.name.toUpperCase()))?.id;
-        };
+        // Pre-fetch all classes and existing IDs for O(1) checks
+        const [classesRes, existingIdsRes] = await Promise.all([
+            client.query(`SELECT id, name FROM "Class"`),
+            client.query(`SELECT "studentId", "banglarSikkhaId" FROM "Student"`)
+        ]);
 
-        // Fetch all classes for mapping
-        const classesRes = await db.query(`SELECT * FROM "Class"`);
         const classes = classesRes.rows;
+        const existingStudentIds = new Set(existingIdsRes.rows.map(r => r.studentId.toUpperCase()));
+        const existingBanglarIds = new Set(existingIdsRes.rows.filter(r => r.banglarSikkhaId).map(r => r.banglarSikkhaId.toUpperCase()));
 
+        const getMappedClassId = (rawName: string) => {
+            const name = rawName.toString().toUpperCase().trim();
+            const found = classes.find(c => c.name.toUpperCase() === name || name.includes(c.name.toUpperCase()));
+            return found?.id;
+        };
+
+        // Step 1: Pre-process and validate all rows (In-memory)
         for (const [index, row] of (data as any[]).entries()) {
             try {
-                // Column mapping based on screenshots:
-                // CLASS, Roll, NAME, STUDENT ID IN BANGLAR SHIKSHA PORTAL, Admission Registration No.
-                const name = row['NAME'];
-                const rawClass = row['CLASS'];
-                const rollNumber = row['Roll']?.toString();
-                let studentId = row['Admission Registration No.']?.toString();
-                const banglarSikkhaId = row['STUDENT ID IN BANGLAR SHIKSHA PORTAL']?.toString();
+                const name = row['NAME']?.toString().trim();
+                const rawClass = row['CLASS']?.toString().trim();
+                const rollNumber = row['Roll']?.toString().trim() || '0';
+                let studentId = row['Admission Registration No.']?.toString().trim();
+                const banglarSikkhaId = row['STUDENT ID IN BANGLAR SHIKSHA PORTAL']?.toString().trim();
 
                 if (!name || !rawClass || !studentId) {
-                    results.failed++;
-                    results.errors.push(`Row ${index + 2}: Missing mandatory fields (Name, Class, or Admission No)`);
-                    continue;
+                    throw new Error(`Missing mandatory fields (Name: ${!!name}, Class: ${!!rawClass}, Admission No: ${!!studentId})`);
                 }
 
-                // Ensure S- prefix
                 if (!studentId.toUpperCase().startsWith('S-')) {
                     studentId = `S-${studentId}`;
                 }
 
-                const classId = getMappedClassId(rawClass, classes);
+                const upperStudentId = studentId.toUpperCase();
+                if (existingStudentIds.has(upperStudentId)) {
+                    throw new Error(`Admission No "${studentId}" already exists`);
+                }
+
+                if (banglarSikkhaId && existingBanglarIds.has(banglarSikkhaId.toUpperCase())) {
+                    throw new Error(`Banglar Sikkha ID "${banglarSikkhaId}" already exists`);
+                }
+
+                const classId = getMappedClassId(rawClass);
                 if (!classId) {
-                    results.failed++;
-                    results.errors.push(`Row ${index + 2}: Unknown class "${rawClass}"`);
-                    continue;
+                    throw new Error(`Unknown class "${rawClass}"`);
                 }
 
-                // Check for existing studentId
-                const existingId = await db.query(`SELECT id FROM "Student" WHERE "studentId" = $1`, [studentId]);
-                if (existingId.rows.length > 0) {
-                    results.failed++;
-                    results.errors.push(`Row ${index + 2}: Student with Admission No "${studentId}" already exists`);
-                    continue;
-                }
-
-                // Create student
-                const id = crypto.randomUUID();
-                const cleanName = name.toString().trim().toLowerCase().replace(/\s+/g, '');
+                const cleanName = name.toLowerCase().replace(/\s+/g, '');
                 const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
                 const numericId = studentId.replace(/\D/g, '');
-                const password = `${capitalizedName}@${numericId}`;
-                const hashedPassword = await bcrypt.hash(password, 10);
+                const password = `${capitalizedName}@${numericId.slice(-4) || '0000'}`;
 
-                await db.query(
-                    `INSERT INTO "Student" (id, "studentId", password, "plainPassword", name, "rollNumber", "classId", "banglarSikkhaId") 
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                    [id, studentId, hashedPassword, password, name, rollNumber || '0', classId, banglarSikkhaId || null]
-                );
+                validStudents.push({
+                    id: crypto.randomUUID(),
+                    studentId,
+                    password,
+                    name,
+                    rollNumber,
+                    classId,
+                    banglarSikkhaId: banglarSikkhaId || null
+                });
 
-                results.success++;
+                existingStudentIds.add(upperStudentId);
+                if (banglarSikkhaId) existingBanglarIds.add(banglarSikkhaId.toUpperCase());
             } catch (err: any) {
-                console.error(`Error importing row ${index + 2}:`, err);
                 results.failed++;
                 results.errors.push(`Row ${index + 2}: ${err.message}`);
             }
         }
 
+        // Step 2: Parallel Password Hashing in Chunks
+        // Using chunks to prevent CPU exhaustion on very large files
+        const HASH_BATCH_SIZE = 50;
+        for (let i = 0; i < validStudents.length; i += HASH_BATCH_SIZE) {
+            const batch = validStudents.slice(i, i + HASH_BATCH_SIZE);
+            await Promise.all(batch.map(async (st) => {
+                st.hashedPassword = await bcrypt.hash(st.password, 10);
+            }));
+        }
+
+        // Step 3: Single Bulk Transaction
+        if (validStudents.length > 0) {
+            await client.query('BEGIN');
+            try {
+                // Construct a single multi-row INSERT query
+                // Parameter count = rows * 8 (id, studentId, password, plainPassword, name, rollNumber, classId, banglarSikkhaId)
+                const columns = '(id, "studentId", password, "plainPassword", name, "rollNumber", "classId", "banglarSikkhaId")';
+                const values: any[] = [];
+                const placeholders: string[] = [];
+
+                validStudents.forEach((st, idx) => {
+                    const base = idx * 8;
+                    placeholders.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8})`);
+                    values.push(
+                        st.id, st.studentId, st.hashedPassword, st.password, 
+                        st.name, st.rollNumber, st.classId, st.banglarSikkhaId
+                    );
+                });
+
+                const query = `INSERT INTO "Student" ${columns} VALUES ${placeholders.join(', ')}`;
+                await client.query(query, values);
+                await client.query('COMMIT');
+                results.success = validStudents.length;
+            } catch (dbError: any) {
+                await client.query('ROLLBACK');
+                throw dbError;
+            }
+        }
+
         res.json({
-            message: `Import completed: ${results.success} students imported successfully, ${results.failed} failed.`,
+            message: `Import completed: ${results.success} students imported, ${results.failed} failed.`,
             ...results
         });
     } catch (error: any) {
         console.error('Bulk import error:', error);
         res.status(500).json({ message: 'Error processing bulk import', error: error.message });
+    } finally {
+        client.release();
     }
 };

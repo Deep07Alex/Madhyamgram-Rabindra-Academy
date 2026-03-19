@@ -15,9 +15,9 @@ export const removeClient = (res: Response) => {
 
 export type SSEEventType =
     | 'attendance:updated'
-    | 'homework:created'
-    | 'homework:deleted'
-    | 'homework:submitted'
+    | 'homework_created'
+    | 'homework_deleted'
+    | 'homework_submitted'
     | 'result:created'
     | 'fee:created'
     | 'fee:paid'

@@ -5,17 +5,20 @@ import { GraduationCap, Trash2 } from 'lucide-react';
 const ManageClasses = () => {
     const [classes, setClasses] = useState([]);
 
-    const fetchData = async () => {
+    const fetchData = async (signal?: AbortSignal) => {
         try {
-            const clsRes = await api.get('/users/classes');
+            const clsRes = await api.get('/users/classes', { signal });
             setClasses(clsRes.data);
-        } catch (error) {
+        } catch (error: any) {
+            if (error.name === 'CanceledError') return;
             console.error('Failed to fetch data:', error);
         }
     };
 
     useEffect(() => {
-        fetchData();
+        const controller = new AbortController();
+        fetchData(controller.signal);
+        return () => controller.abort();
     }, []);
 
     const handleDeleteClass = async (id: string) => {

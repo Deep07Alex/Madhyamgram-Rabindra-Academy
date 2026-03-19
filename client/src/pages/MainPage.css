@@ -22,7 +22,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 1rem 2rem;
-  background-color: var(--primary); /* using app primary color replacing #00447c */
+  background-color: var(--nav-bg);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -34,7 +34,7 @@
   font-family: 'Outfit', sans-serif;
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--primary-rich);
+  color: var(--nav-text);
 }
 
 .landing-nav-menu {
@@ -43,8 +43,8 @@
 }
 
 .landing-nav-menu a {
-  color: #1e293b;
-  font-weight: 600;
+  color: var(--nav-text);
+  font-weight: 650;
   margin: 0 1rem;
   text-decoration: none;
   transition: color 0.2s;
@@ -128,7 +128,7 @@
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 100%);
+  background: var(--hero-overlay);
 }
 
 .hero-content {
@@ -176,8 +176,9 @@
 
 /* Admission Section */
 .admission {
-  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); /* soft amber matching app palette */
+  background: var(--accent-soft);
   text-align: center;
+  border: 1px solid var(--border-soft);
 }
 
 .admission p {
@@ -204,35 +205,6 @@
   color: white;
 }
 
-/* Quick Links */
-.quick-links ul {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-}
-
-.quick-links a {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  background-color: var(--primary);
-  color: #1e293b;
-  border-radius: var(--radius-md);
-  text-decoration: none;
-  font-weight: 600;
-  transition: all var(--transition-fast);
-  box-shadow: var(--shadow-sm);
-  text-align: center;
-}
-
-.quick-links a:hover {
-  background-color: var(--primary-deep);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
 
 /* Notice Board */
 .notice {
@@ -305,8 +277,8 @@
 
 /* Footer */
 .landing-footer {
-  background-color: var(--primary-rich); /* using primary-rich instead of generic #222 */
-  color: white;
+  background-color: var(--footer-bg);
+  color: var(--footer-text);
   padding: 4rem 2rem 2rem;
   text-align: center;
 }
@@ -314,15 +286,13 @@
 .landing-footer h3 {
   font-size: 1.75rem;
   margin-bottom: 1rem;
-  background: linear-gradient(135deg, var(--primary) 0%, #fff 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
   font-family: 'Outfit', sans-serif;
+  color: var(--footer-text);
 }
 
 .landing-footer p {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--footer-text);
+  opacity: 0.8;
   margin-bottom: 2rem;
 }
 
@@ -334,14 +304,15 @@
 }
 
 .social-icons a {
-  color: var(--primary);
+  color: var(--footer-text);
   font-size: 1.5rem;
   transition: color 0.2s, transform 0.2s;
   text-decoration: none;
+  opacity: 0.9;
 }
 
 .social-icons a:hover {
-  color: white;
+  opacity: 1;
   transform: translateY(-2px);
 }
 
@@ -349,6 +320,7 @@
   border-top: 1px solid rgba(255,255,255,0.1);
   padding-top: 2rem;
   font-size: 0.875rem;
-  color: rgba(255,255,255,0.6) !important;
+  color: var(--footer-text);
+  opacity: 0.6 !important;
   margin-bottom: 0 !important;
 }

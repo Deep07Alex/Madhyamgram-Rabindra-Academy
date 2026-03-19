@@ -128,7 +128,7 @@ const ManageGallery = () => {
                                 <tr key={img.id}>
                                     <td>
                                         <div style={{ width: '64px', height: '48px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-soft)' }}>
-                                            <img src={`http://localhost:5000${img.imageUrl}`} alt={img.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${img.imageUrl}`} alt={img.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         </div>
                                     </td>
                                     <td style={{ fontWeight: '600' }}>{img.title}</td>

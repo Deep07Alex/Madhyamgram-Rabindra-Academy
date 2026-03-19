@@ -23,6 +23,7 @@ interface Notice {
     targetAudience: 'ALL' | 'TEACHER' | 'STUDENT';
     targetClassId: string | null;
     targetStudentId: string | null;
+    expiresAt: string | null;
     createdAt: string;
 }
 
@@ -50,7 +51,8 @@ const ManageNotices = () => {
         type: 'PUBLIC' as 'PUBLIC' | 'INTERNAL',
         targetAudience: 'ALL' as 'ALL' | 'TEACHER' | 'STUDENT',
         targetClassId: '',
-        targetStudentId: ''
+        targetStudentId: '',
+        expiresAt: ''
     });
 
     useEffect(() => {
@@ -58,11 +60,13 @@ const ManageNotices = () => {
             try {
                 const [noticesRes, classesRes, studentsRes] = await Promise.all([
                     api.get('/notices'),
-                    api.get('/dashboard/classes'),
-                    api.get('/dashboard/users?role=student')
+                    api.get('/users/classes'),
+                    api.get('/users/students')
                 ]);
                 setNotices(noticesRes.data);
                 setClasses(classesRes.data);
+                // The students API returns full student objects, so we need to map the ID if necessary
+                // or just ensure we're using the 'id' field for filtering.
                 setStudents(studentsRes.data);
             } catch (error) {
                 console.error('Failed to fetch initial data:', error);
@@ -106,7 +110,8 @@ const ManageNotices = () => {
                 type: 'PUBLIC',
                 targetAudience: 'ALL',
                 targetClassId: '',
-                targetStudentId: ''
+                targetStudentId: '',
+                expiresAt: ''
             });
         } catch (error) {
             console.error('Failed to create notice:', error);
@@ -287,6 +292,20 @@ const ManageNotices = () => {
                             </>
                         )}
 
+                        <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                            <label>Auto-Expiration Date & Time (Optional)</label>
+                            <div style={{ position: 'relative' }}>
+                                <input 
+                                    type="datetime-local" 
+                                    value={formData.expiresAt}
+                                    onChange={e => setFormData({...formData, expiresAt: e.target.value})}
+                                    style={{ paddingLeft: '40px' }}
+                                />
+                                <Calendar size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-bold)' }} />
+                            </div>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Notice will be automatically hidden from students/teachers after this time. Leave empty for manual deletion.</p>
+                        </div>
+
                         <div style={{ gridColumn: 'span 2', display: 'flex', gap: '16px', marginTop: '16px', justifyContent: 'flex-end' }}>
                             <button 
                                 type="button" 
@@ -387,6 +406,22 @@ const ManageNotices = () => {
                                                                 ? `${classes.find(c => c.id === notice.targetClassId)?.name || 'Class'}` 
                                                                 : 'All Classes'}
                                                             {notice.targetStudentId && ` • Individual Alert`}
+                                                        </div>
+                                                    )}
+                                                    {notice.expiresAt && (
+                                                        <div style={{ 
+                                                            fontSize: '0.7rem', 
+                                                            marginTop: '4px',
+                                                            color: new Date(notice.expiresAt) < new Date() ? 'var(--danger)' : 'var(--success)',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px',
+                                                            fontWeight: '700'
+                                                        }}>
+                                                            <Calendar size={10} />
+                                                            {new Date(notice.expiresAt) < new Date() 
+                                                                ? `Expired: ${new Date(notice.expiresAt).toLocaleString()}` 
+                                                                : `Expires: ${new Date(notice.expiresAt).toLocaleString()}`}
                                                         </div>
                                                     )}
                                                 </div>

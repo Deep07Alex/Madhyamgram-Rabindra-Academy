@@ -3,6 +3,7 @@ import { db } from '../lib/db.js';
 import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.js';
 import { broadcast } from '../lib/sseManager.js';
+import { emitEvent } from '../lib/socket.js';
 
 // --- Homework Management ---
 
@@ -18,14 +19,19 @@ export const createHomework = async (req: AuthRequest, res: Response) => {
 
         if (!teacherId) return res.status(401).json({ message: 'Unauthorized' });
 
+        const finalDueDate = new Date(dueDate);
+        finalDueDate.setHours(23, 59, 59, 999);
+
         const id = crypto.randomUUID();
         const homeworkRes = await db.query(
             `INSERT INTO "Homework" (id, title, description, subject, "dueDate", "classId", "teacherId", "fileUrl", "allowFileUpload") 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-            [id, title, description, subject || null, new Date(dueDate), classId, teacherId, fileUrl, allowFileUpload === 'true' || allowFileUpload === true]
+            [id, title, description, subject || null, finalDueDate, classId, teacherId, fileUrl, allowFileUpload === 'true' || allowFileUpload === true]
         );
 
-        broadcast('homework:created', { classId: homeworkRes.rows[0].classId });
+        emitEvent('homework_created', { classId: homeworkRes.rows[0].classId });
+        emitEvent('homework_created', homeworkRes.rows[0], `class:${classId}`);
+        
         res.status(201).json(homeworkRes.rows[0]);
     } catch (error) {
         console.error(error);
@@ -38,9 +44,10 @@ export const deleteHomework = async (req: Request, res: Response) => {
         const { id } = req.params;
         // Remove submissions first to avoid FK violation
         await db.query(`DELETE FROM "Submission" WHERE "homeworkId" = $1`, [id]);
-        const result = await db.query(`DELETE FROM "Homework" WHERE id = $1 RETURNING id`, [id]);
+        const result = await db.query(`DELETE FROM "Homework" WHERE id = $1 RETURNING "classId"`, [id]);
         if (result.rows.length === 0) return res.status(404).json({ message: 'Homework not found' });
-        broadcast('homework:deleted', { id });
+        broadcast('homework_deleted', { id });
+        emitEvent('homework_deleted', { id, classId: result.rows[0].classId }, `class:${result.rows[0].classId}`);
         res.json({ message: 'Homework deleted' });
     } catch (error) {
         console.error(error);
@@ -55,10 +62,15 @@ export const getHomeworks = async (req: AuthRequest, res: Response) => {
         const role = req.user?.role;
 
         // For students: include their own submissions in each homework row
-        const submissionsSubquery = role === 'STUDENT'
-            ? `(SELECT json_agg(json_build_object('id', s.id, 'status', s.status, 'content', s.content, 'fileUrl', s."fileUrl", 'submittedAt', s."submittedAt"))
-               FROM "Submission" s WHERE s."homeworkId" = h.id AND s."studentId" = '${userId}') as submissions`
-            : `'[]'::json as submissions`;
+        let submissionsSubquery = `'[]'::json as submissions`;
+        const params: any[] = [];
+        let paramCount = 1;
+
+        if (role === 'STUDENT') {
+            submissionsSubquery = `COALESCE((SELECT json_agg(json_build_object('id', s.id, 'status', s.status, 'content', s.content, 'fileUrl', s."fileUrl", 'submittedAt', s."submittedAt"))
+               FROM "Submission" s WHERE s."homeworkId" = h.id AND s."studentId" = $${paramCount++}), '[]'::json) as submissions`;
+            params.push(userId);
+        }
 
         let query = `
             SELECT h.*,
@@ -70,8 +82,6 @@ export const getHomeworks = async (req: AuthRequest, res: Response) => {
             LEFT JOIN "Class" c ON h."classId" = c.id
             WHERE 1=1
         `;
-        const params: any[] = [];
-        let paramCount = 1;
 
         if (classId) {
             query += ` AND h."classId" = $${paramCount++}`;
@@ -124,7 +134,11 @@ export const submitHomework = async (req: AuthRequest, res: Response) => {
                  WHERE id = $3 RETURNING *`,
                 [content, fileUrl, existingId]
             );
-            broadcast('homework:submitted', { homeworkId, studentId });
+            broadcast('homework_submitted', { homeworkId, studentId });
+            emitEvent('homework_submitted', { homeworkId, studentId }, 'admin_room');
+            emitEvent('homework_submitted', { homeworkId, studentId }, `teacher:${updatedRes.rows[0].teacherId}`);
+            emitEvent('homework_submitted', { homeworkId, studentId }, `student:${studentId}`);
+            
             return res.json(updatedRes.rows[0]);
         }
 
@@ -135,7 +149,17 @@ export const submitHomework = async (req: AuthRequest, res: Response) => {
             [subId, homeworkId, studentId, content, fileUrl]
         );
 
-        broadcast('homework:submitted', { homeworkId, studentId });
+        // Fetch teacherId to emit to the specific teacher's dashboard
+        const tRes = await db.query('SELECT "teacherId" FROM "Homework" WHERE id = $1', [homeworkId]);
+        const assignmentTeacherId = tRes.rows[0]?.teacherId;
+
+        broadcast('homework_submitted', { homeworkId, studentId });
+        emitEvent('homework_submitted', { homeworkId, studentId }, 'admin_room');
+        emitEvent('homework_submitted', { homeworkId, studentId }, `student:${studentId}`);
+        if (assignmentTeacherId) {
+            emitEvent('homework_submitted', { homeworkId, studentId }, `teacher:${assignmentTeacherId}`);
+        }
+        
         res.status(201).json(submissionRes.rows[0]);
     } catch (error) {
         res.status(500).json({ message: 'Error submitting homework' });
@@ -177,18 +201,36 @@ export const getSubmissions = async (req: Request, res: Response) => {
     }
 };
 
-export const gradeSubmission = async (req: Request, res: Response) => {
+export const gradeSubmission = async (req: AuthRequest, res: Response) => {
     try {
         const id = req.params.id as string;
-        const { status } = req.body; // should be 'GRADED' etc.
+        const { status, feedback } = req.body; // status should be 'GRADED' etc.
+
+        // Check if deadline is passed
+        const checkRes = await db.query(`
+            SELECT h."dueDate" 
+            FROM "Submission" s
+            JOIN "Homework" h ON s."homeworkId" = h.id
+            WHERE s.id = $1
+        `, [id]);
+
+        if (checkRes.rows.length === 0) return res.status(404).json({ message: 'Submission not found' });
+
+        const dueDate = new Date(checkRes.rows[0].dueDate);
+        if (new Date() < dueDate) {
+            return res.status(403).json({ message: 'Grading is only permitted after the submission deadline has passed.' });
+        }
 
         const submissionRes = await db.query(
-            `UPDATE "Submission" SET status = $1 WHERE id = $2 RETURNING *`,
-            [status, id]
+            `UPDATE "Submission" SET status = $1, feedback = $2 WHERE id = $3 RETURNING *`,
+            [status, feedback || null, id]
         );
+
+        emitEvent('homework_graded', submissionRes.rows[0], `student:${submissionRes.rows[0].studentId}`);
 
         res.json(submissionRes.rows[0]);
     } catch (error) {
+        console.error(error);
         res.status(500).json({ message: 'Error grading submission' });
     }
 };

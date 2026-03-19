@@ -26,6 +26,7 @@ const TeacherHomework = () => {
     const [submissions, setSubmissions] = useState([]);
     const [selectedHomework, setSelectedHomework] = useState('');
     const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
+    const [gradingFeedback, setGradingFeedback] = useState('');
     const [newHomework, setNewHomework] = useState({
         classId: '', title: '', description: '', subject: '', dueDate: '', allowFileUpload: false
     });
@@ -64,9 +65,9 @@ const TeacherHomework = () => {
 
     // Live: refresh on remote changes
     useServerEvents({
-        'homework:submitted': fetchSubmissions,
-        'homework:created': fetchData,
-        'homework:deleted': (data: any) => {
+        'homework_submitted': fetchSubmissions,
+        'homework_created': fetchData,
+        'homework_deleted': (data: any) => {
             fetchData();
             if (data && data.id === selectedHomework) {
                 setSelectedHomework('');
@@ -89,7 +90,7 @@ const TeacherHomework = () => {
             await api.post('/homework', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-            showToast('Homework assigned successfully!', 'success');
+            showToast('Assignment deployed successfully!', 'success');
             setNewHomework({ classId: '', title: '', description: '', subject: '', dueDate: '', allowFileUpload: false });
             setAttachedFile(null);
             fetchData();
@@ -110,11 +111,15 @@ const TeacherHomework = () => {
 
     const handleGrade = async (submissionId: string, status: string) => {
         try {
-            await api.put(`/homework/submissions/${submissionId}`, { status });
+            await api.put(`/homework/submissions/${submissionId}`, { status, feedback: gradingFeedback });
+            showToast('Submission graded and feedback recorded.', 'success');
             api.get(`/homework/${selectedHomework}/submissions`)
                 .then(res => setSubmissions(res.data));
-        } catch (error) {
+            setGradingFeedback('');
+        } catch (error: any) {
             console.error('Failed to update submission:', error);
+            const msg = error.response?.data?.message || 'Failed to update submission.';
+            showToast(msg, 'error');
         }
     };
 
@@ -259,7 +264,7 @@ const TeacherHomework = () => {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <span>{hw.title}</span>
                                             {hw.fileUrl && (
-                                                <a href={`http://localhost:5000${hw.fileUrl}`} target="_blank" rel="noreferrer"
+                                                <a href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${hw.fileUrl}`} target="_blank" rel="noreferrer"
                                                     title="View attached file"
                                                     style={{ color: 'var(--primary-bold)', display: 'flex', alignItems: 'center' }}>
                                                     <Paperclip size={13} />
@@ -333,7 +338,10 @@ const TeacherHomework = () => {
                                                     </span>
                                                 )}
                                                 <span className={`badge ${s.status.toLowerCase()}`}>{s.status}</span>
-                                                <button onClick={() => setSelectedSubmission(s)} className="btn-primary" style={{ padding: '6px 16px', fontSize: '0.8rem', borderRadius: 'var(--radius-sm)', gap: '6px' }}>
+                                                <button onClick={() => {
+                                                    setSelectedSubmission(s);
+                                                    setGradingFeedback(s.feedback || '');
+                                                }} className="btn-primary" style={{ padding: '6px 16px', fontSize: '0.8rem', borderRadius: 'var(--radius-sm)', gap: '6px' }}>
                                                     <Eye size={14} /> Review
                                                 </button>
                                             </div>
@@ -401,16 +409,64 @@ const TeacherHomework = () => {
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
                                     <span className={`badge ${s.status.toLowerCase()}`}>{s.status}</span>
                                     {s.status === 'SUBMITTED' && (
-                                        <button onClick={() => {
-                                            handleGrade(s.id, 'GRADED');
-                                            setSelectedSubmission({ ...s, status: 'GRADED' });
-                                        }}
-                                            className="btn-primary"
-                                            style={{ background: 'var(--success)', border: 'none', padding: '6px 16px', fontSize: '0.8rem' }}>
-                                            <CheckCircle2 size={16} /> Mark Graded
-                                        </button>
+                                        (() => {
+                                            const isPastDue = new Date() > new Date(s.homework?.dueDate);
+                                            return (
+                                                <div style={{ textAlign: 'right' }}>
+                                                    <button 
+                                                        onClick={() => {
+                                                            handleGrade(s.id, 'GRADED');
+                                                            setSelectedSubmission({ ...s, status: 'GRADED', feedback: gradingFeedback });
+                                                        }}
+                                                        disabled={!isPastDue}
+                                                        className="btn-primary"
+                                                        style={{ 
+                                                            background: isPastDue ? 'var(--success)' : 'var(--text-muted)', 
+                                                            opacity: isPastDue ? 1 : 0.6,
+                                                            border: 'none', 
+                                                            padding: '6px 16px', 
+                                                            fontSize: '0.8rem',
+                                                            cursor: isPastDue ? 'pointer' : 'not-allowed'
+                                                        }}>
+                                                        <CheckCircle2 size={16} /> Finalize Grading
+                                                    </button>
+                                                    {!isPastDue && (
+                                                        <p style={{ margin: '4px 0 0 0', fontSize: '0.65rem', color: 'var(--error)', fontWeight: '700' }}>
+                                                            UNAVAILABLE UNTIL DEADLINE EXPIRES
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()
                                     )}
                                 </div>
+                            </div>
+
+                             <div style={{ marginBottom: '24px' }}>
+                                <p style={{ margin: '0 0 8px', fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+                                    Academic Feedback & evaluation
+                                </p>
+                                <textarea
+                                    placeholder="Provide constructive feedback, mention mistakes, or add grading notes..."
+                                    value={gradingFeedback}
+                                    onChange={e => setGradingFeedback(e.target.value)}
+                                    rows={3}
+                                    style={{ 
+                                        width: '100%', padding: '12px', borderRadius: 'var(--radius-md)', 
+                                        border: '1px solid var(--border-soft)', fontSize: '0.9rem', outline: 'none', 
+                                        transition: 'var(--transition-fast)', background: 'var(--bg-main)',
+                                        color: 'var(--text-main)', boxSizing: 'border-box'
+                                    }}
+                                    onFocus={e => e.target.style.borderColor = 'var(--primary)'}
+                                    onBlur={e => e.target.style.borderColor = 'var(--border-soft)'}
+                                />
+                                {s.status === 'GRADED' && (
+                                    <button 
+                                        onClick={() => handleGrade(s.id, 'GRADED')}
+                                        style={{ marginTop: '8px', padding: '6px 12px', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-soft)', fontWeight: '700', cursor: 'pointer' }}>
+                                        Update Feedback
+                                    </button>
+                                )}
                             </div>
 
                             {s.content && s.content.trim() && (
@@ -427,7 +483,7 @@ const TeacherHomework = () => {
                                         {s.content}
                                     </div>
                                 </div>
-                            )}
+                            ) }
 
                             {fileUrl && (
                                 <div>
@@ -448,10 +504,11 @@ const TeacherHomework = () => {
                                             <span style={{ fontWeight: '800', fontSize: '0.9rem', color: fc.text }}>{fc.label}</span>
                                             <span style={{ flex: 1, fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>
                                             <div style={{ display: 'flex', gap: '8px' }}>
-                                                <a href={fileUrl} target="_blank" rel="noreferrer"
-                                                    style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', fontWeight: '700', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <button 
+                                                    onClick={() => window.open(fileUrl, '_blank', 'width=1000,height=800,menubar=no,toolbar=no,location=no,status=no')}
+                                                    style={{ padding: '8px 16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     <ExternalLink size={14} /> Open
-                                                </a>
+                                                </button>
                                                  <a href={fileUrl} download
                                                     style={{ padding: '8px 16px', background: 'var(--bg-card)', border: '1px solid var(--border-soft)', color: 'var(--text-main)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', fontWeight: '700', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     Download

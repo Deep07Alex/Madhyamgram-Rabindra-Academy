@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, NavLink, Routes, Route, Navigate } from 'react-router-dom';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { logout } from '../services/authService';
 import ManageStudents from '../components/admin/ManageStudents';
 import ManageTeachers from '../components/admin/ManageTeachers';
@@ -26,8 +27,10 @@ import {
     X,
     UserCircle
 } from 'lucide-react';
+import { socket } from '../services/socket';
 
 const AdminDashboard = () => {
+    const { showToast } = useToast();
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [stats, setStats] = useState({
@@ -37,21 +40,44 @@ const AdminDashboard = () => {
         projectedFees: 0
     });
     const userJson = localStorage.getItem('user');
-    const user = userJson ? JSON.parse(userJson) : null;
+    let user = null;
+    try {
+        user = userJson && userJson !== 'undefined' ? JSON.parse(userJson) : null;
+    } catch (e) {
+        localStorage.removeItem('user');
+    }
 
     useEffect(() => {
         const fetchStats = async () => {
             try {
                 const res = await api.get('/dashboard/stats');
                 setStats(res.data);
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Failed to fetch stats:', error);
+                const msg = error.response?.data?.message || 'Failed to load dashboard stats.';
+                showToast(msg, 'error');
             }
         };
 
         fetchStats();
         const interval = setInterval(fetchStats, 30000); // Update every 30 seconds
-        return () => clearInterval(interval);
+
+        // Socket.io - Real-time updates
+        socket.emit('join_room', 'admin_room');
+
+        socket.on('fee_paid', () => {
+            fetchStats();
+        });
+
+        socket.on('attendance_marked', () => {
+            fetchStats();
+        });
+
+        return () => {
+            clearInterval(interval);
+            socket.off('fee_paid');
+            socket.off('attendance_marked');
+        };
     }, []);
 
     const handleLogout = () => {
@@ -81,8 +107,12 @@ const AdminDashboard = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '50%', border: '2px solid var(--border-soft)' }} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '0.6rem', fontWeight: '800', textTransform: 'uppercase', opacity: 0.8, color: 'var(--text-main)', lineHeight: 1 }}>Madhyamgram</span>
-                        <span style={{ fontSize: '1.1rem', fontWeight: '1000', textTransform: 'uppercase', color: '#5d1717', letterSpacing: '0.02em' }}>Rabindra Academy</span>
+                        <span style={{ fontSize: '0.6rem', fontWeight: '900', textTransform: 'uppercase', color: 'var(--nav-text)', lineHeight: 1 }}>Madhyamgram</span>
+                        <span style={{ fontSize: '1.1rem', fontWeight: '1000', textTransform: 'uppercase', color: 'var(--nav-text)', letterSpacing: '0.02em' }}>Rabindra Academy</span>
+                        <div style={{ display: 'flex', gap: '6px', fontSize: '0.45rem', fontWeight: '800', color: 'var(--nav-text)' }}>
+                            <span>UDISE: 19112601311</span>
+                            <span>ESTD: 2005</span>
+                        </div>
                     </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -120,8 +150,12 @@ const AdminDashboard = () => {
                     </button>
                     <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '64px', height: '64px', borderRadius: '50%', border: '2px solid var(--border-soft)', padding: '2px', background: 'var(--primary-soft)' }} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase', opacity: 0.8, color: 'var(--text-main)', lineHeight: 1 }}>Madhyamgram</span>
-                        <span style={{ fontSize: '1.3rem', fontWeight: '1000', textTransform: 'uppercase', color: '#5d1717' }}>Rabindra Academy</span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: '900', textTransform: 'uppercase', color: 'var(--nav-text)', lineHeight: 1 }}>Madhyamgram</span>
+                        <span style={{ fontSize: '1.3rem', fontWeight: '1000', textTransform: 'uppercase', color: 'var(--nav-text)' }}>Rabindra Academy</span>
+                        <div style={{ display: 'flex', gap: '8px', fontSize: '0.55rem', fontWeight: '800', color: 'var(--nav-text)', marginTop: '2px' }}>
+                            <span>UDISE: 19112601311</span>
+                            <span>ESTD: 2005</span>
+                        </div>
                         <span style={{ fontSize: '0.65rem', fontWeight: '600', color: 'var(--text-muted)', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '4px' }}>Administrative Portal</span>
                     </div>
                 </div>
@@ -171,7 +205,6 @@ const AdminDashboard = () => {
                             <BellRing size={20} />
                         </button>
                         <div className="admin-info-pill hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-card)', padding: '6px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-soft)' }}>
-                            <UserCircle size={28} color="var(--primary-bold)" />
                             <div style={{ textAlign: 'right' }}>
                                 <p style={{ fontSize: '0.85rem', fontWeight: '700', margin: 0 }}>{user?.name} <span style={{ opacity: 0.5, fontWeight: '500', marginLeft: '4px' }}>({user?.adminId || user?.username || user?.teacherId})</span></p>
                                 <p style={{ fontSize: '0.65rem', fontWeight: '600', color: 'var(--text-muted)', margin: 0, textTransform: 'uppercase' }}>Super Admin</p>

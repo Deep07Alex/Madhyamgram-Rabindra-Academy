@@ -44,8 +44,12 @@ const Gallery = () => {
                         <div style={{ position: 'absolute', bottom: -2, right: -2, width: '12px', height: '12px', background: 'var(--success)', borderRadius: '50%', border: '2px solid white' }}></div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: '800', textTransform: 'uppercase', opacity: 0.6, color: 'var(--text-main)', lineHeight: 1 }}>Madhyamgram</span>
-                        <span style={{ fontWeight: 950, fontSize: '1.25rem', color: '#5d1717', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Rabindra Academy</span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: '900', textTransform: 'uppercase', color: 'var(--nav-text)', lineHeight: 1 }}>Madhyamgram</span>
+                        <span style={{ fontWeight: 950, fontSize: '1.25rem', color: 'var(--nav-text)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Rabindra Academy</span>
+                        <div style={{ display: 'flex', gap: '8px', fontSize: '0.5rem', fontWeight: '800', color: 'var(--nav-text)' }}>
+                            <span>UDISE: 19112601311</span>
+                            <span>ESTD: 2005</span>
+                        </div>
                     </div>
                 </div>
                 <Link to="/login" className="btn-primary" style={{
@@ -88,10 +92,11 @@ const Gallery = () => {
                         }}>
                             <div style={{ overflow: 'hidden', height: '240px' }}>
                                 <img
-                                    src={`http://localhost:5000${img.imageUrl}`}
+                                    src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${img.imageUrl}`}
                                     alt={img.title}
                                     style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease' }}
                                     className="gallery-img"
+                                    loading="lazy"
                                 />
                             </div>
                             <div style={{ padding: '24px' }}>

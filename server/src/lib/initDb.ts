@@ -45,13 +45,42 @@ export const initDb = async () => {
                 "teacherId" TEXT UNIQUE, -- Optional/Null for non-teaching staff
                 "phone" TEXT,
                 "aadhar" TEXT,
+                "photo" TEXT, -- URL to uploaded photo
+                "address" TEXT,
+                "dob" DATE,
+                "qualification" TEXT,
+                "extraQualification" TEXT,
                 "designation" TEXT,
+                "caste" TEXT,
                 "joiningDate" DATE,
                 "isTeaching" BOOLEAN DEFAULT TRUE,
                 "plainPassword" TEXT, -- Storing for admin visibility
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+
+            -- Add missing columns if they don't exist
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Teacher' AND column_name='photo') THEN
+                    ALTER TABLE "Teacher" ADD COLUMN "photo" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Teacher' AND column_name='address') THEN
+                    ALTER TABLE "Teacher" ADD COLUMN "address" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Teacher' AND column_name='dob') THEN
+                    ALTER TABLE "Teacher" ADD COLUMN "dob" DATE;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Teacher' AND column_name='qualification') THEN
+                    ALTER TABLE "Teacher" ADD COLUMN "qualification" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Teacher' AND column_name='extraQualification') THEN
+                    ALTER TABLE "Teacher" ADD COLUMN "extraQualification" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Teacher' AND column_name='caste') THEN
+                    ALTER TABLE "Teacher" ADD COLUMN "caste" TEXT;
+                END IF;
+            END $$;
 
             -- Class Table
             CREATE TABLE IF NOT EXISTS "Class" (
@@ -78,6 +107,7 @@ export const initDb = async () => {
                 "rollNumber" TEXT NOT NULL,
                 "banglarSikkhaId" TEXT,
                 "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+                "photo" TEXT,
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -232,7 +262,7 @@ export const initDb = async () => {
             END $$;
         `);
 
-        // 3. Add 'banglarSikkhaId' column to Student if it doesn't exist
+        // 3. Add 'banglarSikkhaId' and 'photo' columns to Student if they don't exist
         await db.query(`
             DO $$ BEGIN
                 IF NOT EXISTS (
@@ -240,6 +270,21 @@ export const initDb = async () => {
                     WHERE table_name = 'Student' AND column_name = 'banglarSikkhaId'
                 ) THEN
                     ALTER TABLE "Student" ADD COLUMN "banglarSikkhaId" TEXT;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'Student' AND column_name = 'photo'
+                ) THEN
+                    ALTER TABLE "Student" ADD COLUMN "photo" TEXT;
+                END IF;
+
+                -- Add unique constraint if not exists
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_indexes 
+                    WHERE tablename = 'Student' AND indexname = 'Student_banglarSikkhaId_unique'
+                ) THEN
+                    CREATE UNIQUE INDEX "Student_banglarSikkhaId_unique" ON "Student"("banglarSikkhaId") WHERE ("banglarSikkhaId" IS NOT NULL);
                 END IF;
             END $$;
         `);
@@ -272,10 +317,30 @@ export const initDb = async () => {
             END $$;
         `);
 
-        // 5. Create unique indexes if they don't exist
+        // 5. Update Submission Table Schema
+        await db.query(`
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Submission' AND column_name = 'feedback') THEN
+                    ALTER TABLE "Submission" ADD COLUMN "feedback" TEXT;
+                END IF;
+            END $$;
+        `);
+
+        // 6. Create unique and performance indexes if they don't exist
         await db.query(`
             CREATE UNIQUE INDEX IF NOT EXISTS "Attendance_student_date_unique" ON "Attendance"("studentId", date);
             CREATE UNIQUE INDEX IF NOT EXISTS "TeacherAttendance_teacher_date_unique" ON "TeacherAttendance"("teacherId", date);
+            
+            -- Performance Indexes for common lookups
+            CREATE INDEX IF NOT EXISTS "idx_student_class" ON "Student"("classId");
+            CREATE INDEX IF NOT EXISTS "idx_student_rollNumber" ON "Student"("rollNumber");
+            CREATE INDEX IF NOT EXISTS "idx_attendance_date" ON "Attendance"("date");
+            CREATE INDEX IF NOT EXISTS "idx_attendance_class" ON "Attendance"("classId");
+            CREATE INDEX IF NOT EXISTS "idx_teacher_phone" ON "Teacher"("phone");
+            CREATE INDEX IF NOT EXISTS "idx_teacher_aadhar" ON "Teacher"("aadhar");
+            CREATE INDEX IF NOT EXISTS "idx_fee_student" ON "Fee"("studentId");
+            CREATE INDEX IF NOT EXISTS "idx_result_student" ON "Result"("studentId");
+            CREATE INDEX IF NOT EXISTS "idx_homework_class" ON "Homework"("classId");
         `);
 
         console.log('Migrations applied successfully.');

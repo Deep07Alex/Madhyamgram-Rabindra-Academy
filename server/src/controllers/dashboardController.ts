@@ -30,26 +30,70 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
             `, [userId]);
 
             // Average attendance for classes this teacher teaches
+            // New Logic: 100% by default, decreased only by ABSENT marks
             const attendanceRes = await db.query(`
+                WITH ClassSessions AS (
+                    SELECT "classId", COUNT(DISTINCT date) as total_sessions
+                    FROM "Attendance"
+                    WHERE "classId" IN (SELECT "A" FROM "_ClassToTeacher" WHERE "B" = $1)
+                    GROUP BY "classId"
+                ),
+                ClassAbsences AS (
+                    SELECT "classId", COUNT(*) as total_absences
+                    FROM "Attendance"
+                    WHERE "classId" IN (SELECT "A" FROM "_ClassToTeacher" WHERE "B" = $1)
+                      AND status = 'ABSENT'
+                    GROUP BY "classId"
+                ),
+                ClassEnrollment AS (
+                    SELECT "classId", COUNT(*) as student_count
+                    FROM "Student"
+                    WHERE "classId" IN (SELECT "A" FROM "_ClassToTeacher" WHERE "B" = $1)
+                    GROUP BY "classId"
+                )
                 SELECT 
-                    COUNT(*) FILTER (WHERE status = 'PRESENT')::float / NULLIF(COUNT(*), 0) * 100 as rate
-                FROM "Attendance"
-                WHERE "teacherId" = $1
+                    COALESCE(
+                        AVG(
+                            CASE 
+                                WHEN cs.total_sessions = 0 THEN 100
+                                ELSE (1.0 - (ca.total_absences::float / (cs.total_sessions * ce.student_count))) * 100
+                            END
+                        ), 
+                        100
+                    ) as rate
+                FROM ClassSessions cs
+                LEFT JOIN ClassAbsences ca ON cs."classId" = ca."classId"
+                JOIN ClassEnrollment ce ON cs."classId" = ce."classId"
             `, [userId]);
 
             return res.json({
                 assignedClasses: parseInt(classCountRes.rows[0].count, 10),
                 pendingSubmissions: parseInt(pendingHomeworkRes.rows[0].count, 10),
-                attendanceRate: Math.round(parseFloat(attendanceRes.rows[0].rate || '0'))
+                attendanceRate: Math.round(parseFloat(attendanceRes.rows[0].rate || '100'))
             });
         }
 
         if (role === 'STUDENT') {
             const attendanceRes = await db.query(`
+                WITH SchoolSessions AS (
+                    SELECT COUNT(DISTINCT d) as total_sessions
+                    FROM (
+                        SELECT date::date as d FROM "Attendance"
+                        UNION
+                        SELECT CURRENT_DATE as d
+                    ) as sessions
+                ),
+                StudentAbsences AS (
+                    SELECT COUNT(*) as absent_count
+                    FROM "Attendance"
+                    WHERE "studentId" = $1 AND status = 'ABSENT'
+                )
                 SELECT 
-                    COUNT(*) FILTER (WHERE status = 'PRESENT')::float / NULLIF(COUNT(*), 0) * 100 as rate
-                FROM "Attendance"
-                WHERE "studentId" = $1
+                    CASE 
+                        WHEN ss.total_sessions = 0 THEN 100
+                        ELSE ((ss.total_sessions - sa.absent_count)::float / ss.total_sessions * 100)
+                    END as rate
+                FROM SchoolSessions ss, StudentAbsences sa
             `, [userId]);
 
             const gradeRes = await db.query(`
@@ -69,7 +113,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
             `, [userId]);
 
             return res.json({
-                attendanceRate: Math.round(parseFloat(attendanceRes.rows[0].rate || '0')),
+                attendanceRate: Math.round(parseFloat(attendanceRes.rows[0].rate || '100')),
                 averageGrade: Math.round(parseFloat(gradeRes.rows[0].average || '0')),
                 activeSubjects: parseInt(subjectRes.rows[0].count, 10)
             });

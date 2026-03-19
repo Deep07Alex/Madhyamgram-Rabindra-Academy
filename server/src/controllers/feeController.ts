@@ -3,6 +3,7 @@ import { db } from '../lib/db.js';
 import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.js';
 import { broadcast } from '../lib/sseManager.js';
+import { emitEvent } from '../lib/socket.js';
 
 export const createFee = async (req: Request, res: Response) => {
     try {
@@ -16,6 +17,8 @@ export const createFee = async (req: Request, res: Response) => {
         );
 
         broadcast('fee:created', { studentId: feeRes.rows[0].studentId });
+        emitEvent('fee_created', feeRes.rows[0], `student:${studentId}`);
+        
         res.status(201).json(feeRes.rows[0]);
     } catch (error) {
         res.status(500).json({ message: 'Error creating fee' });
@@ -40,6 +43,8 @@ export const createFeesForClass = async (req: Request, res: Response) => {
         }
 
         broadcast('fee:created', { classId });
+        emitEvent('fee_created', { classId, message: 'New fees created for your class' }, `class:${classId}`);
+        
         res.status(201).json({ message: `${count} fees created` });
     } catch (error) {
         res.status(500).json({ message: 'Error creating fees for class' });
@@ -58,7 +63,11 @@ export const recordPayment = async (req: Request, res: Response) => {
             [status || 'PAID', paymentMethod, remark, id]
         );
 
-        res.json(updateRes.rows[0]);
+        const paidFee = updateRes.rows[0];
+        emitEvent('fee_paid', paidFee, 'admin_room');
+        emitEvent('fee_paid', paidFee, `student:${paidFee.studentId}`);
+
+        res.json(paidFee);
     } catch (error) {
         res.status(500).json({ message: 'Error recording payment' });
     }

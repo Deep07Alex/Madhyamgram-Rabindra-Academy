@@ -10,32 +10,32 @@ function MainPage() {
 
   useEffect(() => {
     // Fetch public notices from API
-    fetch('http://localhost:5000/api/notices')
-        .then(res => res.json())
-        .then(data => {
-            if (Array.isArray(data) && data.length > 0) {
-                // If API returns notices, format them
-                setNotices(data.map((n: any) => `📢 ${n.title} - ${n.content}`));
-            } else {
-                // Fallback to static if none exist
-                setNotices([
-                    "📢 Annual Sports Day – 25 March",
-                    "📢 Saraswati Puja Celebration",
-                    "📢 Admission Open For 2026",
-                    "📢 Parent Teacher Meeting – Sunday",
-                ]);
-            }
-        })
-        .catch(err => {
-            console.error('Failed to fetch notices:', err);
-            // Fallback
-            setNotices([
-                "📢 Annual Sports Day – 25 March",
-                "📢 Saraswati Puja Celebration",
-                "📢 Admission Open For 2026",
-                "📢 Parent Teacher Meeting – Sunday",
-            ]);
-        });
+    fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/notices`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          // If API returns notices, format them
+          setNotices(data.map((n: any) => `📢 ${n.title} - ${n.content}`));
+        } else {
+          // Fallback to static if none exist
+          setNotices([
+            "📢 Annual Sports Day – 25 March",
+            "📢 Saraswati Puja Celebration",
+            "📢 Admission Open For 2026",
+            "📢 Parent Teacher Meeting – Sunday",
+          ]);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to fetch notices:', err);
+        // Fallback
+        setNotices([
+          "📢 Annual Sports Day – 25 March",
+          "📢 Saraswati Puja Celebration",
+          "📢 Admission Open For 2026",
+          "📢 Parent Teacher Meeting – Sunday",
+        ]);
+      });
   }, []);
 
   const galleryItems: GalleryItem[] = [
@@ -64,7 +64,6 @@ function MainPage() {
       <div className="main-container">
         <Hero />
         <AdmissionSection />
-        <QuickLinks />
         <NoticeBoard notices={notices} />
         <Gallery items={galleryItems} />
       </div>
@@ -79,7 +78,13 @@ function MainPage() {
 function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
     <nav className="landing-navbar">
-      <h2 className="logo">Madhyamgram Rabindra Academy</h2>
+      <div className="logo-group" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+        <h2 className="logo" style={{ marginBottom: 0 }}>Madhyamgram Rabindra Academy</h2>
+        <div style={{ display: 'flex', gap: '12px', fontSize: '0.65rem', fontWeight: '850', color: 'var(--nav-text)', letterSpacing: '0.02em' }}>
+          <span>UDISE: 19112601311</span>
+          <span>ESTD: 2005</span>
+        </div>
+      </div>
       <button
         className="landing-nav-toggle"
         onClick={onToggle}
@@ -105,16 +110,21 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
 function Hero() {
   return (
     <section className="hero">
-      <img 
-        src="/banner.png" 
-        alt="School building" 
-        onError={(e) => { 
+      <img
+        src="/banner.png"
+        alt="School building"
+        loading="lazy"
+        onError={(e) => {
           // Default fallback if image doesn't exist
-          e.currentTarget.src = "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1200"; 
-        }} 
+          e.currentTarget.src = "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1200";
+        }}
       />
       <div className="hero-content">
         <h1>Welcome To Madhyamgram Rabindra Academy</h1>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '16px', fontSize: '1rem', fontWeight: '800', color: 'var(--primary)', letterSpacing: '0.05em' }}>
+           <span>UDISE CODE: 19112601311</span>
+           <span>ESTD: 2005</span>
+        </div>
         <p>Empowering Students For A Better Future</p>
       </div>
     </section>
@@ -133,24 +143,6 @@ function AdmissionSection() {
   );
 }
 
-function QuickLinks() {
-  return (
-    <section className="landing-section quick-links">
-      <h2>Student's Corner</h2>
-      <ul>
-        <li><a href="/annual-sports">Annual Sports</a></li>
-        <li><a href="/annual-topper-list">Annual Topper List</a></li>
-        <li><a href="/cultural-programs">Cultural Programs</a></li>
-        <li><a href="/downloads">Downloads</a></li>
-        <li><a href="/holiday-calendar">Holiday Calendar</a></li>
-        <li><a href="/inter-school-contest">Inter School Contest</a></li>
-        <li><a href="/prize-distribution">Prize Distribution</a></li>
-        <li><a href="/result">Result</a></li>
-        <li><a href="/science-club">Science Club</a></li>
-      </ul>
-    </section>
-  );
-}
 
 function NoticeBoard({ notices }: { notices: string[] }) {
   return (
@@ -174,7 +166,7 @@ function Gallery({ items }: { items: GalleryItem[] }) {
       <div className="gallery-grid">
         {items.map((item, idx) => (
           <div className="gallery-card" key={idx}>
-            <img src={item.src} alt={item.caption} />
+            <img src={item.src} alt={item.caption} loading="lazy" />
             <p>{item.caption}</p>
           </div>
         ))}
@@ -187,7 +179,11 @@ function Footer() {
   return (
     <footer id="contact" className="landing-footer">
       <h3>Madhyamgram Rabindra Academy</h3>
-      <p>Providing Quality Education Since 1995</p>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', fontSize: '0.8rem', opacity: 0.8, marginBottom: '10px', fontWeight: '600' }}>
+        <span>UDISE: 19112601311</span>
+        <span>ESTD: 2005</span>
+      </div>
+      <p>Providing Quality Education Since 2005</p>
       <div className="social-icons">
         <a href="#">🌐</a>
         <a href="#">📘</a>

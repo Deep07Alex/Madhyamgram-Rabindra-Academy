@@ -2,14 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import useServerEvents from '../../hooks/useServerEvents';
 import { Calendar, CheckCircle2, XCircle, BarChart3, List } from 'lucide-react';
+import { socket } from '../../services/socket';
 
 const StudentAttendance = () => {
-    const [attendance, setAttendance] = useState([]);
+    const [attendanceData, setAttendanceData] = useState({ records: [] as any[], totalSessions: 0 });
 
     const fetchAttendance = useCallback(async () => {
         try {
             const res = await api.get('/attendance/student');
-            setAttendance(res.data);
+            setAttendanceData(res.data);
         } catch (error) {
             console.error('Failed to fetch attendance', error);
         }
@@ -20,9 +21,15 @@ const StudentAttendance = () => {
     // Live updates: refresh when teacher marks or admin edits attendance
     useServerEvents({ 'attendance:updated': fetchAttendance });
 
-    const totalDays = attendance.length;
-    const presentDays = attendance.filter((a: any) => a.status === 'PRESENT').length;
-    const percentage = totalDays > 0 ? ((presentDays / totalDays) * 100).toFixed(1) : 0;
+    useEffect(() => {
+        socket.on('attendance_marked', fetchAttendance);
+        return () => { socket.off('attendance_marked', fetchAttendance); };
+    }, [fetchAttendance]);
+
+    const totalDays = attendanceData.totalSessions;
+    const absentDays = attendanceData.records.filter((a: any) => a.status === 'ABSENT').length;
+    const presentDays = totalDays - absentDays;
+    const percentage = totalDays > 0 ? ((presentDays / totalDays) * 100).toFixed(1) : 100;
 
     return (
         <div className="manage-section">
@@ -71,7 +78,7 @@ const StudentAttendance = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {attendance.map((record: any) => (
+                            {attendanceData.records.map((record: any) => (
                                 <tr key={record.id}>
                                     <td style={{ fontWeight: '600' }}>
                                         {new Date(record.date).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
@@ -94,7 +101,7 @@ const StudentAttendance = () => {
                                     </td>
                                 </tr>
                             ))}
-                            {attendance.length === 0 && (
+                            {attendanceData.records.length === 0 && (
                                 <tr>
                                     <td colSpan={3} style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
                                         No attendance data available for the current period.

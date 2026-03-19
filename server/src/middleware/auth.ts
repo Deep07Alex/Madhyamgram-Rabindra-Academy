@@ -1,7 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret_key_change_in_production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    console.error('CRITICAL ERROR: JWT_SECRET IS NOT DEFINED IN ENVIRONMENT');
+    process.exit(1);
+}
 
 export interface AuthRequest extends Request {
     user?: {

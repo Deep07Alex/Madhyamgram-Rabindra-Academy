@@ -36,8 +36,8 @@ const StudentHomework = () => {
 
     // Live: refresh on assignment changes and on own submission
     useServerEvents({
-        'homework:created': fetchAssignments,
-        'homework:deleted': (data: any) => {
+        'homework_created': fetchAssignments,
+        'homework_deleted': (data: any) => {
             fetchAssignments();
             if (data && data.id === selectedAssignment?.id) {
                 setSelectedAssignment(null);
@@ -45,7 +45,7 @@ const StudentHomework = () => {
                 setFile(null);
             }
         },
-        'homework:submitted': fetchAssignments,
+        'homework_submitted': fetchAssignments,
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -61,7 +61,7 @@ const StudentHomework = () => {
             await api.post('/homework/submit', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-            showToast('Homework submitted successfully!', 'success');
+            showToast('Assignment submitted successfully!', 'success');
             setSelectedAssignment(null);
             setContent('');
             setFile(null);
@@ -119,14 +119,28 @@ const StudentHomework = () => {
 
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <Calendar size={14} /> Due: {new Date(hw.dueDate).toLocaleDateString()}
+                                            <Calendar size={14} /> Due: {new Date(hw.dueDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                         </div>
                                     </div>
+
+                                    {hasSubmitted && submission.status === 'GRADED' && submission.feedback && (
+                                        <div style={{
+                                            marginTop: '16px', background: 'var(--primary-soft)', padding: '12px 16px',
+                                            borderRadius: 'var(--radius-sm)', borderLeft: '4px solid var(--primary-bold)'
+                                        }}>
+                                            <p style={{ margin: '0 0 4px', fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--primary-bold)' }}>
+                                                Teacher's Feedback
+                                            </p>
+                                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-main)', fontStyle: 'italic', lineHeight: 1.5 }}>
+                                                "{submission.feedback}"
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid var(--border-soft)' }}>
                                     {hw.fileUrl ? (
-                                        <a href={`http://localhost:5000${hw.fileUrl}`} target="_blank" rel="noreferrer" style={{
+                                        <a href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${hw.fileUrl}`} target="_blank" rel="noreferrer" style={{
                                             fontSize: '0.75rem', color: 'var(--primary-bold)', fontWeight: 700,
                                             textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px'
                                         }}>
@@ -162,7 +176,7 @@ const StudentHomework = () => {
                     {assignments.length === 0 && (
                         <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-soft)' }}>
                             <FileText size={32} style={{ opacity: 0.2, marginBottom: '12px' }} />
-                            <p style={{ color: 'var(--text-muted)', fontWeight: 600 }}>No academic tasks assigned to your profile yet.</p>
+                            <p style={{ color: 'var(--text-muted)', fontWeight: 600 }}>No academic tasks or assignments found for your class.</p>
                         </div>
                     )}
                 </div>
