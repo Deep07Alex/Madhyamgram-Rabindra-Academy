@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, NavLink, Routes, Route, Navigate } from 'react-router-dom';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
-import { logout } from '../services/authService';
 import StudentAttendance from '../components/student/StudentAttendance';
 import StudentFees from '../components/student/StudentFees';
 import StudentHomework from '../components/student/StudentHomework';
@@ -12,6 +11,7 @@ import NoticeBoard from '../components/common/NoticeBoard';
 import LiveClock from '../components/common/LiveClock';
 import ThemeToggle from '../components/common/ThemeToggle';
 import useServerEvents from '../hooks/useServerEvents';
+import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard,
     CalendarCheck,
@@ -44,9 +44,18 @@ const StudentClassDisplay = ({ classId }: { classId?: string }) => {
 };
 
 const StudentDashboard = () => {
+    const { user, updateUser, logout: authLogout } = useAuth();
     const { showToast } = useToast();
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    // Safety check: if somehow PrivateRoute was bypassed
+    useEffect(() => {
+        if (!user || user.role !== 'STUDENT') {
+            navigate('/', { replace: true });
+        }
+    }, [user, navigate]);
+
     const [stats, setStats] = useState({
         attendanceRate: 0,
         averageGrade: 0,
@@ -55,39 +64,29 @@ const StudentDashboard = () => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [notices, setNotices] = useState<any[]>([]);
     const [pendingAssignments, setPendingAssignments] = useState<any[]>([]);
-    const [user, setUser] = useState<any>(() => {
-        const userJson = localStorage.getItem('user');
-        let initialUser = null;
-        try {
-            initialUser = userJson && userJson !== 'undefined' ? JSON.parse(userJson) : null;
-        } catch (e) {
-            localStorage.removeItem('user');
-        }
-        return initialUser;
-    });
 
     const fetchProfile = useCallback(async () => {
         try {
             const res = await api.get('/auth/me');
-            const freshUser = res.data;
-            setUser(freshUser);
-            localStorage.setItem('user', JSON.stringify(freshUser));
-
-            // Join rooms if ID changed or just joining for the first time
-            if (freshUser.id) {
-                socket.emit('join_room', `student:${freshUser.id}`);
-                if (freshUser.classId) socket.emit('join_room', `class:${freshUser.classId}`);
-            }
+            updateUser(res.data);
         } catch (error: any) {
             console.error('Failed to fetch profile:', error);
             const msg = error.response?.data?.message || 'Failed to load student data.';
             showToast(msg, 'error');
         }
-    }, []);
+    }, [showToast, updateUser]);
 
     useEffect(() => {
         fetchProfile();
     }, [fetchProfile]);
+
+    // Handle room joining in a separate effect when user is available
+    useEffect(() => {
+        if (user?.id) {
+            socket.emit('join_room', `student:${user.id}`);
+            if (user.classId) socket.emit('join_room', `class:${user.classId}`);
+        }
+    }, [user?.id, user?.classId]);
 
     const fetchStats = useCallback(async () => {
         try {
@@ -146,70 +145,81 @@ const StudentDashboard = () => {
     });
 
     useEffect(() => {
-        const statsInterval = setInterval(fetchStats, 30000); // Polling every 30s
-        const noticesInterval = setInterval(fetchNotices, 60000); // Polling every 1m
+        const statsInterval = setInterval(fetchStats, 30000);
+        const noticesInterval = setInterval(fetchNotices, 60000);
 
-        // Socket.io - Real-time updates
         if (user?.id) {
             socket.emit('join_room', `student:${user.id}`);
             if (user?.classId) socket.emit('join_room', `class:${user.classId}`);
         }
 
-        socket.on('new_notice', () => {
-            fetchNotices();
+        socket.on('profile_updated', () => {
+             showToast('Your profile has been updated by the administrator.', 'success');
+             fetchProfile();
+             fetchStats();
+        });
+
+        socket.on('attendance_marked', () => {
+             showToast('Your attendance status has been updated.', 'info');
+             fetchStats();
+        });
+
+        socket.on('fee_created', () => {
+             showToast('A new fee record has been added to your account.', 'warning');
+             fetchStats();
+        });
+
+        socket.on('fee_paid', () => {
+             showToast('Fee payment confirmed successfully.', 'success');
+             fetchStats();
         });
 
         socket.on('result_published', () => {
-            fetchStats();
+             showToast('New academic results have been published!', 'success');
+             fetchStats();
         });
 
-        socket.on('fee_generated', () => {
-            fetchStats();
-        });
-
-        socket.on('profile_updated', () => {
-            fetchProfile();
-        });
-
-        socket.on('attendance_update', () => {
-            fetchStats();
+        socket.on('new_notice', () => {
+             showToast('New update on the notice board.', 'info');
+             fetchNotices();
         });
 
         socket.on('homework_created', () => {
-            fetchAssignments();
-            showToast('New academic assignment received!', 'info');
+             showToast('New assignment received!', 'info');
+             fetchAssignments();
+             fetchStats();
+        });
+
+        socket.on('homework_deleted', () => {
+             fetchAssignments();
+             fetchStats();
         });
 
         socket.on('homework_submitted', (data: any) => {
-            if (data?.homeworkId) {
-                setPendingAssignments(prev => prev.filter(hw => hw.id !== data.homeworkId));
-            }
-            fetchAssignments();
-        });
-
-        socket.on('homework_deleted', (data: any) => {
-            if (data?.id) {
-                setPendingAssignments(prev => prev.filter(hw => hw.id !== data.id));
-            }
-            fetchAssignments();
+             if (data?.homeworkId) {
+                 setPendingAssignments(prev => prev.filter(hw => hw.id !== data.homeworkId));
+             }
+             fetchAssignments();
+             fetchStats();
         });
 
         return () => {
             clearInterval(statsInterval);
             clearInterval(noticesInterval);
-            socket.off('new_notice');
-            socket.off('result_published');
-            socket.off('fee_created');
             socket.off('profile_updated');
             socket.off('attendance_marked');
+            socket.off('fee_created');
+            socket.off('fee_paid');
+            socket.off('result_published');
+            socket.off('new_notice');
             socket.off('homework_created');
-            socket.off('homework_submitted');
             socket.off('homework_deleted');
+            socket.off('homework_submitted');
         };
-    }, [user?.id, user?.classId]);
+    }, [user?.id, user?.classId, fetchProfile, fetchStats, fetchNotices, fetchAssignments, showToast]);
 
     const handleLogout = () => {
-        logout();
+        authLogout();
         navigate('/');
     };
 
@@ -388,7 +398,7 @@ const StudentDashboard = () => {
                                         <div style={{ flex: '0 0 160px' }}>
                                             <div style={{ width: '160px', height: '160px', borderRadius: '20px', overflow: 'hidden', border: '4px solid var(--bg-main)', boxShadow: 'var(--shadow-lg)' }}>
                                                 {user?.photo ? (
-                                                    <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${user.photo}`} alt="Student Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                                                    <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${user.photo}?t=${Date.now()}`} alt="Student Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                                                 ) : (
                                                     <div style={{ width: '100%', height: '100%', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                         <UserCircle size={100} color="var(--primary-bold)" />

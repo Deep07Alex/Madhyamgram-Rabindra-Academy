@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import "./MainPage.css";
+import api from "../services/api";
 import ThemeToggle from "../components/common/ThemeToggle";
+import { useAuth } from '../context/AuthContext';
 // Adjusting path from App.tsx (../photos) to pages/MainPage.tsx (../../photos)
 type GalleryItem = { src: string; caption: string };
 
@@ -10,14 +12,12 @@ function MainPage() {
 
   useEffect(() => {
     // Fetch public notices from API
-    fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/notices`)
-      .then(res => res.json())
-      .then(data => {
+    api.get('/notices')
+      .then((res: { data: any[] }) => {
+        const data = res.data;
         if (Array.isArray(data) && data.length > 0) {
-          // If API returns notices, format them
           setNotices(data.map((n: any) => `📢 ${n.title} - ${n.content}`));
         } else {
-          // Fallback to static if none exist
           setNotices([
             "📢 Annual Sports Day – 25 March",
             "📢 Saraswati Puja Celebration",
@@ -26,9 +26,8 @@ function MainPage() {
           ]);
         }
       })
-      .catch(err => {
+      .catch((err: any) => {
         console.error('Failed to fetch notices:', err);
-        // Fallback
         setNotices([
           "📢 Annual Sports Day – 25 March",
           "📢 Saraswati Puja Celebration",
@@ -76,13 +75,27 @@ function MainPage() {
 // --- components ---
 
 function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  const { user } = useAuth();
+
+  const getDashboardPath = () => {
+    if (!user) return '/login';
+    if (user.role === 'ADMIN') return '/admin/dashboard';
+    if (user.role === 'TEACHER') return '/teacher/dashboard';
+    if (user.role === 'STUDENT') return '/student/dashboard';
+    return '/login';
+  };
+
   return (
     <nav className="landing-navbar">
-      <div className="logo-group" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-        <h2 className="logo" style={{ marginBottom: 0 }}>Madhyamgram Rabindra Academy</h2>
-        <div style={{ display: 'flex', gap: '12px', fontSize: '0.65rem', fontWeight: '850', color: 'var(--nav-text)', letterSpacing: '0.02em' }}>
-          <span>UDISE: 19112601311</span>
-          <span>ESTD: 2005</span>
+      <div className="logo-group">
+        <img src="/RABINDRA_LOGO.jpeg" alt="Logo" className="nav-logo-img" loading="eager" fetchPriority="high" />
+        <div className="logo-text-wrapper">
+          <h2 className="logo">MADHYAMGRAM RABINDRA ACADEMY</h2>
+          <p className="nav-tagline">Education ★ Culture ★ Art</p>
+          <div className="nav-info-row">
+            <span>UDISE: 19112601311</span>
+            <span>ESTD: 2005</span>
+          </div>
         </div>
       </div>
       <button
@@ -101,7 +114,11 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
         <div style={{ marginLeft: '12px', display: 'flex', alignItems: 'center' }}>
           <ThemeToggle />
         </div>
-        <a href="/login" className="login-btn">Login</a>
+        {user ? (
+          <a href={getDashboardPath()} className="login-btn" style={{ background: 'var(--primary-bold)', color: 'white' }}>Dashboard</a>
+        ) : (
+          <a href="/login" className="login-btn">Login</a>
+        )}
       </div>
     </nav>
   );
@@ -113,19 +130,21 @@ function Hero() {
       <img
         src="/banner.png"
         alt="School building"
-        loading="lazy"
+        loading="eager"
+        fetchPriority="high"
         onError={(e) => {
-          // Default fallback if image doesn't exist
           e.currentTarget.src = "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1200";
         }}
       />
       <div className="hero-content">
-        <h1>Welcome To Madhyamgram Rabindra Academy</h1>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '16px', fontSize: '1rem', fontWeight: '800', color: 'var(--primary)', letterSpacing: '0.05em' }}>
+        <p className="hero-mission-top">Education ★ Culture ★ Art</p>
+        <h1>MADHYAMGRAM RABINDRA ACADEMY</h1>
+        <div className="hero-level-badge">K.G. & PRIMARY SCHOOL</div>
+        <div className="hero-stats-row">
            <span>UDISE CODE: 19112601311</span>
            <span>ESTD: 2005</span>
         </div>
-        <p>Empowering Students For A Better Future</p>
+        <p className="hero-subtitle">Empowering Students For A Better Future</p>
       </div>
     </section>
   );
@@ -178,19 +197,40 @@ function Gallery({ items }: { items: GalleryItem[] }) {
 function Footer() {
   return (
     <footer id="contact" className="landing-footer">
-      <h3>Madhyamgram Rabindra Academy</h3>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', fontSize: '0.8rem', opacity: 0.8, marginBottom: '10px', fontWeight: '600' }}>
-        <span>UDISE: 19112601311</span>
-        <span>ESTD: 2005</span>
+      <div className="footer-main-info">
+        <h3 className="footer-title">RABINDRA ACADEMY</h3>
+        <p className="footer-mission">Education ★ Culture ★ Art</p>
+        <div className="footer-level">K.G. & PRIMARY SCHOOL</div>
+        <p className="footer-estd">Estd. : 2005</p>
       </div>
-      <p>Providing Quality Education Since 2005</p>
-      <div className="social-icons">
-        <a href="#">🌐</a>
-        <a href="#">📘</a>
-        <a href="#">📸</a>
-        <a href="#">🐦</a>
+
+      <div className="footer-address">
+        <p>Rabindranagar-Milanpally, P.O. - Ganganagar,</p>
+        <p>P.S.-Madhyamgram, North 24 Parganas, Kolkata - 700132</p>
       </div>
-      <p className="copyright">© 2026 Madhyamgram Rabindra Academy</p>
+
+      <div className="footer-registration-box">
+        <p>Registered by West Bengal Govt.</p>
+        <p>Following West Bengal Board of Primary Education Syllabus</p>
+        <p className="footer-reg-no">Regd. No. : SO165438 of 2009-2010</p>
+        <p className="footer-udise">Udise No. : 19112601311</p>
+      </div>
+
+      <div className="footer-contact-details">
+        <p><strong>Mob. No & Whatsapp No. :</strong> 8240267850 / 9830286767</p>
+        <p><strong>E-mail:</strong> rabindra.academy@gmail.com / sdssarkar9@gmail.com</p>
+        <p><strong>Facebook page :</strong> madhyamgramrabindraacademy</p>
+        <p><strong>Website :</strong> <a href="http://www.rabindraacademy.in" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none' }}>www.rabindraacademy.in</a></p>
+      </div>
+
+      <div className="social-icons" style={{ marginTop: '1rem' }}>
+        <a href="http://www.rabindraacademy.in" target="_blank" rel="noopener noreferrer" title="Website">🌐</a>
+        <a href="https://facebook.com/madhyamgramrabindraacademy" target="_blank" rel="noopener noreferrer" title="Facebook">📘</a>
+        <a href="#" title="Instagram">📸</a>
+        <a href="#" title="Twitter">🐦</a>
+      </div>
+      
+      <p className="copyright">© 2026 Madhyamgram Rabindra Academy | All Rights Reserved</p>
     </footer>
   );
 }

@@ -1,4 +1,5 @@
 import express from 'express';
+import morgan from 'morgan';
 import compression from 'compression';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -40,7 +41,8 @@ const teacherUploadDir = path.join(__dirname, '../uploads/teachers');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 if (!fs.existsSync(teacherUploadDir)) fs.mkdirSync(teacherUploadDir, { recursive: true });
 
-// 1. Compression should be first
+// 1. Logging and Compression
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(compression());
 
 // 2. Security Middleware
@@ -92,10 +94,11 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 
-// Serve static files with caching
+// Serve static files with aggressive caching for institutional assets
 app.use('/uploads', express.static(uploadDir, {
-    maxAge: '1d', // Cache for 1 day
-    etag: true
+    maxAge: '30d', // Cache user photos for 30 days
+    etag: true,
+    lastModified: true
 }));
 
 // Routes
@@ -150,9 +153,25 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
-app.get('/', (req, res) => {
+app.get('/api', (req, res) => {
     res.send('Madhyamgram Rabindra Academy API is running');
 });
+
+// Serve frontend in production
+if (process.env.NODE_ENV === 'production') {
+    const clientDistPath = path.resolve(__dirname, '../../client/dist');
+    app.use(express.static(clientDistPath, {
+        maxAge: '1y',
+        etag: true,
+        immutable: true
+    }));
+    app.get('*', (req, res) => {
+        // Only serve index.html if it's not an /api route (already handled above)
+        if (!req.path.startsWith('/api')) {
+            res.sendFile(path.join(clientDistPath, 'index.html'));
+        }
+    });
+}
 
 // Global Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

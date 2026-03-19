@@ -2,13 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, NavLink, Routes, Route, Navigate } from 'react-router-dom';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
-import { logout } from '../services/authService';
 import TeacherAttendance from '../components/teacher/TeacherAttendance';
 import TeacherHomework from '../components/teacher/TeacherHomework';
 import NoticeBoard from '../components/common/NoticeBoard';
 import LiveClock from '../components/common/LiveClock';
 import ThemeToggle from '../components/common/ThemeToggle';
 import useServerEvents from '../hooks/useServerEvents';
+import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard,
     ClipboardCheck,
@@ -20,17 +20,26 @@ import {
     UserCircle,
     Phone,
     Fingerprint,
-    MapPin,
     GraduationCap,
+    Award,
     Eye,
     EyeOff
 } from 'lucide-react';
 import { socket } from '../services/socket';
 
 const TeacherDashboard = () => {
+    const { user, updateUser, logout: authLogout } = useAuth();
     const { showToast } = useToast();
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    // Safety check: if somehow PrivateRoute was bypassed
+    useEffect(() => {
+        if (!user || user.role !== 'TEACHER') {
+            navigate('/', { replace: true });
+        }
+    }, [user, navigate]);
+
     const [stats, setStats] = useState({
         assignedClasses: 0,
         pendingSubmissions: 0,
@@ -40,13 +49,6 @@ const TeacherDashboard = () => {
     const [notices, setNotices] = useState<any[]>([]);
     const [profile, setProfile] = useState<any>(null);
     const [showFullAadhar, setShowFullAadhar] = useState(false);
-    const userJson = localStorage.getItem('user');
-    let initialUser = null;
-    try {
-        initialUser = userJson && userJson !== 'undefined' ? JSON.parse(userJson) : null;
-    } catch (e) {
-        localStorage.removeItem('user');
-    }
 
     const fetchStats = useCallback(async () => {
         try {
@@ -62,13 +64,12 @@ const TeacherDashboard = () => {
     const fetchProfile = useCallback(async () => {
         try {
             const res = await api.get('/auth/me');
+            updateUser(res.data);
             setProfile(res.data);
-            // Sync with localStorage
-            localStorage.setItem('user', JSON.stringify(res.data));
         } catch (error) {
             console.error('Failed to fetch profile:', error);
         }
-    }, []);
+    }, [updateUser]);
 
     const fetchNotices = useCallback(async () => {
         try {
@@ -89,30 +90,38 @@ const TeacherDashboard = () => {
         fetchNotices();
         fetchProfile();
         
-        // Socket.io - Real-time updates
-        if (initialUser?.id) {
-            socket.emit('join_room', `teacher:${initialUser.id}`);
+        if (user?.id) {
+            socket.emit('join_room', `teacher:${user.id}`);
         }
 
         socket.on('profile_updated', () => {
+            showToast('Your faculty profile has been updated by the administrator.', 'success');
             fetchProfile();
-            fetchNotices();
             fetchStats();
         });
 
         socket.on('new_notice', () => {
+            showToast('New important notice has been posted.', 'info');
             fetchNotices();
         });
 
         socket.on('homework_submitted', () => {
+             showToast(`New assignment submission received from a student!`, 'success');
+             fetchStats();
+        });
+
+        socket.on('attendance_marked', () => {
+             showToast('Your attendance status has been updated.', 'info');
              fetchStats();
         });
 
         return () => {
+            socket.off('profile_updated');
             socket.off('new_notice');
             socket.off('homework_submitted');
+            socket.off('attendance_marked');
         };
-    }, [initialUser?.id, fetchStats, fetchNotices]);
+    }, [user?.id, fetchStats, fetchNotices, fetchProfile, showToast]);
 
     // Live events (SSE)
     useServerEvents({
@@ -123,7 +132,7 @@ const TeacherDashboard = () => {
     });
 
     const handleLogout = () => {
-        logout();
+        authLogout();
         navigate('/');
     };
 
@@ -196,8 +205,8 @@ const TeacherDashboard = () => {
 
                 <div className="sidebar-user-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '16px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span className="user-name" style={{ fontSize: '0.9rem', fontWeight: '800' }}>{profile?.name || initialUser?.name}</span>
-                        <span className="user-id" style={{ fontSize: '0.7rem' }}>ID: {profile?.teacherId || initialUser?.teacherId}</span>
+                        <span className="user-name" style={{ fontSize: '0.9rem', fontWeight: '800' }}>{profile?.name || user?.name}</span>
+                        <span className="user-id" style={{ fontSize: '0.7rem' }}>ID: {profile?.teacherId || user?.teacherId}</span>
                     </div>
                 </div>
 
@@ -231,7 +240,12 @@ const TeacherDashboard = () => {
             <main className="dashboard-content">
                 <header className="content-header" style={{ animation: 'slideInRight 0.4s ease-out' }}>
                     <div>
-                        <h2>Welcome, Professor {(profile?.name || initialUser?.name || 'Teacher')?.split(' ')[0]}</h2>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
+                            <h1 style={{ fontSize: '2.5rem', fontWeight: 900, margin: 0, color: 'var(--text-main)', letterSpacing: '-0.03em' }}>Hello, {user?.name?.split(' ')[0]}!</h1>
+                            <div style={{ padding: '6px 16px', borderRadius: '100px', background: 'var(--primary-soft)', color: 'var(--primary-bold)', fontSize: '0.85rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary-bold)' }}></span> Active Portal
+                            </div>
+                        </div>
                         <p style={{ color: 'var(--text-muted)', fontWeight: '500' }}>Manage your classroom and academic excellence.</p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
@@ -271,8 +285,8 @@ const TeacherDashboard = () => {
                         </div>
                         <div className="teacher-info-pill hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-card)', padding: '6px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-soft)' }}>
                             <div style={{ textAlign: 'right' }}>
-                                <p style={{ fontSize: '0.85rem', fontWeight: '700', margin: 0 }}>{profile?.name || initialUser?.name} <span style={{ opacity: 0.5, fontWeight: '500', marginLeft: '4px' }}>({profile?.teacherId || initialUser?.teacherId})</span></p>
-                                <p style={{ fontSize: '0.65rem', fontWeight: '600', color: 'var(--text-muted)', margin: 0, textTransform: 'uppercase' }}>{profile?.designation || initialUser?.designation}</p>
+                                <p style={{ fontSize: '0.85rem', fontWeight: '700', margin: 0 }}>{profile?.name || user?.name} <span style={{ opacity: 0.5, fontWeight: '500', marginLeft: '4px' }}>({profile?.teacherId || user?.teacherId})</span></p>
+                                <p style={{ fontSize: '0.65rem', fontWeight: '600', color: 'var(--text-muted)', margin: 0, textTransform: 'uppercase' }}>{profile?.designation || user?.designation}</p>
                             </div>
                         </div>
                     </div>
@@ -346,15 +360,15 @@ const TeacherDashboard = () => {
                                 </div>
 
                                 {/* Profile Summary Card */}
-                                {(profile || initialUser) && (
+                                {(profile || user) && (
                                     <div className="card" style={{ marginTop: '32px', padding: '32px', borderRadius: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-soft)', boxShadow: 'var(--shadow-md)', position: 'relative', overflow: 'hidden' }}>
                                         <div style={{ position: 'absolute', top: 0, right: 0, width: '200px', height: '200px', background: 'var(--primary-soft)', borderRadius: '50%', filter: 'blur(80px)', opacity: 0.3, zIndex: 0 }}></div>
                                         
                                         <div style={{ position: 'relative', zIndex: 1, display: 'flex', gap: '32px', flexWrap: 'wrap' }}>
                                             <div style={{ flex: '0 0 160px' }}>
                                                 <div style={{ width: '160px', height: '160px', borderRadius: '20px', overflow: 'hidden', border: '4px solid var(--bg-main)', boxShadow: 'var(--shadow-lg)' }}>
-                                                    {(profile?.photo || initialUser?.photo) ? (
-                                                        <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${profile?.photo || initialUser?.photo}`} alt="Dashboard Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                                                     {(profile?.photo || user?.photo) ? (
+                                                        <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${profile?.photo || user?.photo}?t=${Date.now()}`} alt="Dashboard Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                                                     ) : (
                                                         <div style={{ width: '100%', height: '100%', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                             <UserCircle size={100} color="var(--primary-bold)" />
@@ -366,12 +380,12 @@ const TeacherDashboard = () => {
                                             <div style={{ flex: '1', minWidth: '300px' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                                                     <div>
-                                                        <h3 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900', color: 'var(--text-main)' }}>{profile?.name || initialUser?.name}</h3>
-                                                        <p style={{ margin: '4px 0 0 0', fontSize: '1rem', fontWeight: '700', color: 'var(--primary-bold)', textTransform: 'uppercase' }}>{profile?.designation || initialUser?.designation}</p>
+                                                        <h3 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900', color: 'var(--text-main)' }}>{profile?.name || user?.name}</h3>
+                                                        <p style={{ margin: '4px 0 0 0', fontSize: '1rem', fontWeight: '700', color: 'var(--primary-bold)', textTransform: 'uppercase' }}>{profile?.designation || user?.designation}</p>
                                                     </div>
                                                     <div style={{ textAlign: 'right' }}>
                                                         <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>MEMBER SINCE</p>
-                                                        <p style={{ margin: 0, fontWeight: '800', color: 'var(--text-main)' }}>{new Date(profile?.joiningDate || initialUser?.joiningDate).getFullYear()}</p>
+                                                        <p style={{ margin: 0, fontWeight: '800', color: 'var(--text-main)' }}>{new Date(profile?.joiningDate || user?.joiningDate).getFullYear()}</p>
                                                     </div>
                                                 </div>
 
@@ -380,12 +394,16 @@ const TeacherDashboard = () => {
                                                         <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><Phone size={18} /></div>
                                                         <div>
                                                             <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-muted)' }}>PHONE</p>
-                                                            <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600' }}>{profile?.phone || initialUser?.phone || 'N/A'}</p>
+                                                            <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600' }}>{profile?.phone || user?.phone || 'N/A'}</p>
                                                         </div>
                                                     </div>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                         <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><Fingerprint size={18} /></div>
                                                         <div>
+                                                            <p style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Faculty ID</p>
+                                                            <h3 style={{ fontSize: '1.8rem', fontWeight: 900, margin: '8px 0 0 0', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                                {user?.teacherId || user?.adminId || 'T-AUTO-GEN'}
+                                                            </h3>
                                                             <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-muted)' }}>AADHAR</p>
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                                 <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600' }}>
@@ -406,20 +424,24 @@ const TeacherDashboard = () => {
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><MapPin size={18} /></div>
-                                                        <div>
-                                                            <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-muted)' }}>LOCATION</p>
-                                                            <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile?.address || initialUser?.address || 'India'}</p>
+                                                    {(profile?.qualification || user?.qualification) && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><GraduationCap size={18} /></div>
+                                                            <div>
+                                                                <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-muted)' }}>QUALIFICATION</p>
+                                                                <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600' }}>{profile?.qualification || user?.qualification}</p>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><GraduationCap size={18} /></div>
-                                                        <div>
-                                                            <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-muted)' }}>QUALIFICATION</p>
-                                                            <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600' }}>{profile?.qualification || initialUser?.qualification || 'Graduate'}</p>
+                                                    )}
+                                                    {(profile?.extraQualification || user?.extraQualification) && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><Award size={18} /></div>
+                                                            <div>
+                                                                <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-muted)' }}>EXTRA CERTIFICATIONS</p>
+                                                                <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600' }}>{profile?.extraQualification || user?.extraQualification}</p>
+                                                            </div>
                                                         </div>
-                                                    </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

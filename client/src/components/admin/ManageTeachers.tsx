@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { UserCircle, UserPlus, List, Eye, EyeOff, Save, Phone, Fingerprint, MapPin, GraduationCap, Calendar, Users as UsersIcon } from 'lucide-react';
 import PhotoUpload from '../common/PhotoUpload';
 import Modal from '../common/Modal';
 import { useFetch } from '../../hooks/useFetch';
+import { socket } from '../../services/socket';
 
 const ManageTeachers = () => {
     const { showToast } = useToast();
@@ -16,6 +17,15 @@ const ManageTeachers = () => {
     const [editData, setEditData] = useState<any>({});
     const [selectedTeacher, setSelectedTeacher] = useState<any | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+    useEffect(() => {
+        socket.on('profile_updated', () => {
+            refreshTeachers();
+        });
+        return () => {
+            socket.off('profile_updated');
+        };
+    }, [refreshTeachers]);
 
     const [newUser, setNewUser] = useState({
         name: '', email: '', teacherId: '', password: '',
@@ -309,9 +319,9 @@ const ManageTeachers = () => {
                                 <tr key={user.id}>
                                     <td style={{ fontWeight: '500', color: 'var(--text-main)', padding: '24px 20px' }}>{index + 1}</td>
                                     <td style={{ padding: '24px 20px', verticalAlign: 'middle' }}>
-                                        <div style={{ width: '45px', height: '45px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-soft)', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                         <div style={{ width: '45px', height: '45px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-soft)', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                             {user.photo ? (
-                                                <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${user.photo}`} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${user.photo}?t=${Date.now()}`} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                             ) : (
                                                 <UserCircle size={24} color="var(--primary-bold)" />
                                             )}

@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login } from '../services/authService.js';
+import { useAuth } from '../context/AuthContext';
+import { login as loginService } from '../services/authService.js';
 import { Lock, User, Eye, EyeOff, GraduationCap, ChevronRight } from 'lucide-react';
 
 const Login = () => {
+    const { login } = useAuth();
     const [userId, setUserId] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -25,8 +27,11 @@ const Login = () => {
         setLoading(true);
 
         try {
-            const data = await login(userId, password, activeRole); // Pass activeRole to the login service
-            const user = data.user;
+            const data = await loginService(userId, password, activeRole);
+            const { token, user } = data;
+            
+            // Centralized login update
+            login(token, user);
 
             if (user.role === 'ADMIN') navigate('/admin');
             else if (user.role === 'TEACHER') navigate('/teacher');

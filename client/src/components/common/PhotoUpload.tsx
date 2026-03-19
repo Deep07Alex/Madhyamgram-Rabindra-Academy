@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, X, Check, Loader2 } from 'lucide-react';
+import { Camera, Upload, X, Loader2 } from 'lucide-react';
 import api from '../../services/api';
 
 interface PhotoUploadProps {
@@ -83,7 +83,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({ value, currentUrl, onChange, 
                     borderStyle: actualValue ? 'solid' : 'dashed',
                     borderColor: actualValue ? 'var(--primary-bold)' : 'var(--border-soft)'
                 }}
-                onMouseEnter={e => !actualValue && (e.currentTarget.style.borderColor = 'var(--primary-main)')}
+                onMouseEnter={e => !actualValue && (e.currentTarget.style.borderColor = 'var(--primary-bold)')}
                 onMouseLeave={e => !actualValue && (e.currentTarget.style.borderColor = 'var(--border-soft)')}
             >
                 {actualValue ? (
@@ -123,7 +123,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({ value, currentUrl, onChange, 
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 cursor: 'pointer',
-                                color: 'var(--danger-main)',
+                                color: 'var(--error)',
                                 boxShadow: 'var(--shadow-sm)'
                             }}
                         >
@@ -133,7 +133,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({ value, currentUrl, onChange, 
                 ) : (
                     <>
                         {uploading ? (
-                            <Loader2 className="animate-spin" size={24} color="var(--primary-main)" />
+                            <Loader2 className="animate-spin" size={24} color="var(--primary-bold)" />
                         ) : (
                             <>
                                 <Upload size={24} color="var(--text-muted)" style={{ marginBottom: '4px' }} />
@@ -156,7 +156,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({ value, currentUrl, onChange, 
             />
 
             {error && (
-                <p style={{ color: 'var(--danger-main)', fontSize: '0.75rem', marginTop: '6px', fontWeight: '500' }}>
+                <p style={{ color: 'var(--error)', fontSize: '0.75rem', marginTop: '6px', fontWeight: '500' }}>
                     {error}
                 </p>
             )}

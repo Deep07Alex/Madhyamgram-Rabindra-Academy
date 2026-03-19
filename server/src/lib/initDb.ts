@@ -334,10 +334,12 @@ export const initDb = async () => {
             -- Performance Indexes for common lookups
             CREATE INDEX IF NOT EXISTS "idx_student_class" ON "Student"("classId");
             CREATE INDEX IF NOT EXISTS "idx_student_rollNumber" ON "Student"("rollNumber");
+            CREATE INDEX IF NOT EXISTS "idx_student_name" ON "Student"("name");
             CREATE INDEX IF NOT EXISTS "idx_attendance_date" ON "Attendance"("date");
             CREATE INDEX IF NOT EXISTS "idx_attendance_class" ON "Attendance"("classId");
             CREATE INDEX IF NOT EXISTS "idx_teacher_phone" ON "Teacher"("phone");
             CREATE INDEX IF NOT EXISTS "idx_teacher_aadhar" ON "Teacher"("aadhar");
+            CREATE INDEX IF NOT EXISTS "idx_teacher_name" ON "Teacher"("name");
             CREATE INDEX IF NOT EXISTS "idx_fee_student" ON "Fee"("studentId");
             CREATE INDEX IF NOT EXISTS "idx_result_student" ON "Result"("studentId");
             CREATE INDEX IF NOT EXISTS "idx_homework_class" ON "Homework"("classId");

@@ -212,7 +212,7 @@ export const register = async (req: Request, res: Response) => {
                 // Standardize to uppercase S- if it already had a prefix
                 finalStudentId = `S-${finalStudentId.slice(2)}`;
             }
-
+            
             // Check if studentId already exists
             const studentIdCheck = await db.query(
                 `SELECT id FROM "Student" WHERE "studentId" = $1 LIMIT 1`,
@@ -245,7 +245,7 @@ export const register = async (req: Request, res: Response) => {
                 }
             }
 
-            // Auto-generate password if not provided or empty
+            // Restore Name@1234 password generation
             let finalPassword = password;
             if (!finalPassword || finalPassword.trim() === '') {
                 const cleanName = name.trim().toLowerCase().replace(/\s+/g, '');

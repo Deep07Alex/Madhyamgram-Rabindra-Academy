@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ToastProvider } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { Loader2 } from 'lucide-react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Lazy load components for production optimization
 const Login = React.lazy(() => import('./pages/Login'));
@@ -10,84 +11,105 @@ const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
 const TeacherDashboard = React.lazy(() => import('./pages/TeacherDashboard'));
 const StudentDashboard = React.lazy(() => import('./pages/StudentDashboard'));
 const Gallery = React.lazy(() => import('./pages/Gallery'));
-const MainPage = React.lazy(() => import('./pages/MainPage'));
+import MainPage from './pages/MainPage';
+
+// Preload utility to fetch dashboard chunks in the background
+const preloadDashboard = (factory: () => Promise<any>) => {
+    const component = factory();
+    component.catch(() => {}); // Handle potential network errors silently
+};
 
 const LoadingFallback = () => (
-  <div style={{ 
-    height: '100vh', 
-    width: '100vw', 
-    display: 'flex', 
-    flexDirection: 'column',
-    alignItems: 'center', 
-    justifyContent: 'center',
-    background: 'var(--bg-main)',
-    color: 'var(--primary-bold)'
-  }}>
-    <Loader2 className="animate-spin" size={48} />
-    <p style={{ marginTop: '16px', fontWeight: '600', letterSpacing: '0.05em' }}>Loading Excellence...</p>
-  </div>
+    <div style={{
+        height: '100vh',
+        width: '100vw',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--bg-main)',
+        color: 'var(--primary-bold)'
+    }}>
+        <Loader2 className="animate-spin" size={48} />
+        <p style={{ marginTop: '16px', fontWeight: '600', letterSpacing: '0.05em' }}>Loading Excellence...</p>
+    </div>
 );
 
 const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) => {
-  const userJson = localStorage.getItem('user');
-  const user = userJson ? JSON.parse(userJson) : null;
-  const token = localStorage.getItem('token');
+    const { user, token, loading } = useAuth();
 
-  if (!token || !user) {
-    return <Navigate to="/" replace />;
-  }
+    if (loading) return <LoadingFallback />;
 
-  if (!allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />;
-  }
+    // Redirect to login if NO session exists
+    if (!token || !user) {
+        return <Navigate to="/login" replace />;
+    }
 
-  return children;
+    // Redirect to login (or home) if role is WRONG
+    if (!allowedRoles.includes(user.role)) {
+        return <Navigate to="/login" replace />;
+    }
+
+    return <>{children}</>;
 };
 
 function App() {
-  return (
-    <ThemeProvider>
-      <ToastProvider>
-        <Router>
-          <React.Suspense fallback={<LoadingFallback />}>
-            <Routes>
-              <Route path="/login" element={<Login />} />
+    // Preload dashboards when the app mounts to ensure near-instant navigation
+    React.useEffect(() => {
+        const timer = setTimeout(() => {
+            preloadDashboard(() => import('./pages/AdminDashboard'));
+            preloadDashboard(() => import('./pages/TeacherDashboard'));
+            preloadDashboard(() => import('./pages/StudentDashboard'));
+            preloadDashboard(() => import('./pages/Login'));
+        }, 2000); // Wait 2 seconds to not interfere with initial MainPage load
+        return () => clearTimeout(timer);
+    }, []);
 
-              <Route
-                path="/admin/*"
-                element={
-                  <PrivateRoute allowedRoles={['ADMIN']}>
-                    <AdminDashboard />
-                  </PrivateRoute>
-                }
-              />
+    return (
+        <ThemeProvider>
+            <ToastProvider>
+                <AuthProvider>
+                    <Router>
+                        <React.Suspense fallback={<LoadingFallback />}>
+                            <Routes>
+                                <Route path="/login" element={<Login />} />
 
-              <Route
-                path="/teacher/*"
-                element={
-                  <PrivateRoute allowedRoles={['TEACHER']}>
-                    <TeacherDashboard />
-                  </PrivateRoute>
-                }
-              />
+                                <Route
+                                    path="/admin/*"
+                                    element={
+                                        <PrivateRoute allowedRoles={['ADMIN']}>
+                                            <AdminDashboard />
+                                        </PrivateRoute>
+                                    }
+                                />
 
-              <Route
-                path="/student/*"
-                element={
-                  <PrivateRoute allowedRoles={['STUDENT']}>
-                    <StudentDashboard />
-                  </PrivateRoute>
-                }
-              />
+                                <Route
+                                    path="/teacher/*"
+                                    element={
+                                        <PrivateRoute allowedRoles={['TEACHER']}>
+                                            <TeacherDashboard />
+                                        </PrivateRoute>
+                                    }
+                                />
 
-              <Route path="/gallery" element={<Gallery />} />
-              <Route path="/" element={<MainPage />} />
-            </Routes>
-          </React.Suspense>
-        </Router>
-      </ToastProvider>
-    </ThemeProvider>
-  );
+                                <Route
+                                    path="/student/*"
+                                    element={
+                                        <PrivateRoute allowedRoles={['STUDENT']}>
+                                            <StudentDashboard />
+                                        </PrivateRoute>
+                                    }
+                                />
+
+                                <Route path="/" element={<MainPage />} />
+                                <Route path="/gallery" element={<Gallery />} />
+                            </Routes>
+                        </React.Suspense>
+                    </Router>
+                </AuthProvider>
+            </ToastProvider>
+        </ThemeProvider>
+    );
 }
 
 export default App;

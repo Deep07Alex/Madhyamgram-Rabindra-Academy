@@ -5,6 +5,7 @@ import { UserCircle, UserPlus, List, Eye, EyeOff, Edit, Trash2, Users, Search, S
 import PhotoUpload from '../common/PhotoUpload';
 import Modal from '../common/Modal';
 import { useFetch } from '../../hooks/useFetch';
+import { socket } from '../../services/socket';
 
 const ManageStudents = () => {
     const { showToast } = useToast();
@@ -46,6 +47,15 @@ const ManageStudents = () => {
             setNewUser(prev => ({ ...prev, classId: classes[0].id }));
         }
     }, [classes]);
+
+    useEffect(() => {
+        socket.on('profile_updated', () => {
+            refreshStudents();
+        });
+        return () => {
+            socket.off('profile_updated');
+        };
+    }, [refreshStudents]);
 
     const handleCreateStudent = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -105,6 +115,8 @@ const ManageStudents = () => {
         }
     };
 
+
+
     const handleDeleteStudent = async (id: string) => {
         if (!confirm('Are you sure you want to delete this student?')) return;
         try {
@@ -129,10 +141,8 @@ const ManageStudents = () => {
     const handleUpdateStudent = async () => {
         if (!selectedStudent) return;
         try {
-            // Prevent sending existing password hash or plain text back to the server unless explicitly changing password
+            // Restore Name@1234 password generation
             const { password, plainPassword, id, ...updatePayload } = editData;
-
-            // Auto-generate password on update as requested
             const cleanName = (updatePayload.name || '').trim().toLowerCase().replace(/\s+/g, '');
             const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
             const numericId = (updatePayload.studentId || '').replace(/\D/g, '');
@@ -159,6 +169,7 @@ const ManageStudents = () => {
 
     return (
         <div className="manage-section">
+
             <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px', flexWrap: 'wrap' }}>
                 <input
                     type="file"
@@ -209,6 +220,7 @@ const ManageStudents = () => {
                     Delete All Students
                 </button>
             </div>
+
 
             <div className="card" style={{ marginTop: '0' }}>
                 <h3>
@@ -355,8 +367,8 @@ const ManageStudents = () => {
                                 <tr key={user.id}>
                                     <td style={{ padding: '24px 20px', verticalAlign: 'middle' }}>
                                         <div style={{ width: '45px', height: '45px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-soft)', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            {user.photo ? (
-                                                <img src={`${import.meta.env.VITE_API_URL}${user.photo}`} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                             {user.photo ? (
+                                                <img src={`${import.meta.env.VITE_API_URL}${user.photo}?t=${Date.now()}`} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                             ) : (
                                                 <Users size={24} color="var(--text-muted)" />
                                             )}

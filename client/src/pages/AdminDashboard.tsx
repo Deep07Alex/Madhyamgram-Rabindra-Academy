@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate, NavLink, Routes, Route, Navigate } from 'react-router-dom';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
-import { logout } from '../services/authService';
 import ManageStudents from '../components/admin/ManageStudents';
 import ManageTeachers from '../components/admin/ManageTeachers';
 import ManageClasses from '../components/admin/ManageClasses';
@@ -13,6 +12,7 @@ import ManageAttendance from '../components/admin/ManageAttendance';
 import ManageNotices from '../components/admin/ManageNotices';
 import LiveClock from '../components/common/LiveClock';
 import ThemeToggle from '../components/common/ThemeToggle';
+import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard,
     Users,
@@ -30,22 +30,24 @@ import {
 import { socket } from '../services/socket';
 
 const AdminDashboard = () => {
+    const { user, logout: authLogout } = useAuth();
     const { showToast } = useToast();
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    
+    // Safety check: if somehow PrivateRoute was bypassed
+    useEffect(() => {
+        if (!user || user.role !== 'ADMIN') {
+            navigate('/', { replace: true });
+        }
+    }, [user, navigate]);
+
     const [stats, setStats] = useState({
         students: 0,
         teachers: 0,
         classes: 0,
         projectedFees: 0
     });
-    const userJson = localStorage.getItem('user');
-    let user = null;
-    try {
-        user = userJson && userJson !== 'undefined' ? JSON.parse(userJson) : null;
-    } catch (e) {
-        localStorage.removeItem('user');
-    }
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -81,7 +83,7 @@ const AdminDashboard = () => {
     }, []);
 
     const handleLogout = () => {
-        logout();
+        authLogout();
         navigate('/');
     };
 
