@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.js';
-import { broadcast } from '../lib/sseManager.js';
+import { broadcast, sendToUser, sendToRole } from '../lib/sseManager.js';
 import { emitEvent } from '../lib/socket.js';
 
 export const createFee = async (req: Request, res: Response) => {
@@ -16,8 +16,8 @@ export const createFee = async (req: Request, res: Response) => {
             [id, studentId, parseFloat(amount as string), new Date(dueDate), type]
         );
 
-        broadcast('fee:created', { studentId: feeRes.rows[0].studentId });
-        emitEvent('fee_created', feeRes.rows[0], `student:${studentId}`);
+        broadcast('fee:created', feeRes.rows[0]);
+        sendToUser(studentId, 'fee:created', feeRes.rows[0]);
         
         res.status(201).json(feeRes.rows[0]);
     } catch (error) {
@@ -64,8 +64,9 @@ export const recordPayment = async (req: Request, res: Response) => {
         );
 
         const paidFee = updateRes.rows[0];
-        emitEvent('fee_paid', paidFee, 'admin_room');
-        emitEvent('fee_paid', paidFee, `student:${paidFee.studentId}`);
+        broadcast('fee:paid', { studentId: paidFee.studentId, amount: paidFee.amount });
+        sendToRole('ADMIN', 'fee:paid', paidFee);
+        sendToUser(paidFee.studentId, 'fee:paid', paidFee);
 
         res.json(paidFee);
     } catch (error) {

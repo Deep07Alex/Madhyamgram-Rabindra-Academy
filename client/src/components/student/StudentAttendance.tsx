@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import useServerEvents from '../../hooks/useServerEvents';
 import { Calendar, CheckCircle2, XCircle, BarChart3, List } from 'lucide-react';
-import { socket } from '../../services/socket';
 
 const StudentAttendance = () => {
     const [attendanceData, setAttendanceData] = useState({ records: [] as any[], totalSessions: 0 });
@@ -21,10 +20,6 @@ const StudentAttendance = () => {
     // Live updates: refresh when teacher marks or admin edits attendance
     useServerEvents({ 'attendance:updated': fetchAttendance });
 
-    useEffect(() => {
-        socket.on('attendance_marked', fetchAttendance);
-        return () => { socket.off('attendance_marked', fetchAttendance); };
-    }, [fetchAttendance]);
 
     const totalDays = attendanceData.totalSessions;
     const absentDays = attendanceData.records.filter((a: any) => a.status === 'ABSENT').length;

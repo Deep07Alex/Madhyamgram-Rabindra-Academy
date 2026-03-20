@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
-import { socket } from '../../services/socket';
 import useServerEvents from '../../hooks/useServerEvents';
 import {
     ClipboardCheck,
@@ -426,17 +425,6 @@ const ManageAttendance = () => {
         }
     });
 
-    useEffect(() => {
-        const handleUpdate = () => {
-            fetchMonthlyData();
-            if (viewMode === 'daily') {
-                if (tab === 'students') fetchStudentData();
-                else fetchTeacherData();
-            }
-        };
-        socket.on('attendance_marked', handleUpdate);
-        return () => { socket.off('attendance_marked', handleUpdate); };
-    }, [fetchMonthlyData, fetchStudentData, fetchTeacherData, tab, viewMode]);
 
     // Filtered rows
     const filteredStudents = studentRows.filter(r => {

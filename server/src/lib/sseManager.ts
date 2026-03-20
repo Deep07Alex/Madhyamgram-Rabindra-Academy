@@ -1,38 +1,87 @@
-// SSE Manager: keeps a registry of all connected client response streams
-// and provides a broadcast function to push events to all of them.
-
 import { Response } from 'express';
 
-const clients = new Set<Response>();
+interface SSEClient {
+    id: string;
+    res: Response;
+    userId: string | undefined;
+    role: string | undefined;
+}
 
-export const addClient = (res: Response) => {
-    clients.add(res);
+let clients: SSEClient[] = [];
+
+export const addClient = (res: Response, userId?: string, role?: string) => {
+    const id = Date.now().toString();
+    const newClient: SSEClient = { id, res, userId, role };
+    clients.push(newClient);
+
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+    });
+
+    res.write('retry: 10000\n\n');
+
+    return id;
 };
 
-export const removeClient = (res: Response) => {
-    clients.delete(res);
+export const removeClient = (id: string) => {
+    clients = clients.filter(c => c.id !== id);
 };
 
 export type SSEEventType =
-    | 'attendance:updated'
+    | 'user:deleted'
+    | 'class:updated'
+    | 'new_notice'
+    | 'profile_updated'
+    | 'result_published'
     | 'homework_created'
     | 'homework_deleted'
     | 'homework_submitted'
-    | 'result:created'
-    | 'fee:created'
+    | 'homework_graded'
+    | 'attendance:updated'
     | 'fee:paid'
-    | 'user:created'
-    | 'user:deleted'
-    | 'class:updated';
+    | 'fee:created'
+    | 'user:created';
 
+/**
+ * Broadcast to all connected clients
+ */
 export const broadcast = (event: SSEEventType, data: Record<string, unknown> = {}) => {
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    clients.forEach(res => {
+    clients.forEach(c => {
         try {
-            res.write(payload);
-        } catch {
-            // Client already disconnected
-            clients.delete(res);
+            c.res.write(payload);
+        } catch (err) {
+            // Error writing to client, likely disconnected
+        }
+    });
+};
+
+/**
+ * Send event to a specific user
+ */
+export const sendToUser = (userId: string, event: SSEEventType, data: Record<string, unknown> = {}) => {
+    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    clients.filter(c => c.userId === userId).forEach(c => {
+        try {
+            c.res.write(payload);
+        } catch (err) {
+            // Error
+        }
+    });
+};
+
+/**
+ * Send event to a specific role
+ */
+export const sendToRole = (role: string, event: SSEEventType, data: Record<string, unknown> = {}) => {
+    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    clients.filter(c => c.role === role).forEach(c => {
+        try {
+            c.res.write(payload);
+        } catch (err) {
+            // Error
         }
     });
 };

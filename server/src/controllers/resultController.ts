@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.js';
-import { broadcast } from '../lib/sseManager.js';
+import { broadcast, sendToRole, sendToUser } from '../lib/sseManager.js';
 import { emitEvent } from '../lib/socket.js';
 
 export const createResult = async (req: Request, res: Response) => {
@@ -16,8 +16,8 @@ export const createResult = async (req: Request, res: Response) => {
             [id, semester, subject, parseFloat(marks as string), parseFloat(totalMarks as string), grade || null, studentId]
         );
 
-        broadcast('result:created', { studentId: resultRes.rows[0].studentId });
-        emitEvent('result_published', resultRes.rows[0], `student:${studentId}`);
+        broadcast('result_published', { studentId: resultRes.rows[0].studentId });
+        sendToUser(studentId, 'result_published', resultRes.rows[0]);
         
         res.status(201).json(resultRes.rows[0]);
     } catch (error) {

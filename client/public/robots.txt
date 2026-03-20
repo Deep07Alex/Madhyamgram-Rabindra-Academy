@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://madhyamgramrabindraacademy.com/sitemap.xml

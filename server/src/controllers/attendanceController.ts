@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.js';
-import { broadcast } from '../lib/sseManager.js';
+import { broadcast, sendToUser, sendToRole } from '../lib/sseManager.js';
 import { emitEvent } from '../lib/socket.js';
 
 // --- Student Attendance ---
@@ -54,8 +54,8 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
         }
 
         broadcast('attendance:updated', { studentId, date: attendanceDateStr });
-        emitEvent('attendance_marked', { studentId, date: attendanceDateStr }, `student:${studentId}`);
-        emitEvent('attendance_marked', { studentId, date: attendanceDateStr }, 'admin_room');
+        sendToUser(studentId, 'attendance:updated', { date: attendanceDateStr });
+        sendToRole('ADMIN', 'attendance:updated', { studentId, date: attendanceDateStr });
         
         res.status(200).json(attendanceRes.rows[0]);
     } catch (error) {
@@ -190,8 +190,8 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
         }
 
         broadcast('attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr });
-        emitEvent('attendance_marked', { teacherId: targetTeacherId, date: attendanceDateStr }, `teacher:${targetTeacherId}`);
-        emitEvent('attendance_marked', { teacherId: targetTeacherId, date: attendanceDateStr }, 'admin_room');
+        sendToUser(targetTeacherId, 'attendance:updated', { date: attendanceDateStr });
+        sendToRole('ADMIN', 'attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr });
         
         res.status(200).json(attendanceRes.rows[0]);
     } catch (error) {
@@ -229,9 +229,9 @@ export const updateStudentAttendance = async (req: AuthRequest, res: Response) =
 
             if (sid) {
                 broadcast('attendance:updated', { studentId: sid, date: dStr });
-                emitEvent('attendance_marked', { studentId: sid, date: dStr }, `student:${sid}`);
+                sendToUser(sid, 'attendance:updated', { date: dStr });
             }
-            emitEvent('attendance_marked', { date: dStr }, 'admin_room');
+            sendToRole('ADMIN', 'attendance:updated', { date: dStr });
         } catch (err) {
             console.error('Live update broadcast failed (student):', err);
         }
@@ -270,9 +270,9 @@ export const updateTeacherAttendance = async (req: AuthRequest, res: Response) =
 
             if (tid) {
                 broadcast('attendance:updated', { teacherId: tid, date: dStr });
-                emitEvent('attendance_marked', { teacherId: tid, date: dStr }, `teacher:${tid}`);
+                sendToUser(tid, 'attendance:updated', { date: dStr });
             }
-            emitEvent('attendance_marked', { date: dStr }, 'admin_room');
+            sendToRole('ADMIN', 'attendance:updated', { date: dStr });
         } catch (err) {
             console.error('Live update broadcast failed (teacher):', err);
         }

@@ -4,6 +4,7 @@ import { db } from '../lib/db.js';
 import crypto from 'crypto';
 import * as XLSX from 'xlsx';
 import { AuthRequest } from '../middleware/auth.js';
+import { broadcast, sendToUser, sendToRole } from '../lib/sseManager.js';
 
 // Get all students
 export const getStudents = async (req: AuthRequest, res: Response) => {
@@ -118,6 +119,7 @@ export const deleteStudent = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     try {
         await db.query(`DELETE FROM "Student" WHERE id = $1`, [id]);
+        broadcast('user:deleted', { id, role: 'STUDENT' });
         res.json({ message: 'Student deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting student' });
@@ -129,6 +131,7 @@ export const deleteTeacher = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     try {
         await db.query(`DELETE FROM "Teacher" WHERE id = $1`, [id]);
+        broadcast('user:deleted', { id, role: 'TEACHER' });
         res.json({ message: 'Teacher deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting teacher' });
@@ -138,6 +141,7 @@ export const deleteTeacher = async (req: Request, res: Response) => {
 export const deleteAllStudents = async (req: Request, res: Response) => {
     try {
         await db.query(`DELETE FROM "Student"`);
+        broadcast('user:deleted', { all: true, role: 'STUDENT' });
         res.json({ message: 'All students deleted successfully' });
     } catch (error) {
         console.error('Error deleting all students:', error);
@@ -227,10 +231,12 @@ export const updateStudent = async (req: Request, res: Response) => {
         }
 
         const updatedStudent = result.rows[0];
-        // Emit live update event
-        import('../lib/socket.js').then(({ emitEvent }) => {
-            emitEvent('profile_updated', { studentId: id }, `student:${id}`);
-        }).catch(err => console.error('Socket emission error:', err));
+        // Emit live update events
+        broadcast('profile_updated', { studentId: id });
+        if (typeof id === 'string') {
+            sendToUser(id, 'profile_updated', { studentId: id });
+        }
+        sendToRole('ADMIN', 'profile_updated', { studentId: id });
 
         res.json({ message: 'Student updated successfully', student: updatedStudent });
     } catch (error: any) {
@@ -334,10 +340,12 @@ export const updateTeacher = async (req: Request, res: Response) => {
 
 
         const updatedTeacher = result.rows[0];
-        // Emit live update event
-        import('../lib/socket.js').then(({ emitEvent }) => {
-            emitEvent('profile_updated', { teacherId: id }, `teacher:${id}`);
-        }).catch(err => console.error('Socket emission error:', err));
+        // Emit live update events
+        broadcast('profile_updated', { teacherId: id });
+        if (typeof id === 'string') {
+            sendToUser(id, 'profile_updated', { teacherId: id });
+        }
+        sendToRole('ADMIN', 'profile_updated', { teacherId: id });
 
         res.json({ message: 'Faculty updated successfully', teacher: updatedTeacher });
     } catch (error: any) {
@@ -539,6 +547,7 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
                 const query = `INSERT INTO "Student" ${columns} VALUES ${placeholders.join(', ')}`;
                 await client.query(query, values);
                 await client.query('COMMIT');
+                broadcast('user:created', { count: validStudents.length });
                 results.success = validStudents.length;
             } catch (dbError: any) {
                 await client.query('ROLLBACK');

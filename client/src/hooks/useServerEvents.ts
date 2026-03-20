@@ -14,7 +14,9 @@ export type SSEEventType =
     | 'user:created'
     | 'user:deleted'
     | 'class:updated'
-    | 'profile_updated';
+    | 'profile_updated'
+    | 'new_notice'
+    | 'result_published';
 
 type EventHandlers = Partial<Record<SSEEventType, (data: any) => void>>;
 

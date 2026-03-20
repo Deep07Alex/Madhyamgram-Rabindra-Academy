@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { UserCircle, UserPlus, List, Eye, EyeOff, Save, Phone, Fingerprint, MapPin, GraduationCap, Calendar, Users as UsersIcon } from 'lucide-react';
 import PhotoUpload from '../common/PhotoUpload';
 import Modal from '../common/Modal';
 import { useFetch } from '../../hooks/useFetch';
-import { socket } from '../../services/socket';
+import useServerEvents from '../../hooks/useServerEvents';
 
 const ManageTeachers = () => {
     const { showToast } = useToast();
@@ -18,14 +18,7 @@ const ManageTeachers = () => {
     const [selectedTeacher, setSelectedTeacher] = useState<any | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-    useEffect(() => {
-        socket.on('profile_updated', () => {
-            refreshTeachers();
-        });
-        return () => {
-            socket.off('profile_updated');
-        };
-    }, [refreshTeachers]);
+    useServerEvents({ 'profile_updated': refreshTeachers });
 
     const [newUser, setNewUser] = useState({
         name: '', email: '', teacherId: '', password: '',

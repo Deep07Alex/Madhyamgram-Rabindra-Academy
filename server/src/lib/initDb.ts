@@ -343,6 +343,13 @@ export const initDb = async () => {
             CREATE INDEX IF NOT EXISTS "idx_fee_student" ON "Fee"("studentId");
             CREATE INDEX IF NOT EXISTS "idx_result_student" ON "Result"("studentId");
             CREATE INDEX IF NOT EXISTS "idx_homework_class" ON "Homework"("classId");
+            CREATE INDEX IF NOT EXISTS "idx_homework_teacher" ON "Homework"("teacherId");
+            CREATE INDEX IF NOT EXISTS "idx_submission_status" ON "Submission"("status");
+            CREATE INDEX IF NOT EXISTS "idx_submission_homework" ON "Submission"("homeworkId");
+            CREATE INDEX IF NOT EXISTS "idx_submission_student" ON "Submission"("studentId");
+            CREATE INDEX IF NOT EXISTS "idx_notice_createdAt" ON "Notice"("createdAt");
+            CREATE INDEX IF NOT EXISTS "idx_notice_audience" ON "Notice"("targetAudience");
+            CREATE INDEX IF NOT EXISTS "idx_notice_type" ON "Notice"("type");
         `);
 
         console.log('Migrations applied successfully.');

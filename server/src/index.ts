@@ -8,8 +8,6 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
@@ -23,8 +21,8 @@ import uploadRoutes from './routes/uploadRoutes.js';
 import { db } from './lib/db.js';
 import { initDb } from './lib/initDb.js';
 import { initCronJobs } from './lib/cron.js';
-import { initSocket } from './lib/socket.js';
 import { addClient, removeClient } from './lib/sseManager.js';
+import jwt from 'jsonwebtoken';
 
 dotenv.config();
 
@@ -32,8 +30,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// Environment Validation
+const REQUIRED_ENV = ['JWT_SECRET', 'DATABASE_URL'];
+REQUIRED_ENV.forEach(key => {
+    if (!process.env[key]) {
+        console.error(`CRITICAL: Missing environment variable ${key}`);
+        process.exit(1);
+    }
+});
 
 // Ensure upload directories exist
 const uploadDir = path.join(__dirname, '../uploads');
@@ -41,11 +47,24 @@ const teacherUploadDir = path.join(__dirname, '../uploads/teachers');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 if (!fs.existsSync(teacherUploadDir)) fs.mkdirSync(teacherUploadDir, { recursive: true });
 
-// 1. Logging and Compression
+// 1. Logging and Performance
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(compression());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Health Check (Professional monitoring)
+app.get('/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'UP', 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memoryUsage: process.memoryUsage()
+    });
+});
 
 // 2. Security Middleware
+const isProd = process.env.NODE_ENV === 'production';
 app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
     contentSecurityPolicy: {
@@ -60,13 +79,14 @@ app.use(helmet({
             mediaSrc: ["'self'"],
             frameSrc: ["'none'"],
         },
-    }
+    },
+    hsts: isProd ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false
 }));
 
 // 3. Rate Limiting
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 2000,
+    max: isProd ? 1000 : 5000, // Stricter in prod
     standardHeaders: true,
     legacyHeaders: false,
     message: 'Too many requests from this IP, please try again after 15 minutes'
@@ -81,7 +101,7 @@ if (!process.env.NODE_ENV) {
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:5173', 'http://localhost:3000'];
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+        if (!origin || allowedOrigins.includes(origin) || !isProd) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -115,19 +135,34 @@ app.use('/api/uploads', uploadRoutes);
 
 // SSE
 app.get('/api/events', (req, res) => {
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.flushHeaders();
-    addClient(res);
-    res.write('event: connected\ndata: {"message":"SSE connected"}\n\n');
+    const token = req.query.token as string;
+    let userId: string | undefined;
+    let role: string | undefined;
+
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_key') as any;
+            userId = decoded.id;
+            role = decoded.role;
+        } catch (err) {
+            console.error('SSE Auth Error:', err);
+        }
+    }
+
+    const clientId = addClient(res, userId, role);
+    
+    // Heartbeat to keep connection alive
     const heartbeat = setInterval(() => {
-        try { res.write(':ping\n\n'); } catch { clearInterval(heartbeat); }
-    }, 25000);
+        if (res.writableEnded) {
+            clearInterval(heartbeat);
+            return;
+        }
+        res.write(':ping\n\n');
+    }, 30000);
+
     req.on('close', () => {
         clearInterval(heartbeat);
-        removeClient(res);
+        removeClient(clientId);
     });
 });
 
@@ -182,11 +217,35 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     });
 });
 
-initSocket(httpServer);
-
 initDb().then(() => {
     initCronJobs();
-    httpServer.listen(PORT, () => {
-        console.log(`Server is running on port ${PORT}`);
+// Start Server
+const server = app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
+
+// 5. Graceful Shutdown (Absolute Professional Final Step)
+const shutdown = async () => {
+    console.log('Shutdown signal received. Closing HTTP server...');
+    server.close(async () => {
+        console.log('HTTP server closed. Closing database pool...');
+        try {
+            await db.end();
+            console.log('Database pool closed. Shutdown complete.');
+            process.exit(0);
+        } catch (err) {
+            console.error('Error during database pool shutdown:', err);
+            process.exit(1);
+        }
     });
+
+    // Force close after 10s
+    setTimeout(() => {
+        console.error('Could not close connections in time, forcefully shutting down');
+        process.exit(1);
+    }, 10000);
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 });

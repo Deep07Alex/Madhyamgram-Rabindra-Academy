@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import { v4 as uuidv4 } from 'uuid';
-import { emitEvent } from '../lib/socket.js';
+import { broadcast, sendToRole } from '../lib/sseManager.js';
 
 export const createNotice = async (req: Request, res: Response) => {
     try {
@@ -23,8 +23,9 @@ export const createNotice = async (req: Request, res: Response) => {
         const result = await db.query('SELECT * FROM "Notice" WHERE id = $1', [id]);
         const newNotice = result.rows[0];
         
-        // Emit real-time event
-        emitEvent('new_notice', newNotice);
+        // Emit real-time events
+        broadcast('new_notice', newNotice);
+        sendToRole('ADMIN', 'new_notice', newNotice);
 
         res.status(201).json(newNotice);
     } catch (error) {

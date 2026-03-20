@@ -5,7 +5,7 @@ import { UserCircle, UserPlus, List, Eye, EyeOff, Edit, Trash2, Users, Search, S
 import PhotoUpload from '../common/PhotoUpload';
 import Modal from '../common/Modal';
 import { useFetch } from '../../hooks/useFetch';
-import { socket } from '../../services/socket';
+import useServerEvents from '../../hooks/useServerEvents';
 
 const ManageStudents = () => {
     const { showToast } = useToast();
@@ -48,14 +48,7 @@ const ManageStudents = () => {
         }
     }, [classes]);
 
-    useEffect(() => {
-        socket.on('profile_updated', () => {
-            refreshStudents();
-        });
-        return () => {
-            socket.off('profile_updated');
-        };
-    }, [refreshStudents]);
+    useServerEvents({ 'profile_updated': refreshStudents });
 
     const handleCreateStudent = async (e: React.FormEvent) => {
         e.preventDefault();

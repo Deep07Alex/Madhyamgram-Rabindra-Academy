@@ -2,8 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.js';
-import { broadcast } from '../lib/sseManager.js';
-import { emitEvent } from '../lib/socket.js';
+import { broadcast, sendToUser, sendToRole } from '../lib/sseManager.js';
 
 // --- Homework Management ---
 
@@ -29,8 +28,8 @@ export const createHomework = async (req: AuthRequest, res: Response) => {
             [id, title, description, subject || null, finalDueDate, classId, teacherId, fileUrl, allowFileUpload === 'true' || allowFileUpload === true]
         );
 
-        emitEvent('homework_created', { classId: homeworkRes.rows[0].classId });
-        emitEvent('homework_created', homeworkRes.rows[0], `class:${classId}`);
+        broadcast('homework_created', { classId: homeworkRes.rows[0].classId });
+        sendToRole('STUDENT', 'homework_created', { classId: homeworkRes.rows[0].classId });
         
         res.status(201).json(homeworkRes.rows[0]);
     } catch (error) {
@@ -47,7 +46,7 @@ export const deleteHomework = async (req: Request, res: Response) => {
         const result = await db.query(`DELETE FROM "Homework" WHERE id = $1 RETURNING "classId"`, [id]);
         if (result.rows.length === 0) return res.status(404).json({ message: 'Homework not found' });
         broadcast('homework_deleted', { id });
-        emitEvent('homework_deleted', { id, classId: result.rows[0].classId }, `class:${result.rows[0].classId}`);
+        sendToRole('STUDENT', 'homework_deleted', { id, classId: result.rows[0].classId });
         res.json({ message: 'Homework deleted' });
     } catch (error) {
         console.error(error);
@@ -135,9 +134,14 @@ export const submitHomework = async (req: AuthRequest, res: Response) => {
                 [content, fileUrl, existingId]
             );
             broadcast('homework_submitted', { homeworkId, studentId });
-            emitEvent('homework_submitted', { homeworkId, studentId }, 'admin_room');
-            emitEvent('homework_submitted', { homeworkId, studentId }, `teacher:${updatedRes.rows[0].teacherId}`);
-            emitEvent('homework_submitted', { homeworkId, studentId }, `student:${studentId}`);
+            sendToRole('ADMIN', 'homework_submitted', { homeworkId, studentId });
+            // Fetch teacherId to emit to the specific teacher's dashboard
+            const tRes = await db.query('SELECT "teacherId" FROM "Homework" WHERE id = $1', [homeworkId]);
+            const assignmentTeacherId = tRes.rows[0]?.teacherId;
+            if (assignmentTeacherId) {
+                sendToUser(assignmentTeacherId, 'homework_submitted', { homeworkId, studentId });
+            }
+            sendToUser(studentId, 'homework_submitted', { homeworkId, studentId });
             
             return res.json(updatedRes.rows[0]);
         }
@@ -154,10 +158,9 @@ export const submitHomework = async (req: AuthRequest, res: Response) => {
         const assignmentTeacherId = tRes.rows[0]?.teacherId;
 
         broadcast('homework_submitted', { homeworkId, studentId });
-        emitEvent('homework_submitted', { homeworkId, studentId }, 'admin_room');
-        emitEvent('homework_submitted', { homeworkId, studentId }, `student:${studentId}`);
+        sendToRole('ADMIN', 'homework_submitted', { homeworkId, studentId });
         if (assignmentTeacherId) {
-            emitEvent('homework_submitted', { homeworkId, studentId }, `teacher:${assignmentTeacherId}`);
+            sendToUser(assignmentTeacherId, 'homework_submitted', { homeworkId, studentId });
         }
         
         res.status(201).json(submissionRes.rows[0]);
@@ -226,7 +229,8 @@ export const gradeSubmission = async (req: AuthRequest, res: Response) => {
             [status, feedback || null, id]
         );
 
-        emitEvent('homework_graded', submissionRes.rows[0], `student:${submissionRes.rows[0].studentId}`);
+        sendToUser(submissionRes.rows[0].studentId, 'homework_graded', { submissionId: id });
+        broadcast('homework_graded', { submissionId: id, studentId: submissionRes.rows[0].studentId });
 
         res.json(submissionRes.rows[0]);
     } catch (error) {
