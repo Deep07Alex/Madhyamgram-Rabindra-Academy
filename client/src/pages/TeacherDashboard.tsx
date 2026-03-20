@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, NavLink, Routes, Route, Navigate } from 'react-router-dom';
+import { useNavigate, NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import TeacherAttendance from '../components/teacher/TeacherAttendance';
 import TeacherHomework from '../components/teacher/TeacherHomework';
@@ -17,7 +17,8 @@ import {
     Menu,
     X,
     BellRing,
-    Bell
+    Bell,
+    Loader2
 } from 'lucide-react';
 
 const TeacherDashboard = () => {
@@ -31,59 +32,62 @@ const TeacherDashboard = () => {
         }
     }, [user, navigate]);
 
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [stats, setStats] = useState({
         assignedClasses: 0,
         pendingSubmissions: 0,
         attendanceRate: 0
     });
     const [unreadCount, setUnreadCount] = useState(0);
-    const [notices, setNotices] = useState<any[]>([]);
-    const [profile, setProfile] = useState<any>(null);
 
-    const fetchStats = useCallback(async () => {
+    const refreshData = useCallback(async (silent = false) => {
+        if (!silent) setIsRefreshing(true);
         try {
-            const res = await api.get('/dashboard/stats');
-            setStats(res.data);
-        } catch (error) {
-            console.error('Failed to fetch stats:', error);
-        }
-    }, []);
-
-    const fetchProfile = useCallback(async () => {
-        try {
-            const res = await api.get('/auth/me');
-            updateUser(res.data);
-            setProfile(res.data);
-        } catch (error) {
-            console.error('Failed to fetch profile:', error);
-        }
-    }, [updateUser]);
-
-    const fetchNotices = useCallback(async () => {
-        try {
-            const res = await api.get('/notices');
-            setNotices(res.data);
+            const res = await api.get('/dashboard/unified');
+            const { profile: updatedProfile, stats: updatedStats, notices: noticeList } = res.data;
+            
+            // 1. Update Profile (Global Auth)
+            updateUser(updatedProfile);
+            
+            // 2. Update Local Stats
+            setStats(updatedStats);
+            
+            // 3. Update Unread Count
             const lastChecked = localStorage.getItem('teacher_last_checked_notices') || '0';
-            const unread = res.data.filter((n: any) => new Date(n.createdAt).getTime() > parseInt(lastChecked));
+            const unread = noticeList.filter((n: any) => new Date(n.createdAt).getTime() > parseInt(lastChecked));
             setUnreadCount(unread.length);
-        } catch (error) {
-            console.error('Failed to fetch notices:', error);
+
+        } catch (error: any) {
+            console.error('Teacher Unified Refresh Failed:', error);
+            if (error.response?.status === 401) authLogout();
+        } finally {
+            setIsRefreshing(false);
         }
-    }, []);
+    }, [updateUser, authLogout]);
 
     useEffect(() => {
-        fetchStats();
-        fetchNotices();
-        fetchProfile();
-    }, [fetchStats, fetchNotices, fetchProfile]);
+        refreshData();
+    }, [refreshData]);
+
+    // Handle notice dismissal on navigation
+    const { pathname } = useLocation();
+
+    useEffect(() => {
+        if (pathname === '/teacher/notices' && unreadCount > 0) {
+            clearNotices();
+        }
+    }, [pathname, unreadCount]);
 
     useServerEvents({
-        'attendance:updated': fetchStats,
-        'homework_submitted': fetchStats,
-        'homework_created': fetchStats,
-        'homework_deleted': fetchStats,
-        'new_notice': fetchNotices,
-        'profile_updated': fetchProfile
+        'connected': () => { if (import.meta.env.DEV) console.log('[SSE] Teacher Portal: Live sync active'); },
+        'attendance:updated': () => refreshData(true),
+        'homework_submitted': () => refreshData(true),
+        'homework_created': () => refreshData(true),
+        'homework_deleted': () => refreshData(true),
+        'new_notice': () => refreshData(true),
+        'notice_deleted': () => refreshData(true),
+        'profile_updated': () => refreshData(true),
+        'class:updated': () => refreshData(true)
     });
 
     const handleLogout = () => {
@@ -112,7 +116,7 @@ const TeacherDashboard = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--nav-text)' }}>Rabindra Academy</span>
+                        <span style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--nav-text)' }}>Madhyamgram Rabindra Academy</span>
                     </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -129,15 +133,15 @@ const TeacherDashboard = () => {
                 <div className="sidebar-header">
                     <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '48px', height: '48px', borderRadius: '50%' }} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '1.2rem', fontWeight: '900', color: 'var(--nav-text)' }}>Rabindra Academy</span>
-                        <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Faculty Portal</span>
+                        <span style={{ fontSize: '1.2rem', fontWeight: '900', color: 'var(--nav-text)' }}>Madhyamgram Rabindra Academy</span>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 600, color: 'var(--text-muted)' }}>UDISE: 19112601311 | ESTD: 2005</span>
                     </div>
                 </div>
 
                 <div className="sidebar-user-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '16px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span className="user-name" style={{ fontSize: '0.9rem', fontWeight: '800' }}>{profile?.name || user?.name}</span>
-                        <span className="user-id" style={{ fontSize: '0.7rem' }}>ID: {profile?.teacherId || user?.teacherId}</span>
+                        <span className="user-name" style={{ fontSize: '0.9rem', fontWeight: '800' }}>{user?.name}</span>
+                        <span className="user-id" style={{ fontSize: '0.7rem' }}>ID: {user?.teacherId}</span>
                     </div>
                 </div>
 
@@ -149,7 +153,6 @@ const TeacherDashboard = () => {
                             className={({ isActive }: { isActive: boolean }) => `nav-item ${isActive ? 'active' : ''}`}
                             onClick={() => {
                                 closeSidebar();
-                                if (item.path === '/teacher/notices') clearNotices();
                             }}
                         >
                             {item.icon}
@@ -170,7 +173,12 @@ const TeacherDashboard = () => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
                             <h1 style={{ fontSize: '2.5rem', fontWeight: 900, margin: 0, color: 'var(--text-main)', letterSpacing: '-0.03em' }}>Hello, {user?.name?.split(' ')[0]}!</h1>
                             <div style={{ padding: '6px 16px', borderRadius: '100px', background: 'var(--primary-soft)', color: 'var(--primary-bold)', fontSize: '0.85rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary-bold)' }}></span> Active Portal
+                                {isRefreshing ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary-bold)' }}></span>
+                                )}
+                                {isRefreshing ? 'Syncing...' : 'Active Portal'}
                             </div>
                         </div>
                         <p style={{ color: 'var(--text-muted)', fontWeight: '500' }}>Manage your classroom and academic excellence.</p>
@@ -190,9 +198,9 @@ const TeacherDashboard = () => {
                         <Route path="dashboard" element={
                             <TeacherOverview 
                                 user={user} 
-                                profile={profile} 
+                                profile={user}
                                 stats={stats} 
-                                notices={notices} 
+                                unreadCount={unreadCount} 
                                 onClearNotices={clearNotices}
                             />
                         } />
@@ -200,6 +208,7 @@ const TeacherDashboard = () => {
                         <Route path="homework" element={<TeacherHomework />} />
                         <Route path="notices" element={<NoticeBoard />} />
                         <Route path="/" element={<Navigate to="/teacher/dashboard" />} />
+                        <Route path="*" element={<Navigate to="/teacher/dashboard" />} />
                     </Routes>
                 </div>
             </main>

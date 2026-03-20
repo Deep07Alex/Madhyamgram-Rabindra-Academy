@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.js';
-import { broadcast, sendToUser, sendToRole } from '../lib/sseManager.js';
+import { broadcast, sendToUser, sendToRole, sendToClass } from '../lib/sseManager.js';
 
 // --- Homework Management ---
 
@@ -28,8 +28,9 @@ export const createHomework = async (req: AuthRequest, res: Response) => {
             [id, title, description, subject || null, finalDueDate, classId, teacherId, fileUrl, allowFileUpload === 'true' || allowFileUpload === true]
         );
 
-        broadcast('homework_created', { classId: homeworkRes.rows[0].classId });
-        sendToRole('STUDENT', 'homework_created', { classId: homeworkRes.rows[0].classId });
+        const hw = homeworkRes.rows[0];
+        sendToClass(hw.classId, 'homework_created', { classId: hw.classId });
+        sendToRole('ADMIN', 'homework_created', { classId: hw.classId });
         
         res.status(201).json(homeworkRes.rows[0]);
     } catch (error) {
@@ -162,6 +163,7 @@ export const submitHomework = async (req: AuthRequest, res: Response) => {
         if (assignmentTeacherId) {
             sendToUser(assignmentTeacherId, 'homework_submitted', { homeworkId, studentId });
         }
+        sendToUser(studentId, 'homework_submitted', { homeworkId, studentId });
         
         res.status(201).json(submissionRes.rows[0]);
     } catch (error) {

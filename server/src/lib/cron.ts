@@ -36,5 +36,19 @@ export const initCronJobs = () => {
         }
     });
 
+    // Schedule an hourly cleanup for expired notices
+    cron.schedule('0 * * * *', async () => {
+        console.log('Running Hourly Notice Cleanup Job...');
+        try {
+            const res = await db.query('DELETE FROM "Notice" WHERE "expiresAt" < CURRENT_TIMESTAMP');
+            if (res.rowCount && res.rowCount > 0) {
+                console.log(`Cleanup: Deleted ${res.rowCount} expired notices.`);
+            }
+        } catch (error) {
+            console.error('Error in Notice Cleanup Job:', error);
+        }
+    });
+
     console.log('Attendance Cron Jobs Initialized (6:00 AM Daily).');
+    console.log('Notice Cleanup Cron Initialized (Hourly).');
 };

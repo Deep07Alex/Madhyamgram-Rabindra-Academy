@@ -19,7 +19,7 @@ interface StudentOverviewProps {
         averageGrade: number;
         activeSubjects: number;
     };
-    notices: any[];
+    unreadCount: number;
     pendingAssignments: any[];
     onClearNotices: () => void;
 }
@@ -27,7 +27,7 @@ interface StudentOverviewProps {
 const StudentOverview = ({ 
     user, 
     stats, 
-    notices, 
+    unreadCount, 
     pendingAssignments, 
     onClearNotices 
 }: StudentOverviewProps) => {
@@ -125,7 +125,7 @@ const StudentOverview = ({
                 </div>
             )}
 
-            {notices.length > 0 && (
+            {unreadCount > 0 && (
                 <div
                     onClick={() => {
                         onClearNotices();
@@ -164,7 +164,7 @@ const StudentOverview = ({
                             Important Announcements!
                         </h4>
                         <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.85rem', opacity: 0.8 }}>
-                            You have {notices.length} active notice{notices.length > 1 ? 's' : ''} in your notice board.
+                            You have {unreadCount} new announcement{unreadCount > 1 ? 's' : ''} waiting for you.
                         </p>
                     </div>
                     <div style={{ marginLeft: 'auto', fontWeight: '700', color: 'var(--primary-bold)', fontSize: '0.85rem' }}>

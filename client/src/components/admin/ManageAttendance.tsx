@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import useServerEvents from '../../hooks/useServerEvents';
@@ -281,7 +282,7 @@ const ManageAttendance = () => {
 
             setStudentRows(rows);
         } catch (err: any) {
-            if (err.name === 'CanceledError') return;
+            if (axios.isCancel(err)) return;
             showToast('Failed to load student data.', 'error');
         } finally {
             setLoading(false);
@@ -322,7 +323,7 @@ const ManageAttendance = () => {
 
             setTeacherRows(rows);
         } catch (err: any) {
-            if (err.name === 'CanceledError') return;
+            if (axios.isCancel(err)) return;
             showToast('Failed to load teacher data.', 'error');
         } finally {
             setLoading(false);
@@ -339,7 +340,7 @@ const ManageAttendance = () => {
         if (tab === 'students' && !selectedClass) {
             if (classes.length === 0) {
                 api.get('/users/classes', { signal }).then(res => setClasses(res.data)).catch(err => {
-                    if (err.name !== 'CanceledError') console.error(err);
+                    if (!axios.isCancel(err)) console.error(err);
                 });
             }
             setMonthlyDataMap({});
@@ -394,7 +395,7 @@ const ManageAttendance = () => {
                 })));
             }
         } catch (err: any) {
-            if (err.name === 'CanceledError') return;
+            if (axios.isCancel(err)) return;
             showToast('Failed to load monthly data.', 'error');
         } finally {
             setLoading(false);

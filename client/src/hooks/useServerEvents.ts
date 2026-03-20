@@ -1,4 +1,6 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import { socket } from '../services/socket';
+import { useAuth } from '../context/AuthContext';
 
 // List of all event types the server can emit
 export type SSEEventType =
@@ -9,62 +11,64 @@ export type SSEEventType =
     | 'homework_submitted'
     | 'homework_graded'
     | 'result:created'
+    | 'result_published'
     | 'fee:created'
     | 'fee:paid'
+    | 'fee_created'
+    | 'fee_updated'
     | 'user:created'
     | 'user:deleted'
     | 'class:updated'
     | 'profile_updated'
     | 'new_notice'
-    | 'result_published';
+    | 'notice_deleted';
 
 type EventHandlers = Partial<Record<SSEEventType, (data: any) => void>>;
 
-/**
- * useServerEvents - connects to the SSE stream and fires callbacks
- * whenever matching events arrive from the server.
- *
- * Usage:
- *   useServerEvents({
- *     'attendance:updated': () => fetchAttendance(),
- *     'homework:created': () => fetchHomework(),
- *   });
- */
 const useServerEvents = (handlers: EventHandlers) => {
+    const { user } = useAuth();
     const handlersRef = useRef(handlers);
-    handlersRef.current = handlers; // Always latest without re-subscribing
+    handlersRef.current = handlers;
 
-    const connect = useCallback(() => {
-        const token = localStorage.getItem('token');
-        if (!token) return null;
+    const lastEventsRef = useRef<Record<string, number>>({});
 
-        const url = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events?token=${token}`;
-        const es = new EventSource(url);
+    useEffect(() => {
+        if (!user) return;
+
+        // Debounced event wrapper
+        const handleEvent = (type: SSEEventType, data: any) => {
+            const now = Date.now();
+            const lastTime = lastEventsRef.current[type] || 0;
+            
+            // Only handle same event type once every 200ms
+            if (now - lastTime < 200) return;
+            lastEventsRef.current[type] = now;
+            
+            handlersRef.current[type]?.(data);
+        };
 
         const eventTypes = Object.keys(handlersRef.current) as SSEEventType[];
 
         eventTypes.forEach(type => {
-            es.addEventListener(type, (e: MessageEvent) => {
-                const data = JSON.parse(e.data || '{}');
-                handlersRef.current[type]?.(data);
-            });
+            socket.on(type, (data: any) => handleEvent(type, data));
         });
 
-        es.onerror = () => {
-            es.close();
-            // Auto-reconnect after 3 seconds
-            setTimeout(() => connect(), 3000);
-        };
+        // Join relevant rooms for targeted updates
+        socket.emit('join_room', `user:${user.id}`);
+        socket.emit('join_room', `role:${user.role}`);
+        if (user.classId) {
+            socket.emit('join_room', `class:${user.classId}`);
+        }
 
-        return es;
-    }, []);
-
-    useEffect(() => {
-        const es = connect();
         return () => {
-            es?.close();
+            eventTypes.forEach(type => socket.off(type));
+            socket.emit('leave_room', `user:${user.id}`);
+            socket.emit('leave_room', `role:${user.role}`);
+            if (user.classId) {
+                socket.emit('leave_room', `class:${user.classId}`);
+            }
         };
-    }, [connect]);
+    }, [user]);
 };
 
 export default useServerEvents;

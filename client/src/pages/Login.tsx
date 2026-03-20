@@ -1,19 +1,37 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { login as loginService } from '../services/authService.js';
 import { Lock, User, Eye, EyeOff, GraduationCap, ChevronRight } from 'lucide-react';
 
 const Login = () => {
-    const { login } = useAuth();
     const [userId, setUserId] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const { user, login } = useAuth();
 
     const [activeRole, setActiveRole] = useState<'STUDENT' | 'TEACHER' | 'ADMIN'>('STUDENT');
+
+    // Auto-redirect if already logged in
+    useState(() => {
+        if (user) {
+            if (user.role === 'ADMIN') navigate('/admin');
+            else if (user.role === 'TEACHER') navigate('/teacher');
+            else navigate('/student');
+        }
+    });
+
+    // Also use useEffect for dynamic changes
+    useEffect(() => {
+        if (user) {
+            if (user.role === 'ADMIN') navigate('/admin');
+            else if (user.role === 'TEACHER') navigate('/teacher');
+            else navigate('/student');
+        }
+    }, [user, navigate]);
 
     const roleConfigs = {
         STUDENT: { label: 'School ID', placeholder: 'e.g. S-1001', icon: <GraduationCap size={20} className="input-icon" /> },

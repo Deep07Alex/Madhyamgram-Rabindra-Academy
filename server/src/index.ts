@@ -23,6 +23,7 @@ import { initDb } from './lib/initDb.js';
 import { initCronJobs } from './lib/cron.js';
 import { addClient, removeClient } from './lib/sseManager.js';
 import jwt from 'jsonwebtoken';
+import { initSocket } from './lib/socket.js';
 
 dotenv.config();
 
@@ -198,7 +199,15 @@ if (process.env.NODE_ENV === 'production') {
     app.use(express.static(clientDistPath, {
         maxAge: '1y',
         etag: true,
-        immutable: true
+        lastModified: true,
+        immutable: true,
+        setHeaders: (res, path) => {
+            if (path.endsWith('.html')) {
+                res.setHeader('Cache-Control', 'no-cache'); // Don't cache index.html
+            } else {
+                res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            }
+        }
     }));
     app.get('*', (req, res) => {
         // Only serve index.html if it's not an /api route (already handled above)
@@ -223,6 +232,9 @@ initDb().then(() => {
 const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+
+// Initialize Socket.io
+initSocket(server);
 
 // 5. Graceful Shutdown (Absolute Professional Final Step)
 const shutdown = async () => {

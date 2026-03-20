@@ -17,7 +17,7 @@ const StudentResults = () => {
     const fetchResults = useCallback(async () => {
         try {
             const res = await api.get('/results');
-            const userStr = localStorage.getItem('user');
+            const userStr = sessionStorage.getItem('user');
             if (userStr) {
                 const user = JSON.parse(userStr);
                 const myResults = res.data.filter((r: any) => r.student?.rollNumber === user.rollNumber || r.studentId === user.id);

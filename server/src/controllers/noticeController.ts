@@ -50,8 +50,12 @@ export const getNotices = async (req: Request, res: Response) => {
         }
 
         if (user.role === 'ADMIN') {
-            // Admin -> All notices
-            const result = await db.query(`SELECT * FROM "Notice" ORDER BY "createdAt" DESC`);
+            // Admin -> All notices (but filter expired if we want them "gone from everywhere")
+            const result = await db.query(
+                `SELECT * FROM "Notice" 
+                 WHERE ("expiresAt" IS NULL OR "expiresAt" > CURRENT_TIMESTAMP)
+                 ORDER BY "createdAt" DESC`
+            );
             return res.json(result.rows);
         }
 
@@ -112,6 +116,7 @@ export const deleteNotice = async (req: Request, res: Response) => {
             return res.status(404).json({ message: 'Notice not found' });
         }
 
+        broadcast('notice_deleted', { id });
         res.json({ message: 'Notice deleted successfully' });
     } catch (error) {
         console.error('Error deleting notice:', error);

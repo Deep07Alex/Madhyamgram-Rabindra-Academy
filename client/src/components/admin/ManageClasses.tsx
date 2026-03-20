@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import api from '../../services/api';
 import { GraduationCap, Trash2 } from 'lucide-react';
 
@@ -10,7 +11,7 @@ const ManageClasses = () => {
             const clsRes = await api.get('/users/classes', { signal });
             setClasses(clsRes.data);
         } catch (error: any) {
-            if (error.name === 'CanceledError') return;
+            if (axios.isCancel(error)) return;
             console.error('Failed to fetch data:', error);
         }
     };

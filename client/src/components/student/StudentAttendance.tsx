@@ -22,9 +22,9 @@ const StudentAttendance = () => {
 
 
     const totalDays = attendanceData.totalSessions;
+    const presentDays = attendanceData.records.filter((a: any) => a.status === 'PRESENT').length;
     const absentDays = attendanceData.records.filter((a: any) => a.status === 'ABSENT').length;
-    const presentDays = totalDays - absentDays;
-    const percentage = totalDays > 0 ? ((presentDays / totalDays) * 100).toFixed(1) : 100;
+    const percentage = totalDays > 0 ? ((presentDays / totalDays) * 100).toFixed(1) : 0;
 
     return (
         <div className="manage-section">
@@ -45,6 +45,15 @@ const StudentAttendance = () => {
                             <p>Days Present</p>
                         </div>
                         <CheckCircle2 size={24} color="var(--success)" opacity={0.5} />
+                    </div>
+                </div>
+                <div className="stat-card" style={{ borderLeftColor: '#ef4444' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                            <h3>{absentDays}</h3>
+                            <p>Days Absent</p>
+                        </div>
+                        <XCircle size={24} color="#ef4444" opacity={0.5} />
                     </div>
                 </div>
                 <div className="stat-card" style={{ borderLeftColor: 'var(--accent)' }}>
@@ -73,33 +82,49 @@ const StudentAttendance = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {attendanceData.records.map((record: any) => (
-                                <tr key={record.id}>
-                                    <td style={{ fontWeight: '600' }}>
-                                        {new Date(record.date).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
-                                    </td>
-                                    <td>
-                                        {record.subject ? (
-                                            <span className="badge" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>{record.subject}</span>
-                                        ) : (
-                                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Full Day Session</span>
-                                        )}
-                                    </td>
-                                    <td style={{ textAlign: 'center' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                            <span className={`badge ${(record.status || 'PRESENT').toLowerCase()}`} style={{ minWidth: '100px', justifyContent: 'center', gap: '6px' }}>
-                                                {(record.status === 'PRESENT' || !record.status) && <CheckCircle2 size={12} />}
-                                                {record.status === 'ABSENT' && <XCircle size={12} />}
-                                                {record.status || 'PRESENT'}
-                                            </span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                            {attendanceData.records.map((record: any) => {
+                                const date = new Date(record.date);
+                                return (
+                                    <tr key={record.id}>
+                                        <td style={{ fontWeight: '600' }}>
+                                            {date.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                        </td>
+                                        <td>
+                                            {record.subject ? (
+                                                <span className="badge" style={{ background: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border-soft)' }}>{record.subject}</span>
+                                            ) : (
+                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Full Day Session</span>
+                                            )}
+                                        </td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                                {record.status === 'PRESENT' && (
+                                                    <span className="badge present" style={{ minWidth: '110px', justifyContent: 'center', gap: '6px' }}>
+                                                        <CheckCircle2 size={12} /> PRESENT
+                                                    </span>
+                                                )}
+                                                {record.status === 'ABSENT' && (
+                                                    <span className="badge absent" style={{ minWidth: '110px', justifyContent: 'center', gap: '6px' }}>
+                                                        <XCircle size={12} /> ABSENT
+                                                    </span>
+                                                )}
+                                                {(!record.status || record.status === 'NOT_RECORDED') && (
+                                                    <span className="badge" style={{ minWidth: '110px', justifyContent: 'center', background: 'var(--bg-soft)', color: 'var(--text-muted)' }}>
+                                                        —
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                             {attendanceData.records.length === 0 && (
                                 <tr>
-                                    <td colSpan={3} style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
-                                        No attendance data available for the current period.
+                                    <td colSpan={3} style={{ textAlign: 'center', padding: '64px', color: 'var(--text-muted)' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                                            <Calendar size={32} opacity={0.3} />
+                                            <span>No attendance data available for the current academic period.</span>
+                                        </div>
                                     </td>
                                 </tr>
                             )}

@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { emitEvent } from './socket.js';
 
 interface SSEClient {
     id: string;
@@ -33,6 +34,7 @@ export type SSEEventType =
     | 'user:deleted'
     | 'class:updated'
     | 'new_notice'
+    | 'notice_deleted'
     | 'profile_updated'
     | 'result_published'
     | 'homework_created'
@@ -48,6 +50,10 @@ export type SSEEventType =
  * Broadcast to all connected clients
  */
 export const broadcast = (event: SSEEventType, data: Record<string, unknown> = {}) => {
+    // Sockets (Primary)
+    emitEvent(event, data);
+
+    // SSE (Legacy/Backup)
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     clients.forEach(c => {
         try {
@@ -62,6 +68,10 @@ export const broadcast = (event: SSEEventType, data: Record<string, unknown> = {
  * Send event to a specific user
  */
 export const sendToUser = (userId: string, event: SSEEventType, data: Record<string, unknown> = {}) => {
+    // Sockets (Primary)
+    emitEvent(event, data, `user:${userId}`);
+
+    // SSE (Legacy/Backup)
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     clients.filter(c => c.userId === userId).forEach(c => {
         try {
@@ -76,6 +86,10 @@ export const sendToUser = (userId: string, event: SSEEventType, data: Record<str
  * Send event to a specific role
  */
 export const sendToRole = (role: string, event: SSEEventType, data: Record<string, unknown> = {}) => {
+    // Sockets (Primary)
+    emitEvent(event, data, `role:${role}`);
+
+    // SSE (Legacy/Backup)
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     clients.filter(c => c.role === role).forEach(c => {
         try {
@@ -83,5 +97,21 @@ export const sendToRole = (role: string, event: SSEEventType, data: Record<strin
         } catch (err) {
             // Error
         }
+    });
+};
+
+/**
+ * Send event to a specific class room
+ */
+export const sendToClass = (classId: string, event: SSEEventType, data: Record<string, unknown> = {}) => {
+    // Sockets (Primary)
+    emitEvent(event, data, `class:${classId}`);
+
+    // SSE (Legacy/Backup)
+    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    clients.forEach(c => {
+        try {
+            c.res.write(payload);
+        } catch (err) {}
     });
 };

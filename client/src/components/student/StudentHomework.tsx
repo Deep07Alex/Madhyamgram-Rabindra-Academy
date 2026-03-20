@@ -61,6 +61,13 @@ const StudentHomework = () => {
             await api.post('/homework/submit', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
+            
+            // Sync with dashboard banner instantly via localStorage
+            const stored = localStorage.getItem('recently_submitted_homework');
+            const submittedSet = stored ? new Set(JSON.parse(stored)) : new Set();
+            submittedSet.add(selectedAssignment.id);
+            localStorage.setItem('recently_submitted_homework', JSON.stringify(Array.from(submittedSet)));
+
             showToast('Assignment submitted successfully!', 'success');
             setSelectedAssignment(null);
             setContent('');
@@ -80,7 +87,7 @@ const StudentHomework = () => {
                     Academic Tasks & Assignments
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', marginTop: '24px' }}>
-                    {assignments.map((hw: any) => {
+                    {assignments.filter((hw: any) => new Date(hw.dueDate).getTime() >= new Date().getTime()).map((hw: any) => {
                         const hasSubmitted = hw.submissions?.length > 0;
                         const submission = hw.submissions?.[0];
                         const isPastDue = new Date(hw.dueDate).getTime() < new Date().getTime();

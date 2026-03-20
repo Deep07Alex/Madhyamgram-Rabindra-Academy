@@ -204,6 +204,7 @@ export const initDb = async () => {
                 "targetAudience" TEXT DEFAULT 'ALL' CHECK ("targetAudience" IN ('ALL', 'TEACHER', 'STUDENT')),
                 "targetClassId" TEXT REFERENCES "Class"("id") ON DELETE CASCADE,
                 "targetStudentId" TEXT REFERENCES "Student"("id") ON DELETE CASCADE,
+                "expiresAt" TIMESTAMP(3),
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
         `);
@@ -246,6 +247,15 @@ export const initDb = async () => {
                     );
                     -- Alter column type
                     ALTER TABLE "TeacherAttendance" ALTER COLUMN date TYPE DATE USING date::DATE;
+                END IF;
+            END $$;
+        `);        await db.query(`
+            DO $$ BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'Notice' AND column_name = 'expiresAt'
+                ) THEN
+                    ALTER TABLE "Notice" ADD COLUMN "expiresAt" TIMESTAMP(3);
                 END IF;
             END $$;
         `);

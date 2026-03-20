@@ -79,6 +79,7 @@ export const assignTeacherToClass = async (req: Request, res: Response) => {
             `INSERT INTO "_ClassToTeacher" ("A", "B") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
             [classId, teacherId]
         );
+        broadcast('class:updated', { classId, teacherId });
         res.json({ message: 'Teacher assigned successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error assigning teacher' });
@@ -93,6 +94,7 @@ export const removeTeacherFromClass = async (req: Request, res: Response) => {
             `DELETE FROM "_ClassToTeacher" WHERE "A" = $1 AND "B" = $2`,
             [classId, teacherId]
         );
+        broadcast('class:updated', { classId, teacherId });
         res.json({ message: 'Teacher removed successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error removing teacher' });
@@ -108,6 +110,7 @@ export const createClass = async (req: Request, res: Response) => {
             `INSERT INTO "Class" (id, name, grade) VALUES ($1, $2, $3) RETURNING *`,
             [id, name, parseInt(grade as string)]
         );
+        broadcast('class:updated', { id });
         res.status(201).json(newClassRes.rows[0]);
     } catch (error) {
         res.status(500).json({ message: 'Error creating class' });
@@ -155,6 +158,7 @@ export const deleteClass = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     try {
         await db.query(`DELETE FROM "Class" WHERE id = $1`, [id]);
+        broadcast('class:updated', { id });
         res.json({ message: 'Class deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting class' });
@@ -231,12 +235,8 @@ export const updateStudent = async (req: Request, res: Response) => {
         }
 
         const updatedStudent = result.rows[0];
-        // Emit live update events
+        // Emit live update events (Global broadcast handles all relevant views)
         broadcast('profile_updated', { studentId: id });
-        if (typeof id === 'string') {
-            sendToUser(id, 'profile_updated', { studentId: id });
-        }
-        sendToRole('ADMIN', 'profile_updated', { studentId: id });
 
         res.json({ message: 'Student updated successfully', student: updatedStudent });
     } catch (error: any) {
@@ -340,12 +340,8 @@ export const updateTeacher = async (req: Request, res: Response) => {
 
 
         const updatedTeacher = result.rows[0];
-        // Emit live update events
+        // Emit live update events (Global broadcast handles all relevant views)
         broadcast('profile_updated', { teacherId: id });
-        if (typeof id === 'string') {
-            sendToUser(id, 'profile_updated', { teacherId: id });
-        }
-        sendToRole('ADMIN', 'profile_updated', { teacherId: id });
 
         res.json({ message: 'Faculty updated successfully', teacher: updatedTeacher });
     } catch (error: any) {

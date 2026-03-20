@@ -69,13 +69,9 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
     const targetStudentId = studentId || (req.user?.role === 'STUDENT' ? req.user.id : null);
 
     try {
-        // 1. Get total sessions for the whole school (including Today)
+        // 1. Get total sessions (ALL DAYS)
         let sessionRes = await db.query(`
-            SELECT COUNT(DISTINCT d) FROM (
-                SELECT date::date as d FROM \"Attendance\"
-                UNION
-                SELECT CURRENT_DATE as d
-            ) as all_days
+            SELECT COUNT(DISTINCT date::date) FROM "Attendance"
         `);
         const totalSessions = parseInt(sessionRes.rows[0].count, 10);
 
@@ -108,32 +104,10 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
         query += ` ORDER BY a.date DESC`;
 
         const attendanceRes = await db.query(query, params);
-        let records = attendanceRes.rows;
-
-        // 3. Synthesize "PRESENT" for today if it's missing
-        const now = new Date();
-        const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         
-        const hasTodayRecord = records.some(r => {
-            const d = new Date(r.date);
-            const rDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            return rDateStr === todayDateStr;
-        });
-        
-        if (!hasTodayRecord) {
-            records.unshift({
-                id: 'synthetic-today',
-                date: todayDateStr,
-                status: 'PRESENT',
-                studentId: targetStudentId,
-                subject: null,
-                isSynthetic: true
-            });
-        }
-        
-        // Return both records and totalSessions
+        // Return records and totalSessions
         res.json({
-            records,
+            records: attendanceRes.rows,
             totalSessions
         });
     } catch (error) {

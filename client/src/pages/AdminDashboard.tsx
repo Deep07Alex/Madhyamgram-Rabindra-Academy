@@ -26,7 +26,8 @@ import {
     LogOut,
     Menu,
     X,
-    UserCircle
+    UserCircle,
+    Loader2
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -40,6 +41,7 @@ const AdminDashboard = () => {
         }
     }, [user, navigate]);
 
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [stats, setStats] = useState({
         students: 0,
         teachers: 0,
@@ -47,12 +49,15 @@ const AdminDashboard = () => {
         projectedFees: 0
     });
 
-    const fetchStats = useCallback(async () => {
+    const fetchStats = useCallback(async (silent = false) => {
+        if (!silent) setIsRefreshing(true);
         try {
             const res = await api.get('/dashboard/stats');
             setStats(res.data);
         } catch (error) {
             console.error('Failed to fetch stats:', error);
+        } finally {
+            setIsRefreshing(false);
         }
     }, []);
 
@@ -61,11 +66,16 @@ const AdminDashboard = () => {
     }, [fetchStats]);
 
     useServerEvents({
-        'fee:paid': fetchStats,
-        'fee:created': fetchStats,
-        'attendance:updated': fetchStats,
-        'user:created': fetchStats,
-        'user:deleted': fetchStats
+        'connected': () => { if (import.meta.env.DEV) console.log('[SSE] Admin Control: Real-time link established'); },
+        'fee:paid': () => fetchStats(true),
+        'fee:created': () => fetchStats(true),
+        'attendance:updated': () => fetchStats(true),
+        'user:created': () => fetchStats(true),
+        'user:deleted': () => fetchStats(true),
+        'class:updated': () => fetchStats(true),
+        'profile_updated': () => fetchStats(true),
+        'new_notice': () => fetchStats(true),
+        'notice_deleted': () => fetchStats(true)
     });
 
     const handleLogout = () => {
@@ -94,7 +104,7 @@ const AdminDashboard = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--nav-text)' }}>Rabindra Academy</span>
+                        <span style={{ fontSize: '0.9rem', fontWeight: '800', color: 'var(--nav-text)' }}>Madhyamgram Rabindra Academy</span>
                     </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -111,8 +121,8 @@ const AdminDashboard = () => {
                 <div className="sidebar-header">
                     <img src="/RABINDRA_LOGO.jpeg" alt="Logo" style={{ width: '48px', height: '48px', borderRadius: '50%' }} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '1.2rem', fontWeight: '900', color: 'var(--nav-text)' }}>Rabindra Academy</span>
-                        <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Admin Portal</span>
+                        <span style={{ fontSize: '1.2rem', fontWeight: '900', color: 'var(--nav-text)' }}>Madhyamgram Rabindra Academy</span>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 600, color: 'var(--text-muted)' }}>UDISE: 19112601311 | ESTD: 2005</span>
                     </div>
                 </div>
 
@@ -145,7 +155,17 @@ const AdminDashboard = () => {
             <main className="dashboard-content">
                 <header className="content-header">
                     <div>
-                        <h2>Admin Control Center</h2>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
+                            <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 900 }}>Admin Control Center</h2>
+                            <div style={{ padding: '6px 16px', borderRadius: '100px', background: 'var(--primary-soft)', color: 'var(--primary-bold)', fontSize: '0.85rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {isRefreshing ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary-bold)' }}></span>
+                                )}
+                                {isRefreshing ? 'Syncing...' : 'Active Portal'}
+                            </div>
+                        </div>
                         <p style={{ color: 'var(--text-muted)', fontWeight: '500' }}>Manage academy excellence and systems.</p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
@@ -169,6 +189,7 @@ const AdminDashboard = () => {
                         <Route path="notices" element={<ManageNotices />} />
                         <Route path="gallery" element={<ManageGallery />} />
                         <Route path="/" element={<Navigate to="/admin/dashboard" />} />
+                        <Route path="*" element={<Navigate to="/admin/dashboard" />} />
                     </Routes>
                 </div>
             </main>

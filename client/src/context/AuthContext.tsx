@@ -19,7 +19,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -29,8 +29,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const timeoutRef = useRef<any>(null);
 
     const logout = useCallback(() => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
         setToken(null);
         setUser(null);
     }, []);
@@ -54,55 +54,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (token) {
             resetInactivityTimer();
             events.forEach(event => window.addEventListener(event, handleActivity));
-            
-            // Handle tab closure/exit
-            const handleUnload = () => {
-                // We clear storage but don't call logout() 
-                // because we just want them gone when they come back
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-            };
-            window.addEventListener('beforeunload', handleUnload);
 
             return () => {
                 if (timeoutRef.current) clearTimeout(timeoutRef.current);
                 events.forEach(event => window.removeEventListener(event, handleActivity));
-                window.removeEventListener('beforeunload', handleUnload);
             };
         }
     }, [token, resetInactivityTimer]);
 
     const login = useCallback((newToken: string, newUser: User) => {
-        localStorage.setItem('token', newToken);
-        localStorage.setItem('user', JSON.stringify(newUser));
+        sessionStorage.setItem('token', newToken);
+        sessionStorage.setItem('user', JSON.stringify(newUser));
         setToken(newToken);
         setUser(newUser);
     }, []);
 
     const updateUser = useCallback((newUser: User) => {
-        localStorage.setItem('user', JSON.stringify(newUser));
+        sessionStorage.setItem('user', JSON.stringify(newUser));
         setUser(newUser);
     }, []);
 
     useEffect(() => {
-        const storedToken = localStorage.getItem('token');
-        const storedUser = localStorage.getItem('user');
-
-        if (storedToken && storedUser) {
-            try {
-                const parsedUser = JSON.parse(storedUser);
-                setToken(storedToken);
-                setUser(parsedUser);
-            } catch (e) {
-                console.error('Failed to parse stored user', e);
-                logout();
-            }
-        }
+        // PER USER REQUEST: DISABLE SESSION RESTORATION ON RELOAD
+        // Every refresh or reload will result in a fresh logout.
+        logout(); 
         setLoading(false);
     }, [logout]);
 
+    const value = React.useMemo(() => ({
+        user,
+        token,
+        login,
+        updateUser,
+        logout,
+        loading
+    }), [user, token, login, updateUser, logout, loading]);
+
     return (
-        <AuthContext.Provider value={{ user, token, login, updateUser, logout, loading }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );

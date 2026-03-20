@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import axios from 'axios';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -30,25 +31,39 @@ export const useFetch = <T>(url: string, options: any = DEFAULT_OPTIONS) => {
 
         setState(prev => ({ ...prev, loading: true, error: null }));
 
-        try {
-            const response = await api({
-                url: customUrl || url,
-                ...options,
-                ...customOptions,
-                signal: controller.signal
-            });
+        let attempts = 0;
+        const maxAttempts = 3;
 
-            setState({ data: response.data, loading: false, error: null });
-            return response.data;
-        } catch (err: any) {
-            if (err.name === 'CanceledError') return;
-            
-            console.error(`Fetch error [${url}]:`, err);
-            const errorMsg = err.response?.data?.message || 'Something went wrong';
-            
-            setState({ data: null, loading: false, error: err });
-            showToast(errorMsg, 'error');
-            throw err;
+        while (attempts < maxAttempts) {
+            try {
+                const response = await api({
+                    url: customUrl || url,
+                    ...options,
+                    ...customOptions,
+                    signal: controller.signal
+                });
+
+                setState({ data: response.data, loading: false, error: null });
+                return response.data;
+            } catch (err: any) {
+                if (axios.isCancel(err)) {
+                    return;
+                }
+                
+                attempts++;
+                if (attempts < maxAttempts) {
+                    console.warn(`Fetch attempt ${attempts} failed for [${url}]. Retrying...`, err);
+                    await new Promise(resolve => setTimeout(resolve, 500 * attempts)); // Backoff
+                    continue;
+                }
+
+                console.error(`Fetch error after ${maxAttempts} attempts [${url}]:`, err);
+                const errorMsg = err.response?.data?.message || 'Something went wrong';
+                
+                setState({ data: null, loading: false, error: err });
+                showToast(errorMsg, 'error');
+                throw err;
+            }
         }
     }, [url, JSON.stringify(options), showToast]);
 

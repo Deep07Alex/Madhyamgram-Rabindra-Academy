@@ -1,42 +1,42 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-    BellRing, 
-    UserCircle, 
-    Phone, 
-    Fingerprint, 
-    GraduationCap, 
-    Award, 
-    Eye, 
-    EyeOff 
+import {
+    BellRing,
+    UserCircle,
+    Phone,
+    Fingerprint,
+    GraduationCap,
+    Award,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 
 interface TeacherOverviewProps {
     user: any;
-    profile: any;
+    profile?: any;
     stats: {
         assignedClasses: number;
         pendingSubmissions: number;
         attendanceRate: number;
     };
-    notices: any[];
+    unreadCount: number;
     onClearNotices: () => void;
 }
 
-const TeacherOverview = ({ 
-    user, 
-    profile, 
-    stats, 
-    notices, 
-    onClearNotices 
+const TeacherOverview = ({
+    user,
+    profile,
+    stats,
+    unreadCount,
+    onClearNotices
 }: TeacherOverviewProps) => {
     const navigate = useNavigate();
     const [showFullAadhar, setShowFullAadhar] = useState(false);
 
     return (
         <>
-            {notices.length > 0 && (
-                <div 
+            {unreadCount > 0 && (
+                <div
                     onClick={() => {
                         onClearNotices();
                         navigate('/teacher/notices');
@@ -74,7 +74,7 @@ const TeacherOverview = ({
                             Important Faculty Announcements
                         </h4>
                         <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.85rem', opacity: 0.8 }}>
-                            There are {notices.length} active update{notices.length > 1 ? 's' : ''} in the notice board.
+                            You have {unreadCount} new update{unreadCount > 1 ? 's' : ''} waiting for your review.
                         </p>
                     </div>
                     <div style={{ marginLeft: 'auto', fontWeight: '700', color: 'var(--primary-bold)', fontSize: '0.85rem' }}>
@@ -101,11 +101,11 @@ const TeacherOverview = ({
             {(profile || user) && (
                 <div className="card" style={{ marginTop: '32px', padding: '32px', borderRadius: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-soft)', boxShadow: 'var(--shadow-md)', position: 'relative', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', top: 0, right: 0, width: '200px', height: '200px', background: 'var(--primary-soft)', borderRadius: '50%', filter: 'blur(80px)', opacity: 0.3, zIndex: 0 }}></div>
-                    
+
                     <div style={{ position: 'relative', zIndex: 1, display: 'flex', gap: '32px', flexWrap: 'wrap' }}>
                         <div style={{ flex: '0 0 160px' }}>
                             <div style={{ width: '160px', height: '160px', borderRadius: '20px', overflow: 'hidden', border: '4px solid var(--bg-main)', boxShadow: 'var(--shadow-lg)' }}>
-                                 {(profile?.photo || user?.photo) ? (
+                                {(profile?.photo || user?.photo) ? (
                                     <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${profile?.photo || user?.photo}?t=${Date.now()}`} alt="Dashboard Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                                 ) : (
                                     <div style={{ width: '100%', height: '100%', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -123,11 +123,38 @@ const TeacherOverview = ({
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
                                     <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>MEMBER SINCE</p>
-                                    <p style={{ margin: 0, fontWeight: '800', color: 'var(--text-main)' }}>{new Date(profile?.joiningDate || user?.joiningDate).getFullYear()}</p>
+                                    <p style={{ margin: 0, fontWeight: '800', color: 'var(--text-main)', fontSize: '0.95rem' }}>
+                                        {profile?.joiningDate || user?.joiningDate
+                                            ? new Date(profile?.joiningDate || user?.joiningDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+                                            : 'N/A'}
+                                    </p>
+                                    <div style={{ marginTop: '8px' }}>
+                                        <span style={{
+                                            padding: '2px 8px',
+                                            borderRadius: '6px',
+                                            fontSize: '0.65rem',
+                                            fontWeight: '800',
+                                            background: 'var(--primary-soft)',
+                                            color: 'var(--primary-bold)',
+                                            border: '1px solid var(--primary-bold)',
+                                            letterSpacing: '0.05em'
+                                        }}>
+                                            {['PRINCIPAL', 'HEAD MISTRESS'].includes(profile?.designation || user?.designation)
+                                                ? 'ADMIN'
+                                                : ((profile?.isTeaching ?? user?.isTeaching) ? 'TEACHING' : 'NON-TEACHING')}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginTop: '24px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><UserCircle size={18} /></div>
+                                    <div>
+                                        <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-muted)' }}>LOGIN ID</p>
+                                        <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '800', color: 'var(--text-main)' }}>{profile?.teacherId || user?.teacherId || 'N/A'}</p>
+                                    </div>
+                                </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><Phone size={18} /></div>
                                     <div>
@@ -141,13 +168,13 @@ const TeacherOverview = ({
                                         <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-muted)' }}>AADHAR</p>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600' }}>
-                                                {profile?.aadhar 
-                                                    ? (showFullAadhar ? profile.aadhar : `XXXX XXXX ${profile.aadhar.slice(-4)}`) 
+                                                {(profile?.aadhar || user?.aadhar)
+                                                    ? (showFullAadhar ? (profile?.aadhar || user?.aadhar) : `XXXX XXXX ${(profile?.aadhar || user?.aadhar).slice(-4)}`)
                                                     : 'N/A'
                                                 }
                                             </p>
-                                            {profile?.aadhar && (
-                                                <button 
+                                            {(profile?.aadhar || user?.aadhar) && (
+                                                <button
                                                     onClick={() => setShowFullAadhar(!showFullAadhar)}
                                                     style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', opacity: 0.7 }}
                                                     title={showFullAadhar ? "Hide" : "Show"}
@@ -158,24 +185,20 @@ const TeacherOverview = ({
                                         </div>
                                     </div>
                                 </div>
-                                {(profile?.qualification || user?.qualification) && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><GraduationCap size={18} /></div>
-                                        <div>
-                                            <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-muted)' }}>QUALIFICATION</p>
-                                            <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600' }}>{profile?.qualification || user?.qualification}</p>
-                                        </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><GraduationCap size={18} /></div>
+                                    <div>
+                                        <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-muted)' }}>QUALIFICATION</p>
+                                        <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600' }}>{profile?.qualification || user?.qualification || 'N/A'}</p>
                                     </div>
-                                )}
-                                {(profile?.extraQualification || user?.extraQualification) && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><Award size={18} /></div>
-                                        <div>
-                                            <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-muted)' }}>EXTRA CERTIFICATIONS</p>
-                                            <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600' }}>{profile?.extraQualification || user?.extraQualification}</p>
-                                        </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><Award size={18} /></div>
+                                    <div>
+                                        <p style={{ margin: 0, fontSize: '0.65rem', fontWeight: '700', color: 'var(--text-muted)' }}>EXTRA CERTIFICATIONS</p>
+                                        <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600' }}>{profile?.extraQualification || user?.extraQualification || 'N/A'}</p>
                                     </div>
-                                )}
+                                </div>
                             </div>
                         </div>
                     </div>

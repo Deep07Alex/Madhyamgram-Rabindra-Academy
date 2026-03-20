@@ -8,9 +8,9 @@ export const socket = io(SOCKET_URL, {
 });
 
 socket.on('connect', () => {
-    console.log('Real-time connection established:', socket.id);
+    if (import.meta.env.DEV) console.log('Real-time connection established:', socket.id);
 });
 
 socket.on('disconnect', () => {
-    console.log('Real-time connection lost');
+    if (import.meta.env.DEV) console.log('Real-time connection lost');
 });

@@ -915,6 +915,10 @@ select, option {
     grid-template-columns: 1fr;
     gap: 16px;
   }
+
+  .form-grid > * {
+    grid-column: 1 / -1 !important; /* Prevents span 2 from forcing an implicit second column sideways */
+  }
 }
 
 @media (max-width: 640px) {
