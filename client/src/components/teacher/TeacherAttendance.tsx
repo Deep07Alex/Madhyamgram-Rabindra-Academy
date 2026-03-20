@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { isAttendanceOpen } from '../../utils/attendance';
 import { useToast } from '../../context/ToastContext';
 import { MAIN_SUBJECTS } from '../../utils/constants';
 import useServerEvents from '../../hooks/useServerEvents';
@@ -62,6 +64,7 @@ const StatusToggle = ({ studentId, selected, onChange }: { studentId: string; se
 );
 
 const TeacherAttendance = () => {
+    const navigate = useNavigate();
     const { showToast } = useToast();
     const [tab, setTab] = useState<'mark' | 'history' | 'self'>('mark');
     const [classes, setClasses] = useState<any[]>([]);
@@ -86,53 +89,100 @@ const TeacherAttendance = () => {
     // ── Self Attendance tab ──────────────────────────────────────────────────
     const [showAbsentForm, setShowAbsentForm] = useState(false);
     const [absentReason, setAbsentReason] = useState('');
+    const [lastConfig, setLastConfig] = useState('AUTO');
+
+    const checkEviction = useCallback((status?: string) => {
+        const currentStatus = status || lastConfig;
+        if (!isAttendanceOpen(currentStatus)) {
+            showToast('Attendance system is closed by admin', 'info');
+            navigate('/teacher/dashboard');
+        }
+    }, [navigate, showToast, lastConfig]);
+
+    // Update config and check
+    const updateConfigAndCheck = useCallback((status: string) => {
+        setLastConfig(status);
+        checkEviction(status);
+    }, [checkEviction]);
+
+    // Initial check
+    useEffect(() => {
+        api.get('/attendance/config').then(res => {
+            updateConfigAndCheck(res.data.attendance_override);
+        }).catch(() => {});
+    }, [updateConfigAndCheck]);
+
+    useServerEvents({
+        'system:config_updated': (data: any) => {
+            if (data.key === 'attendance_override') {
+                updateConfigAndCheck(data.value);
+            }
+        }
+    });
+
+    // Check time-based AUTO closure or Admin override every 5 seconds while on this page
+    useEffect(() => {
+        const interval = setInterval(() => {
+            api.get('/attendance/config').then(res => {
+                updateConfigAndCheck(res.data.attendance_override);
+            }).catch(() => {
+                // Fallback to time-based check if API fails
+                checkEviction(); 
+            });
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [checkEviction, updateConfigAndCheck]);
 
     useEffect(() => {
         api.get('/users/classes').then(res => setClasses(res.data)).catch(console.error);
     }, []);
 
     // Load students for mark tab
+    const loadRegister = useCallback(async () => {
+        if (!markClass) { 
+            setStudents([]); 
+            setAttendanceData({}); 
+            return; 
+        }
+
+        try {
+            const [stuRes, attRes] = await Promise.all([
+                api.get(`/users/students?classId=${markClass}`),
+                api.get('/attendance/student', {
+                    params: { classId: markClass, startDate: markDate, endDate: markDate }
+                })
+            ]);
+
+            setStudents(stuRes.data);
+
+            // Prefill existing attendance status, default to PRESENT if none
+            const init: Record<string, string> = {};
+            const attMap: Record<string, string> = {};
+            const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
+            
+            attRecords.forEach((a: any) => {
+                attMap[a.studentId] = a.status;
+            });
+
+            stuRes.data.forEach((s: any) => {
+                init[s.id] = attMap[s.id] || 'PRESENT';
+            });
+
+            setAttendanceData(init);
+        } catch (err) {
+            console.error(err);
+            showToast('Failed to load class register.', 'error');
+        }
+    }, [markClass, markDate, showToast]);
+
     useEffect(() => {
-        if (!markClass) { setStudents([]); setAttendanceData({}); return; }
-
-        const loadRegister = async () => {
-            try {
-                const [stuRes, attRes] = await Promise.all([
-                    api.get(`/users/students?classId=${markClass}`),
-                    api.get('/attendance/student', {
-                        params: { classId: markClass, startDate: markDate, endDate: markDate }
-                    })
-                ]);
-
-                setStudents(stuRes.data);
-
-                // Prefill existing attendance status, default to PRESENT if none
-                const init: Record<string, string> = {};
-                const attMap: Record<string, string> = {};
-                const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
-                
-                attRecords.forEach((a: any) => {
-                    attMap[a.studentId] = a.status;
-                });
-
-                stuRes.data.forEach((s: any) => {
-                    init[s.id] = attMap[s.id] || 'PRESENT';
-                });
-
-                setAttendanceData(init);
-            } catch (err) {
-                console.error(err);
-                showToast('Failed to load class register.', 'error');
-            }
-        };
-
         loadRegister();
-    }, [markClass, markDate]);
+    }, [loadRegister]);
 
     // Load history
-    const fetchHistory = useCallback(async () => {
+    const fetchHistory = useCallback(async (silent = false) => {
         if (!histClass) { setHistRows([]); return; }
-        setHistLoading(true);
+        if (!silent) setHistLoading(true);
         try {
             const [stuRes, attRes] = await Promise.all([
                 api.get(`/users/students?classId=${histClass}`),
@@ -159,14 +209,19 @@ const TeacherAttendance = () => {
         } catch {
             showToast('Failed to load attendance history.', 'error');
         } finally {
-            setHistLoading(false);
+            if (!silent) setHistLoading(false);
         }
     }, [histClass, histDate]);
 
     useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
-    // Live: refresh history when attendance is updated
-    useServerEvents({ 'attendance:updated': fetchHistory });
+    // Live: refresh everything when attendance is updated
+    useServerEvents({ 
+        'attendance:updated': () => {
+            loadRegister();
+            fetchHistory(true);
+        }
+    });
 
 
     const handleStatusChange = async (studentId: string, status: string) => {
@@ -181,7 +236,7 @@ const TeacherAttendance = () => {
                 subject: markSubject
             });
             showToast(`Status updated to ${status.charAt(0) + status.slice(1).toLowerCase()}`, 'success');
-            if (histClass === markClass && histDate === markDate) fetchHistory();
+            if (histClass === markClass && histDate === markDate) fetchHistory(true);
         } catch {
             showToast('Failed to update attendance.', 'error');
         }
@@ -213,7 +268,7 @@ const TeacherAttendance = () => {
         r.studentId.toLowerCase().includes(histSearch.toLowerCase()) ||
         r.rollNumber.includes(histSearch)
     );
-    const presentCount = filteredHist.filter(r => r.status === 'PRESENT').length;
+    const presentCount = filteredHist.filter(r => r.status !== 'ABSENT').length;
     const absentCount = filteredHist.filter(r => r.status === 'ABSENT').length;
     const noRecordCount = filteredHist.filter(r => !r.status).length;
 

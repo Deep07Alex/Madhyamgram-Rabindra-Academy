@@ -19,6 +19,7 @@ interface TeacherOverviewProps {
         pendingSubmissions: number;
         attendanceRate: number;
     };
+    todayAttendance?: any;
     unreadCount: number;
     onClearNotices: () => void;
 }
@@ -27,6 +28,7 @@ const TeacherOverview = ({
     user,
     profile,
     stats,
+    todayAttendance,
     unreadCount,
     onClearNotices
 }: TeacherOverviewProps) => {
@@ -35,53 +37,92 @@ const TeacherOverview = ({
 
     return (
         <>
-            {unreadCount > 0 && (
-                <div
-                    onClick={() => {
-                        onClearNotices();
-                        navigate('/teacher/notices');
-                    }}
-                    style={{
-                        background: 'var(--primary-soft)',
-                        border: '1px solid var(--primary-bold)',
+            <div style={{ display: 'flex', gap: '20px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                {unreadCount > 0 && (
+                    <div
+                        onClick={() => {
+                            onClearNotices();
+                            navigate('/teacher/notices');
+                        }}
+                        style={{
+                            background: 'var(--primary-soft)',
+                            border: '1px solid var(--primary-bold)',
+                            borderRadius: 'var(--radius-lg)',
+                            padding: '16px 24px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '16px',
+                            flex: '1',
+                            minWidth: '300px',
+                            animation: 'pulse-subtle 2s infinite',
+                            position: 'relative',
+                            overflow: 'hidden'
+                        }}
+                    >
+                        <div style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '50%',
+                            background: '#ef4444',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            boxShadow: '0 0 10px rgba(239, 68, 68, 0.4)'
+                        }}>
+                            <BellRing size={20} />
+                        </div>
+                        <div>
+                            <h4 style={{ margin: 0, color: 'var(--primary-bold)', fontSize: '1rem', fontWeight: '800' }}>
+                                Faculty Announcements
+                            </h4>
+                            <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.85rem', opacity: 0.8 }}>
+                                You have {unreadCount} new update{unreadCount > 1 ? 's' : ''} waiting.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {todayAttendance && (
+                    <div style={{
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-soft)',
                         borderRadius: 'var(--radius-lg)',
                         padding: '16px 24px',
-                        marginBottom: '24px',
-                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '16px',
-                        animation: 'pulse-subtle 2s infinite',
-                        position: 'relative',
-                        overflow: 'hidden'
-                    }}
-                >
-                    <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        background: '#ef4444',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white',
-                        boxShadow: '0 0 10px rgba(239, 68, 68, 0.4)'
+                        flex: '1',
+                        minWidth: '300px',
+                        boxShadow: 'var(--shadow-sm)'
                     }}>
-                        <BellRing size={20} />
+                        <div style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '12px',
+                            background: todayAttendance.status === 'PRESENT' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: todayAttendance.status === 'PRESENT' ? '#16a34a' : '#dc2626'
+                        }}>
+                             <UserCircle size={20} />
+                        </div>
+                        <div>
+                            <h4 style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.9rem', fontWeight: '800' }}>
+                                Today: {todayAttendance.status}
+                            </h4>
+                            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                                {todayAttendance.status === 'PRESENT' 
+                                    ? `In: ${todayAttendance.arrivalTime || '--:--'} | Out: ${todayAttendance.departureTime || '--:--'}`
+                                    : `Reason: ${todayAttendance.reason || 'N/A'}`
+                                }
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <h4 style={{ margin: 0, color: 'var(--primary-bold)', fontSize: '1rem', fontWeight: '800' }}>
-                            Important Faculty Announcements
-                        </h4>
-                        <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.85rem', opacity: 0.8 }}>
-                            You have {unreadCount} new update{unreadCount > 1 ? 's' : ''} waiting for your review.
-                        </p>
-                    </div>
-                    <div style={{ marginLeft: 'auto', fontWeight: '700', color: 'var(--primary-bold)', fontSize: '0.85rem' }}>
-                        Review Now →
-                    </div>
-                </div>
-            )}
+                )}
+            </div>
 
             <div className="stats-grid">
                 <div className="stat-card">

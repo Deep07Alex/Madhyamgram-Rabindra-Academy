@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { isAttendanceOpen } from '../utils/attendance';
 import api from '../services/api';
 import TeacherAttendance from '../components/teacher/TeacherAttendance';
 import TeacherHomework from '../components/teacher/TeacherHomework';
@@ -18,8 +19,13 @@ import {
     X,
     BellRing,
     Bell,
-    Loader2
+    Loader2,
+    Clock,
+    LogIn,
+    AlertCircle
 } from 'lucide-react';
+
+// Utility moved to src/utils/attendance.ts
 
 const TeacherDashboard = () => {
     const { user, updateUser, logout: authLogout } = useAuth();
@@ -39,20 +45,43 @@ const TeacherDashboard = () => {
         attendanceRate: 0
     });
     const [unreadCount, setUnreadCount] = useState(0);
+    const [todayAttendance, setTodayAttendance] = useState<any>(null);
+    const [showCheckInModal, setShowCheckInModal] = useState(false);
+    const [showClockOutModal, setShowClockOutModal] = useState(false);
+    const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
+    const [config, setConfig] = useState({ attendance_override: 'AUTO' });
 
     const refreshData = useCallback(async (silent = false) => {
         if (!silent) setIsRefreshing(true);
         try {
             const res = await api.get('/dashboard/unified');
-            const { profile: updatedProfile, stats: updatedStats, notices: noticeList } = res.data;
-            
+            const { 
+                profile: updatedProfile, 
+                stats: updatedStats, 
+                notices: noticeList, 
+                todayAttendance: todayAtt,
+                config: systemConfig 
+            } = res.data;
+
             // 1. Update Profile (Global Auth)
             updateUser(updatedProfile);
-            
+
             // 2. Update Local Stats
             setStats(updatedStats);
-            
-            // 3. Update Unread Count
+            setTodayAttendance(todayAtt);
+            if (systemConfig) setConfig(systemConfig);
+
+            // 3. Show check-in modal if not marked for today
+            if (!todayAtt && !silent) {
+                setShowCheckInModal(true);
+            } else if (todayAtt && todayAtt.status === 'ABSENT') {
+                // If marked absent, we might want to still show dashboard but with a banner
+                setShowCheckInModal(false);
+            } else {
+                setShowCheckInModal(false);
+            }
+
+            // 4. Update Unread Count
             const lastChecked = localStorage.getItem('teacher_last_checked_notices') || '0';
             const unread = noticeList.filter((n: any) => new Date(n.createdAt).getTime() > parseInt(lastChecked));
             setUnreadCount(unread.length);
@@ -67,6 +96,16 @@ const TeacherDashboard = () => {
 
     useEffect(() => {
         refreshData();
+    }, [refreshData]);
+
+    // Periodically sync data and force re-render for time-based 'AUTO' transitions (every 5 seconds)
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setTick(t => t + 1);
+            refreshData(true); // Silent sync
+        }, 5000);
+        return () => clearInterval(interval);
     }, [refreshData]);
 
     // Handle notice dismissal on navigation
@@ -87,7 +126,12 @@ const TeacherDashboard = () => {
         'new_notice': () => refreshData(true),
         'notice_deleted': () => refreshData(true),
         'profile_updated': () => refreshData(true),
-        'class:updated': () => refreshData(true)
+        'class:updated': () => refreshData(true),
+        'system:config_updated': (data: any) => {
+            if (data.key === 'attendance_override') {
+                setConfig(prev => ({ ...prev, attendance_override: data.value }));
+            }
+        }
     });
 
     const handleLogout = () => {
@@ -103,9 +147,56 @@ const TeacherDashboard = () => {
         setUnreadCount(0);
     };
 
+    const handleCheckIn = async (data: { status: string, reason?: string }) => {
+        setIsSubmittingAttendance(true);
+        try {
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            
+            await api.post('/attendance/teacher/mark', {
+                status: data.status,
+                arrivalTime: data.status === 'PRESENT' ? timeStr : null,
+                reason: data.status === 'ABSENT' ? data.reason : null,
+                date: new Date().toISOString().split('T')[0]
+            });
+            await refreshData(true);
+            setShowCheckInModal(false);
+        } catch (error) {
+            console.error('Check-in failed:', error);
+            alert('Failed to submit attendance. Please try again.');
+        } finally {
+            setIsSubmittingAttendance(false);
+        }
+    };
+
+    const handleClockOut = async (earlyLeaveReason?: string) => {
+        setIsSubmittingAttendance(true);
+        try {
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            await api.post('/attendance/teacher/mark', {
+                departureTime: timeStr,
+                earlyLeaveReason,
+                date: new Date().toISOString().split('T')[0]
+            });
+            await refreshData(true);
+            setShowClockOutModal(false);
+        } catch (error) {
+            console.error('Clock-out failed:', error);
+            alert('Failed to log departure.');
+        } finally {
+            setIsSubmittingAttendance(false);
+        }
+    };
+
     const navItems = [
         { path: '/teacher/dashboard', icon: <LayoutDashboard size={20} />, label: 'Overview' },
-        { path: '/teacher/attendance', icon: <ClipboardCheck size={20} />, label: 'Student Attendance' },
+        { 
+            path: '/teacher/attendance', 
+            icon: <ClipboardCheck size={20} />, 
+            label: 'Attendance',
+            disabled: !isAttendanceOpen(config.attendance_override)
+        },
         { path: '/teacher/homework', icon: <BookType size={20} />, label: 'Assignments' },
         { path: '/teacher/notices', icon: <BellRing size={20} />, label: 'Notices' },
     ];
@@ -146,19 +237,42 @@ const TeacherDashboard = () => {
                 </div>
 
                 <nav className="sidebar-nav">
-                    {navItems.map((item) => (
-                        <NavLink
-                            key={item.path}
-                            to={item.path}
-                            className={({ isActive }: { isActive: boolean }) => `nav-item ${isActive ? 'active' : ''}`}
-                            onClick={() => {
-                                closeSidebar();
-                            }}
-                        >
-                            {item.icon}
-                            <span>{item.label}</span>
-                        </NavLink>
-                    ))}
+                    {navItems.map((item: any) => {
+                        const content = (
+                            <>
+                                {item.icon}
+                                <span>{item.label} {item.disabled && <span style={{ fontSize: '0.6rem', color: 'var(--warning-bold)', marginLeft: '4px' }}>(Closed)</span>}</span>
+                            </>
+                        );
+
+                        if (item.disabled) {
+                            return (
+                                <div
+                                    key={item.path}
+                                    className="nav-item disabled"
+                                    style={{ 
+                                        opacity: 0.5, 
+                                        cursor: 'not-allowed', 
+                                        userSelect: 'none',
+                                        pointerEvents: 'none'
+                                    }}
+                                >
+                                    {content}
+                                </div>
+                            );
+                        }
+
+                        return (
+                            <NavLink
+                                key={item.path}
+                                to={item.path}
+                                className={({ isActive }: { isActive: boolean }) => `nav-item ${isActive ? 'active' : ''}`}
+                                onClick={closeSidebar}
+                            >
+                                {content}
+                            </NavLink>
+                        );
+                    })}
                 </nav>
 
                 <button onClick={handleLogout} className="logout-btn">
@@ -185,6 +299,25 @@ const TeacherDashboard = () => {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                         <div className="hide-on-mobile"><LiveClock /></div>
+
+                        {/* Attendance Quick Control */}
+                        {todayAttendance && todayAttendance.status === 'PRESENT' && !todayAttendance.departureTime && (
+                            <button
+                                onClick={() => setShowClockOutModal(true)}
+                                className="btn-primary"
+                                style={{ padding: '8px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--warning-bold)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+                            >
+                                <LogOut size={16} />
+                                Clock Out
+                            </button>
+                        )}
+                        {todayAttendance && todayAttendance.departureTime && (
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Clock size={14} />
+                                Day Ended: {todayAttendance.departureTime}
+                            </div>
+                        )}
+
                         <ThemeToggle />
                         <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => navigate('/teacher/notices')}>
                             <Bell size={22} color="var(--primary-bold)" />
@@ -196,11 +329,12 @@ const TeacherDashboard = () => {
                 <div className="page-view">
                     <Routes>
                         <Route path="dashboard" element={
-                            <TeacherOverview 
-                                user={user} 
+                            <TeacherOverview
+                                user={user}
                                 profile={user}
-                                stats={stats} 
-                                unreadCount={unreadCount} 
+                                stats={stats}
+                                todayAttendance={todayAttendance}
+                                unreadCount={unreadCount}
                                 onClearNotices={clearNotices}
                             />
                         } />
@@ -212,6 +346,159 @@ const TeacherDashboard = () => {
                     </Routes>
                 </div>
             </main>
+
+            {/* Attendance Lock Modal */}
+            {showCheckInModal && (
+                <CheckInModal
+                    onCheckIn={handleCheckIn}
+                    isSubmitting={isSubmittingAttendance}
+                />
+            )}
+
+            {/* Clock Out Modal */}
+            {showClockOutModal && (
+                <ClockOutModal
+                    onClockOut={handleClockOut}
+                    onCancel={() => setShowClockOutModal(false)}
+                    isSubmitting={isSubmittingAttendance}
+                />
+            )}
+        </div>
+    );
+};
+
+const ClockOutModal = ({ onClockOut, onCancel, isSubmitting }: { onClockOut: (reason?: string) => void, onCancel: () => void, isSubmitting: boolean }) => {
+    const [reason, setReason] = useState('');
+
+    return (
+        <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, padding: '20px'
+        }}>
+            <div className="card" style={{ maxWidth: '400px', width: '100%', padding: '32px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
+                <div style={{
+                    width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px'
+                }}>
+                    <LogOut size={32} color="#dc2626" />
+                </div>
+
+                <h2 style={{ marginBottom: '8px', fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)' }}>End Your Day?</h2>
+                <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '0.9rem' }}>
+                    Confirm your departure time. You can optionally provide a reason if leaving before scheduled hours.
+                </p>
+
+                <div style={{ display: 'grid', gap: '20px', textAlign: 'left' }}>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '8px', color: 'var(--text-muted)' }}>EARLY LEAVE REASON (OPTIONAL)</label>
+                        <textarea
+                            className="form-control"
+                            style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-soft)', background: 'var(--bg-input)', color: 'var(--text-main)', minHeight: '80px', resize: 'none' }}
+                            placeholder="Specify reason if applicable..."
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            disabled={isSubmitting}
+                        />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                        <button
+                            className="btn-secondary"
+                            style={{ padding: '14px', borderRadius: '12px', border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 700 }}
+                            onClick={onCancel}
+                            disabled={isSubmitting}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            className="btn-primary"
+                            style={{ padding: '14px', borderRadius: '12px', background: '#dc2626', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                            onClick={() => onClockOut(reason.trim() || undefined)}
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <LogOut size={20} />}
+                            {isSubmitting ? 'Logging...' : 'Clock Out'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const CheckInModal = ({ onCheckIn, isSubmitting }: { onCheckIn: (data: any) => void, isSubmitting: boolean }) => {
+    const [status, setStatus] = useState('PRESENT');
+    const [reason, setReason] = useState('');
+
+    return (
+        <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, padding: '20px'
+        }}>
+            <div className="card" style={{ maxWidth: '400px', width: '100%', padding: '32px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
+                <div style={{
+                    width: '64px', height: '64px', borderRadius: '50%', background: 'var(--primary-soft)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px'
+                }}>
+                    <LogIn size={32} color="var(--primary-bold)" />
+                </div>
+
+                <h2 style={{ marginBottom: '8px', fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)' }}>Daily Check-In</h2>
+                <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '0.9rem' }}>
+                    Welcome to Academy Portal. Please record your entry for <strong>{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}</strong>.
+                    <br />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--primary-bold)' }}>Arrival Time will be recorded automatically as of now.</span>
+                </p>
+
+                <div style={{ display: 'grid', gap: '20px', textAlign: 'left' }}>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '8px', color: 'var(--text-muted)' }}>ATTENDANCE STATUS</label>
+                        <select
+                            className="form-control"
+                            value={status}
+                            onChange={(e) => setStatus(e.target.value)}
+                            disabled={isSubmitting}
+                            style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-main)', background: 'var(--bg-input)', color: 'var(--text-main)' }}
+                        >
+                            <option value="PRESENT">Present at Academy</option>
+                            <option value="ABSENT">Absent Today</option>
+                        </select>
+                    </div>
+
+                    {status === 'ABSENT' && (
+                        <div>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '8px', color: 'var(--text-muted)' }}>REASON FOR ABSENCE</label>
+                            <textarea
+                                className="form-control"
+                                style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-main)', background: 'var(--bg-input)', color: 'var(--text-main)', minHeight: '80px', resize: 'none' }}
+                                placeholder="Please specify reason..."
+                                value={reason}
+                                onChange={(e) => setReason(e.target.value)}
+                                disabled={isSubmitting}
+                            />
+                        </div>
+                    )}
+
+                    <button
+                        className="btn-primary"
+                        style={{ marginTop: '12px', width: '100%', padding: '14px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: 'var(--primary-bold)', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 700 }}
+                        onClick={() => onCheckIn({ status, reason: status === 'ABSENT' ? reason : null })}
+                        disabled={isSubmitting || (status === 'ABSENT' && !reason.trim())}
+                    >
+                        {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
+                        {isSubmitting ? 'Submitting...' : 'Confirm Entry'}
+                    </button>
+
+                    <p style={{ fontSize: '0.7rem', color: 'var(--warning-bold)', textAlign: 'center', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                        <AlertCircle size={12} />
+                        Entry record is mandatory for portal access.
+                    </p>
+                </div>
+            </div>
         </div>
     );
 };

@@ -130,7 +130,10 @@ export const initDb = async () => {
                 "id" TEXT PRIMARY KEY,
                 "date" DATE NOT NULL DEFAULT CURRENT_DATE,
                 "status" "AttendanceStatus" NOT NULL,
+                "arrivalTime" TIME,
+                "departureTime" TIME,
                 "reason" TEXT,
+                "earlyLeaveReason" TEXT,
                 "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE
             );
             -- One attendance record per teacher per day
@@ -207,6 +210,17 @@ export const initDb = async () => {
                 "expiresAt" TIMESTAMP(3),
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+
+            -- SystemConfig Table (for persistent settings)
+            CREATE TABLE IF NOT EXISTS "SystemConfig" (
+                "key" TEXT PRIMARY KEY,
+                "value" TEXT NOT NULL,
+                "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            -- Default configs
+            INSERT INTO "SystemConfig" ("key", "value") VALUES ('attendance_override', 'AUTO')
+            ON CONFLICT ("key") DO NOTHING;
         `);
 
         console.log('Database tables verified/initialized successfully.');
@@ -260,14 +274,20 @@ export const initDb = async () => {
             END $$;
         `);
 
-        // 2. Add 'reason' column to TeacherAttendance if it doesn't exist
+        // 2. Add 'reason' and time columns to TeacherAttendance if they don't exist
         await db.query(`
             DO $$ BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'TeacherAttendance' AND column_name = 'reason'
-                ) THEN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'TeacherAttendance' AND column_name = 'reason') THEN
                     ALTER TABLE "TeacherAttendance" ADD COLUMN "reason" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'TeacherAttendance' AND column_name = 'arrivalTime') THEN
+                    ALTER TABLE "TeacherAttendance" ADD COLUMN "arrivalTime" TIME;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'TeacherAttendance' AND column_name = 'departureTime') THEN
+                    ALTER TABLE "TeacherAttendance" ADD COLUMN "departureTime" TIME;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'TeacherAttendance' AND column_name = 'earlyLeaveReason') THEN
+                    ALTER TABLE "TeacherAttendance" ADD COLUMN "earlyLeaveReason" TEXT;
                 END IF;
             END $$;
         `);

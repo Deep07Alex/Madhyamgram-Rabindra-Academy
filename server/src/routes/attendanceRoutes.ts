@@ -6,7 +6,9 @@ import {
     markTeacherAttendance,
     getTeacherAttendance,
     updateStudentAttendance,
-    updateTeacherAttendance
+    updateTeacherAttendance,
+    getAttendanceConfig,
+    updateAttendanceConfig
 } from '../controllers/attendanceController.js';
 
 const router = Router();
@@ -23,5 +25,9 @@ router.patch('/admin/student/:id', authorize(['ADMIN']), updateStudentAttendance
 router.post('/teacher', authorize(['ADMIN', 'TEACHER']), markTeacherAttendance);
 router.get('/teacher', authorize(['ADMIN', 'TEACHER']), getTeacherAttendance);
 router.patch('/admin/teacher/:id', authorize(['ADMIN']), updateTeacherAttendance);
+
+// Attendance Configuration
+router.get('/config', authorize(['ADMIN', 'TEACHER', 'STUDENT']), getAttendanceConfig);
+router.patch('/config', authorize(['ADMIN']), updateAttendanceConfig);
 
 export default router;

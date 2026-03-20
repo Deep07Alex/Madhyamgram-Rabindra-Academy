@@ -42,6 +42,7 @@ export type SSEEventType =
     | 'homework_submitted'
     | 'homework_graded'
     | 'attendance:updated'
+    | 'system:config_updated'
     | 'fee:paid'
     | 'fee:created'
     | 'user:created';

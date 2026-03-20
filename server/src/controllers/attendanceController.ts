@@ -69,13 +69,20 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
     const targetStudentId = studentId || (req.user?.role === 'STUDENT' ? req.user.id : null);
 
     try {
-        // 1. Get total sessions (ALL DAYS)
-        let sessionRes = await db.query(`
-            SELECT COUNT(DISTINCT date::date) FROM "Attendance"
+        // 1. Get all unique school session dates
+        const allSessionsRes = await db.query(`
+            SELECT DISTINCT date::date as session_date 
+            FROM (
+                SELECT date::date FROM "Attendance"
+                UNION
+                SELECT date::date FROM "TeacherAttendance"
+            ) as session_union
+            ORDER BY session_date DESC
         `);
-        const totalSessions = parseInt(sessionRes.rows[0].count, 10);
+        const sessionDates = allSessionsRes.rows.map(r => r.session_date.toISOString().split('T')[0]);
+        const totalSessions = sessionDates.length;
 
-        // 2. Get explicit records
+        // 2. Get explicit records for this student
         let query = `
             SELECT a.*, 
                    row_to_json(s.*) as student, 
@@ -100,14 +107,50 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
             query += ` AND a.date >= $${paramCount++} AND a.date <= $${paramCount++}`;
             params.push(new Date(startDate as string).toISOString().split('T')[0], new Date(endDate as string).toISOString().split('T')[0]);
         }
-
         query += ` ORDER BY a.date DESC`;
 
         const attendanceRes = await db.query(query, params);
+        const realRecords = attendanceRes.rows;
         
-        // Return records and totalSessions
+        // If we are NOT querying for a single student (e.g. Admin view), 
+        // just return all real records found for the filters without virtualization.
+        if (!targetStudentId) {
+            return res.json({
+                records: realRecords,
+                totalSessions: realRecords.length // Not applicable for multi-student view
+            });
+        }
+
+        // 3. Merge real records with virtual PRESENT records for all sessions (for single student history)
+        const recordMap = new Map();
+        realRecords.forEach(r => {
+            const dateStr = new Date(r.date).toISOString().split('T')[0];
+            recordMap.set(dateStr, r);
+        });
+
+        // Construct final list from session dates
+        const finalRecords = sessionDates.map(dateStr => {
+            // Filter by date range if provided (to optimize response)
+            if (startDate && dateStr < (startDate as string)) return null;
+            if (endDate && dateStr > (endDate as string)) return null;
+
+            if (recordMap.has(dateStr)) {
+                return recordMap.get(dateStr);
+            }
+
+            // Generate virtual PRESENT record
+            return {
+                id: `virtual-${dateStr}`,
+                date: dateStr,
+                status: 'PRESENT',
+                studentId: targetStudentId,
+                subject: 'Full Day Session',
+                isVirtual: true // Flag for debugging if needed
+            };
+        }).filter(Boolean);
+        
         res.json({
-            records: attendanceRes.rows,
+            records: finalRecords,
             totalSessions
         });
     } catch (error) {
@@ -119,7 +162,7 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
 // --- Teacher Attendance ---
 
 export const markTeacherAttendance = async (req: AuthRequest, res: Response) => {
-    const { date, status, reason, teacherId: bodyTeacherId } = req.body;
+    const { date, status, reason, arrivalTime, departureTime, earlyLeaveReason, teacherId: bodyTeacherId } = req.body;
     const markerId = req.user?.id;
     const userRole = req.user?.role;
 
@@ -127,16 +170,13 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
         return res.status(403).json({ message: 'Unauthorized role' });
     }
 
-    // Determine whose attendance we are marking
-    // Admin marks bodyTeacherId, Teacher marks their own markerId
     const targetTeacherId = (userRole === 'ADMIN' && bodyTeacherId) ? bodyTeacherId : markerId;
 
     try {
         const attendanceDateStr = new Date(date || new Date()).toISOString().split('T')[0];
 
-        // Ensure we only have one record per teacher per calendar date
         const existingCheck = await db.query(
-            `SELECT id FROM "TeacherAttendance" 
+            `SELECT id, "arrivalTime", "departureTime" FROM "TeacherAttendance" 
              WHERE "teacherId" = $1 AND date::date = $2`,
             [targetTeacherId, attendanceDateStr]
         );
@@ -144,22 +184,42 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
         let attendanceRes;
 
         if (existingCheck.rows.length > 0) {
-            // Update existing record
+            // Update existing record with coalesced values
             attendanceRes = await db.query(
                 `UPDATE "TeacherAttendance"
-                 SET status = $1, reason = $2
-                 WHERE id = $3
+                 SET status = COALESCE($1, status),
+                     reason = COALESCE($2, reason),
+                     "arrivalTime" = COALESCE($3, "arrivalTime"),
+                     "departureTime" = COALESCE($4, "departureTime"),
+                     "earlyLeaveReason" = COALESCE($5, "earlyLeaveReason")
+                 WHERE id = $6
                  RETURNING *`,
-                [status, status === 'ABSENT' ? reason : null, existingCheck.rows[0].id]
+                [
+                    status || null, 
+                    status === 'ABSENT' ? reason : null, 
+                    arrivalTime || null, 
+                    departureTime || null, 
+                    earlyLeaveReason || null, 
+                    existingCheck.rows[0].id
+                ]
             );
         } else {
             // Insert new record
             const id = crypto.randomUUID();
             attendanceRes = await db.query(
-                `INSERT INTO "TeacherAttendance" (id, date, status, reason, "teacherId") 
-                 VALUES ($1, $2, $3, $4, $5)
+                `INSERT INTO "TeacherAttendance" (id, date, status, reason, "arrivalTime", "departureTime", "earlyLeaveReason", "teacherId") 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                  RETURNING *`,
-                [id, attendanceDateStr, status, status === 'ABSENT' ? reason : null, targetTeacherId]
+                [
+                    id, 
+                    attendanceDateStr, 
+                    status || 'PRESENT', 
+                    status === 'ABSENT' ? reason : null, 
+                    arrivalTime || null, 
+                    departureTime || null, 
+                    earlyLeaveReason || null, 
+                    targetTeacherId
+                ]
             );
         }
 
@@ -287,6 +347,37 @@ export const getTeacherAttendance = async (req: Request, res: Response) => {
         res.json(attendanceRes.rows);
     } catch (error) {
         console.error('Error fetching teacher attendance:', error);
-        res.status(500).json({ message: 'Error fetching teacher attendance' });
+    }
+};
+
+// --- Attendance Configuration ---
+
+export const getAttendanceConfig = async (req: Request, res: Response) => {
+    try {
+        const result = await db.query('SELECT value FROM "SystemConfig" WHERE key = $1', ['attendance_override']);
+        const value = result.rows.length > 0 ? result.rows[0].value : 'AUTO';
+        res.json({ attendance_override: value });
+    } catch (error) {
+        console.error('Error fetching attendance config:', error);
+        res.status(500).json({ message: 'Error fetching attendance config' });
+    }
+};
+
+export const updateAttendanceConfig = async (req: AuthRequest, res: Response) => {
+    const { attendance_override } = req.body; // Expecting 'AUTO', 'OPEN', or 'CLOSED'
+    if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({ message: 'Only admins can update system config' });
+    }
+
+    try {
+        await db.query(
+            'INSERT INTO "SystemConfig" (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2, "updatedAt" = CURRENT_TIMESTAMP',
+            ['attendance_override', attendance_override]
+        );
+        broadcast('system:config_updated', { key: 'attendance_override', value: attendance_override });
+        res.json({ message: 'Configuration updated successfully', attendance_override });
+    } catch (error) {
+        console.error('Error updating attendance config:', error);
+        res.status(500).json({ message: 'Error updating attendance config' });
     }
 };

@@ -20,6 +20,7 @@ export type SSEEventType =
     | 'user:deleted'
     | 'class:updated'
     | 'profile_updated'
+    | 'system:config_updated'
     | 'new_notice'
     | 'notice_deleted';
 

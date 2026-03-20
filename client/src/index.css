@@ -231,6 +231,12 @@ select, option {
   transform: translateX(4px);
 }
 
+.nav-item.disabled:hover {
+  background: transparent;
+  transform: none;
+  cursor: not-allowed;
+}
+
 .nav-item.active {
   background: linear-gradient(90deg, #e5c17a 0%, var(--primary) 100%);
   color: var(--text-on-dark);

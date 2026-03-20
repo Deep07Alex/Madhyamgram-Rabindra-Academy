@@ -13,7 +13,9 @@ import {
     UserCheck,
     ChevronDown,
     CalendarDays,
-    AlertCircle
+    Clock,
+    ShieldAlert,
+    ShieldCheck
 } from 'lucide-react';
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT';
@@ -40,6 +42,9 @@ interface TeacherRow {
     status: AttendanceStatus | null;
     date: string | null;
     reason: string | null;
+    arrivalTime: string | null;
+    departureTime: string | null;
+    earlyLeaveReason: string | null;
     designation?: string;
 }
 
@@ -49,25 +54,16 @@ const STATUS_COLORS: Record<AttendanceStatus, string> = {
 };
 
 const StatusBadge = ({ status }: { status: AttendanceStatus | null }) => {
-    if (!status) return (
-        <span style={{
-            padding: '3px 12px', borderRadius: '20px',
-            background: 'var(--bg-main)', color: '#94a3b8',
-            fontWeight: '600', fontSize: '0.78rem',
-            border: '1px dashed #cbd5e1', display: 'inline-flex', alignItems: 'center', gap: '4px'
-        }}>
-            <AlertCircle size={11} /> No Record
-        </span>
-    );
+    const displayStatus = status || 'PRESENT';
     return (
         <span style={{
             padding: '3px 12px', borderRadius: '20px',
-            background: STATUS_COLORS[status] + '20',
-            color: STATUS_COLORS[status],
+            background: STATUS_COLORS[displayStatus] + '20',
+            color: STATUS_COLORS[displayStatus],
             fontWeight: '700', fontSize: '0.78rem',
-            border: `1px solid ${STATUS_COLORS[status]}40`
+            border: `1px solid ${STATUS_COLORS[displayStatus]}40`
         }}>
-            {status}
+            {displayStatus}
         </span>
     );
 };
@@ -83,7 +79,7 @@ const InlineStatusEdit = ({
     date: string;
     classId?: string;
     initialReason?: string | null;
-    onUpdated: () => void;
+    onUpdated: (silent?: boolean) => void;
 }) => {
     const [editing, setEditing] = useState(false);
     const [status, setStatus] = useState<AttendanceStatus | ''>(currentStatus || '');
@@ -124,7 +120,7 @@ const InlineStatusEdit = ({
             }
             showToast('Attendance updated!', 'success');
             setEditing(false);
-            onUpdated();
+            onUpdated(true);
         } catch {
             showToast('Failed to update attendance.', 'error');
         }
@@ -191,23 +187,25 @@ const InlineStatusEdit = ({
 const MonthlySummaryDisplay = ({ personId, dataMap }: { personId: string; dataMap: Record<string, Record<string, any>> }) => {
     const records = dataMap[personId] || {};
     const days = Object.values(records);
-    const present = days.filter((r: any) => r.status === 'PRESENT').length;
     const absent = days.filter((r: any) => r.status === 'ABSENT').length;
-
-    if (days.length === 0) return <StatusBadge status={null} />;
+    const present = days.filter((r: any) => r.status === 'PRESENT').length;
 
     return (
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
-                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#22c55e' }}>{present} Present</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#22c55e' }}>
+                    {present} Present
+                </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
-                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#ef4444' }}>{absent} Absent</span>
-            </div>
+            {absent > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
+                    <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#ef4444' }}>{absent} Absent</span>
+                </div>
+            )}
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg-main)', padding: '2px 8px', borderRadius: '4px' }}>
-                {days.length} records
+                {days.length} markings
             </span>
         </div>
     );
@@ -223,9 +221,50 @@ const ManageAttendance = () => {
     const [tab, setTab] = useState<'students' | 'teachers' | 'staff'>('students');
     const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
     const [loading, setLoading] = useState(false);
+    const [attendanceStatus, setAttendanceStatus] = useState<'AUTO' | 'OPEN' | 'CLOSED'>('AUTO');
+    const [togglingOverride, setTogglingOverride] = useState(false);
 
     // Student state
     const [studentRows, setStudentRows] = useState<StudentRow[]>([]);
+    const fetchConfig = useCallback(async () => {
+        try {
+            const res = await api.get('/attendance/config');
+            setAttendanceStatus(res.data.attendance_override);
+        } catch (err) {
+            console.error('Failed to fetch attendance config');
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchConfig();
+    }, [fetchConfig]);
+
+    const handleToggleOverride = async () => {
+        setTogglingOverride(true);
+        try {
+            const states: Array<'AUTO' | 'OPEN' | 'CLOSED'> = ['AUTO', 'OPEN', 'CLOSED'];
+            const currentIndex = states.indexOf(attendanceStatus);
+            const nextValue = states[(currentIndex + 1) % states.length];
+            
+            await api.patch('/attendance/config', { attendance_override: nextValue });
+            setAttendanceStatus(nextValue);
+            showToast(`System set to ${nextValue}.`, 'success');
+        } catch (err) {
+            showToast('Failed to update system config.', 'error');
+        } finally {
+            setTogglingOverride(false);
+        }
+    };
+
+    // Use SSE for real-time sync
+    useServerEvents({
+        'system:config_updated': (data: any) => {
+            if (data.key === 'attendance_override') {
+                setAttendanceStatus(data.value);
+            }
+        }
+    });
+
     const [classes, setClasses] = useState<any[]>([]);
     const [selectedClass, setSelectedClass] = useState('');
 
@@ -238,17 +277,16 @@ const ManageAttendance = () => {
     const [search, setSearch] = useState('');
 
     // ── Fetch students + attendance for date ──────────────────────────────
-    const fetchStudentData = useCallback(async (signal?: AbortSignal) => {
+    const fetchStudentData = useCallback(async (silent = false) => {
         if (viewMode !== 'daily') return;
-        setLoading(true);
+        if (!silent) setLoading(true);
         try {
             const [stuRes, attRes, clsRes] = await Promise.all([
-                api.get('/users/students', { signal }),
+                api.get('/users/students'),
                 api.get('/attendance/student', {
-                    params: dateFilter ? { startDate: dateFilter, endDate: dateFilter } : {},
-                    signal
+                    params: dateFilter ? { startDate: dateFilter, endDate: dateFilter } : {}
                 }),
-                api.get('/users/classes', { signal }),
+                api.get('/users/classes'),
             ]);
 
             setClasses(clsRes.data);
@@ -290,15 +328,14 @@ const ManageAttendance = () => {
     }, [dateFilter, viewMode, showToast]);
 
     // ── Fetch teachers + attendance for date ──────────────────────────────
-    const fetchTeacherData = useCallback(async (signal?: AbortSignal) => {
+    const fetchTeacherData = useCallback(async (silent = false) => {
         if (viewMode !== 'daily') return;
-        setLoading(true);
+        if (!silent) setLoading(true);
         try {
             const [teachRes, attRes] = await Promise.all([
-                api.get('/users/teachers', { signal }),
+                api.get('/users/teachers'),
                 api.get('/attendance/teacher', {
-                    params: dateFilter ? { startDate: dateFilter, endDate: dateFilter } : {},
-                    signal
+                    params: dateFilter ? { startDate: dateFilter, endDate: dateFilter } : {}
                 }),
             ]);
 
@@ -317,6 +354,9 @@ const ManageAttendance = () => {
                     status: att?.status || 'PRESENT',
                     date: att?.date || null,
                     reason: att?.reason || null,
+                    arrivalTime: att?.arrivalTime || null,
+                    departureTime: att?.departureTime || null,
+                    earlyLeaveReason: att?.earlyLeaveReason || null,
                     designation: t.designation
                 };
             });
@@ -333,14 +373,14 @@ const ManageAttendance = () => {
     // ── Fetch Monthly Data ────────────────────────────────────────────────────
     const [monthlyDataMap, setMonthlyDataMap] = useState<Record<string, Record<string, any>>>({}); // personId -> { dateStr -> record }
 
-    const fetchMonthlyData = useCallback(async (signal?: AbortSignal) => {
+    const fetchMonthlyData = useCallback(async (silent = false) => {
         if (viewMode !== 'monthly' || !monthFilter) return;
 
         // If students tab but no class selected, we only fetch classes list if needed and return
         if (tab === 'students' && !selectedClass) {
             if (classes.length === 0) {
-                api.get('/users/classes', { signal }).then(res => setClasses(res.data)).catch(err => {
-                    if (!axios.isCancel(err)) console.error(err);
+                api.get('/users/classes').then(res => setClasses(res.data)).catch(err => {
+                    console.error(err);
                 });
             }
             setMonthlyDataMap({});
@@ -348,7 +388,7 @@ const ManageAttendance = () => {
             return;
         }
 
-        setLoading(true);
+        if (!silent) setLoading(true);
         try {
             // Calculate start and end dates
             let startDate = `${monthFilter}-01`;
@@ -358,8 +398,8 @@ const ManageAttendance = () => {
 
             if (tab === 'students') {
                 const [stuRes, attRes] = await Promise.all([
-                    api.get(`/users/students?classId=${selectedClass}`, { signal }),
-                    api.get('/attendance/student', { params: { classId: selectedClass, startDate, endDate }, signal })
+                    api.get(`/users/students?classId=${selectedClass}`),
+                    api.get('/attendance/student', { params: { classId: selectedClass, startDate, endDate } })
                 ]);
 
                 // Map records
@@ -378,8 +418,8 @@ const ManageAttendance = () => {
                 })));
             } else {
                 const [teachRes, attRes] = await Promise.all([
-                    api.get('/users/teachers', { signal }),
-                    api.get('/attendance/teacher', { params: { startDate, endDate }, signal })
+                    api.get('/users/teachers'),
+                    api.get('/attendance/teacher', { params: { startDate, endDate } })
                 ]);
 
                 const matrix: Record<string, Record<string, any>> = {};
@@ -395,24 +435,19 @@ const ManageAttendance = () => {
                 })));
             }
         } catch (err: any) {
-            if (axios.isCancel(err)) return;
             showToast('Failed to load monthly data.', 'error');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [viewMode, tab, monthFilter, selectedClass, classes.length, showToast]);
 
     useEffect(() => {
-        const controller = new AbortController();
-        
         if (viewMode === 'daily') {
-            if (tab === 'students') fetchStudentData(controller.signal);
-            else fetchTeacherData(controller.signal);
+            if (tab === 'students') fetchStudentData();
+            else fetchTeacherData();
         } else {
-            fetchMonthlyData(controller.signal);
+            fetchMonthlyData();
         }
-
-        return () => controller.abort();
     }, [tab, viewMode, dateFilter, monthFilter, selectedClass, fetchStudentData, fetchTeacherData, fetchMonthlyData]);
 
     // Live real-time updates
@@ -473,6 +508,43 @@ const ManageAttendance = () => {
                     <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>Attendance Registry</h2>
                     <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>View and edit attendance for all students and teachers — everyone is shown even with no record</p>
                 </div>
+                
+                <button 
+                    onClick={handleToggleOverride}
+                    disabled={togglingOverride}
+                    style={{
+                        marginLeft: 'auto',
+                        padding: '10px 20px',
+                        borderRadius: '12px',
+                        border: `1px solid ${
+                            attendanceStatus === 'OPEN' ? '#22c55e' : 
+                            attendanceStatus === 'CLOSED' ? '#ef4444' : 
+                            'var(--border-soft)'
+                        }`,
+                        background: 
+                            attendanceStatus === 'OPEN' ? '#22c55e10' : 
+                            attendanceStatus === 'CLOSED' ? '#ef444410' : 
+                            'var(--bg-card)',
+                        color: 
+                            attendanceStatus === 'OPEN' ? '#22c55e' : 
+                            attendanceStatus === 'CLOSED' ? '#ef4444' : 
+                            'var(--text-muted)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        fontSize: '0.85rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                    }}
+                >
+                    {attendanceStatus === 'OPEN' && <ShieldCheck size={18} />}
+                    {attendanceStatus === 'CLOSED' && <ShieldAlert size={18} />}
+                    {attendanceStatus === 'AUTO' && <Clock size={18} />}
+                    {attendanceStatus === 'AUTO' && 'System: AUTO (8AM-5PM)'}
+                    {attendanceStatus === 'OPEN' && 'System: FORCE OPEN'}
+                    {attendanceStatus === 'CLOSED' && 'System: FORCE CLOSED'}
+                </button>
             </div>
 
             {/* Summary badges */}
@@ -645,7 +717,14 @@ const ManageAttendance = () => {
                                                         onUpdated={fetchStudentData}
                                                     />
                                                 ) : (
-                                                    <StatusBadge status={row.status} />
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                                                        <StatusBadge status={row.status} />
+                                                        {row.subject && row.subject !== 'Full Day Record' && (
+                                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', background: 'var(--bg-main)', padding: '2px 6px', borderRadius: '4px' }}>
+                                                                {row.subject}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 )
                                             ) : (
                                                 <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} />
@@ -667,12 +746,15 @@ const ManageAttendance = () => {
                             <thead>
                                 <tr style={{ background: 'var(--bg-main)', borderBottom: '2px solid var(--border-soft)' }}>
                                     <th style={thStyle}>Teacher</th>
+                                    <th style={thStyle}>Arrival</th>
+                                    <th style={thStyle}>Departure</th>
                                     <th style={thStyle}>
                                         {viewMode === 'daily'
                                             ? (dateFilter ? `Status on ${new Date(dateFilter).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Attendance Status')
                                             : 'Monthly Summary'
                                         }
                                     </th>
+                                    <th style={thStyle}>Leave Info</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -689,6 +771,12 @@ const ManageAttendance = () => {
                                                 <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{row.teacherId}</p>
                                             )}
                                         </td>
+                                        <td style={{ padding: '14px 20px', fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: '600' }}>
+                                            {row.arrivalTime || '—'}
+                                        </td>
+                                        <td style={{ padding: '14px 20px', fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: '600' }}>
+                                            {row.departureTime || '—'}
+                                        </td>
                                         <td style={{ padding: '14px 20px' }}>
                                             {viewMode === 'daily' ? (
                                                 dateFilter ? (
@@ -704,16 +792,24 @@ const ManageAttendance = () => {
                                                 ) : (
                                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
                                                         <StatusBadge status={row.status} />
-                                                        {row.status === 'ABSENT' && row.reason && (
-                                                            <span style={{ fontSize: '0.75rem', color: '#ef4444', background: '#fee2e2', padding: '2px 8px', borderRadius: '4px' }}>
-                                                                {row.reason}
-                                                            </span>
-                                                        )}
                                                     </div>
                                                 )
                                             ) : (
                                                 <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} />
                                             )}
+                                        </td>
+                                        <td style={{ padding: '14px 20px' }}>
+                                            {row.status === 'ABSENT' && row.reason && (
+                                                <div style={{ fontSize: '0.75rem', color: '#ef4444', background: '#fee2e2', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                                    <strong>Absent:</strong> {row.reason}
+                                                </div>
+                                            )}
+                                            {row.earlyLeaveReason && (
+                                                <div style={{ marginTop: '4px', fontSize: '0.75rem', color: 'var(--warning-bold)', background: 'rgba(var(--warning-rgb), 0.1)', padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--warning-soft)' }}>
+                                                    <strong>Early Leave:</strong> {row.earlyLeaveReason}
+                                                </div>
+                                            )}
+                                            {!row.reason && !row.earlyLeaveReason && <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>—</span>}
                                         </td>
                                     </tr>
                                 ))}

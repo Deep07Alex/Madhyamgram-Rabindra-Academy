@@ -12,18 +12,22 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
         let statsData: any;
 
         if (role === 'ADMIN') {
-            const [studentRes, teacherRes, classRes, feeRes] = await Promise.all([
+            const [studentRes, teacherRes, classRes, feeRes, configRes] = await Promise.all([
                 db.query(`SELECT COUNT(*) FROM "Student"`),
                 db.query(`SELECT COUNT(*) FROM "Teacher"`),
                 db.query(`SELECT COUNT(*) FROM "Class"`),
-                db.query(`SELECT SUM(amount) FROM "Fee"`)
+                db.query(`SELECT SUM(amount) FROM "Fee"`),
+                db.query('SELECT value FROM "SystemConfig" WHERE key = $1', ['attendance_override'])
             ]);
 
             statsData = {
                 students: parseInt(studentRes.rows[0].count, 10),
                 teachers: parseInt(teacherRes.rows[0].count, 10),
                 classes: parseInt(classRes.rows[0].count, 10),
-                projectedFees: parseFloat(feeRes.rows[0].sum || '0')
+                projectedFees: parseFloat(feeRes.rows[0].sum || '0'),
+                config: {
+                    attendance_override: configRes.rows.length > 0 ? configRes.rows[0].value : 'AUTO'
+                }
             };
         } else if (role === 'TEACHER') {
             const [classCountRes, pendingHomeworkRes, attendanceRes] = await Promise.all([
@@ -71,7 +75,11 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
                 db.query(`
                     WITH Stats AS (
                         SELECT 
-                            (SELECT COUNT(DISTINCT date) FROM "Attendance") as global_sessions,
+                            (SELECT COUNT(DISTINCT date) FROM (
+                                SELECT date::date FROM "Attendance"
+                                UNION
+                                SELECT date::date FROM "TeacherAttendance"
+                            ) as all_dates) as global_sessions,
                             (SELECT COUNT(*) FROM "Attendance" WHERE "studentId" = $1 AND status = 'ABSENT') as student_absences
                     )
                     SELECT 
@@ -119,13 +127,22 @@ export const getUnifiedDashboardData = async (req: AuthRequest, res: Response) =
     const { id: userId, role } = req.user!;
 
     try {
+        const [configRes] = await Promise.all([
+            db.query('SELECT value FROM "SystemConfig" WHERE key = $1', ['attendance_override'])
+        ]);
+        const attendanceOverride = configRes.rows.length > 0 ? configRes.rows[0].value : 'AUTO';
+
         if (role === 'STUDENT') {
             const [profileRes, statsRes, noticeRes, homeworkRes] = await Promise.all([
                 db.query(`SELECT * FROM "Student" WHERE id = $1`, [userId]),
                 db.query(`
                     WITH Stats AS (
                         SELECT 
-                            (SELECT COUNT(DISTINCT date) FROM "Attendance") as global_sessions,
+                            (SELECT COUNT(DISTINCT date) FROM (
+                                SELECT date::date FROM "Attendance"
+                                UNION
+                                SELECT date::date FROM "TeacherAttendance"
+                            ) as all_dates) as global_sessions,
                             (SELECT COUNT(*) FROM "Attendance" WHERE "studentId" = $1 AND status = 'ABSENT') as student_absences,
                             (SELECT AVG(marks / NULLIF("totalMarks", 0) * 100) FROM "Result" WHERE "studentId" = $1) as average_grade,
                             (SELECT COUNT(DISTINCT subject) FROM (
@@ -170,19 +187,24 @@ export const getUnifiedDashboardData = async (req: AuthRequest, res: Response) =
                     activeSubjects: parseInt(stats.active_subjects || '0')
                 },
                 notices: noticeRes.rows,
-                assignments: homeworkRes.rows
+                assignments: homeworkRes.rows,
+                config: { attendance_override: attendanceOverride }
             });
         }
 
         if (role === 'TEACHER') {
-            const [profileRes, statsRes, noticeRes] = await Promise.all([
+            const [profileRes, statsRes, noticeRes, todayAttendanceRes] = await Promise.all([
                 db.query(`SELECT * FROM "Teacher" WHERE id = $1`, [userId]),
                 db.query(`
                     SELECT 
                         (SELECT COUNT(*) FROM "_ClassToTeacher" WHERE "B" = $1) as assigned_classes,
                         (SELECT COUNT(*) FROM "Submission" s JOIN "Homework" h ON s."homeworkId" = h.id WHERE h."teacherId" = $1 AND s.status = 'PENDING') as pending_submissions
                 `, [userId]),
-                db.query(`SELECT * FROM "Notice" ORDER BY "createdAt" DESC LIMIT 5`)
+                db.query(`SELECT * FROM "Notice" ORDER BY "createdAt" DESC LIMIT 5`),
+                db.query(`
+                    SELECT * FROM "TeacherAttendance" 
+                    WHERE "teacherId" = $1 AND date::date = CURRENT_DATE
+                `, [userId])
             ]);
 
             const profile = { ...profileRes.rows[0], role: 'TEACHER' };
@@ -194,7 +216,9 @@ export const getUnifiedDashboardData = async (req: AuthRequest, res: Response) =
                     pendingSubmissions: parseInt(statsRes.rows[0].pending_submissions || '0'),
                     attendanceRate: 98 // Placeholder for teacher specific logic if needed
                 },
-                notices: noticeRes.rows
+                notices: noticeRes.rows,
+                todayAttendance: todayAttendanceRes.rows[0] || null,
+                config: { attendance_override: attendanceOverride }
             });
         }
 
