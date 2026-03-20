@@ -12,6 +12,7 @@ import ManageNotices from '../components/admin/ManageNotices';
 import LiveClock from '../components/common/LiveClock';
 import ThemeToggle from '../components/common/ThemeToggle';
 import AdminOverview from '../components/admin/AdminOverview';
+import ManageMainPage from '../components/admin/ManageMainPage';
 import useServerEvents from '../hooks/useServerEvents';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -27,14 +28,15 @@ import {
     Menu,
     X,
     UserCircle,
-    Loader2
+    Loader2,
+    Monitor
 } from 'lucide-react';
 
 const AdminDashboard = () => {
     const { user, logout: authLogout } = useAuth();
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    
+
     useEffect(() => {
         if (!user || user.role !== 'ADMIN') {
             navigate('/', { replace: true });
@@ -95,6 +97,7 @@ const AdminDashboard = () => {
         { path: '/admin/fees', icon: <CreditCard size={20} />, label: 'Fee Records' },
         { path: '/admin/results', icon: <FileText size={20} />, label: 'Results' },
         { path: '/admin/notices', icon: <BellRing size={20} />, label: 'Notices' },
+        { path: '/admin/website', icon: <Monitor size={20} />, label: 'Manage Main page photo' },
         { path: '/admin/gallery', icon: <ImageIcon size={20} />, label: 'Manage Gallery' },
     ];
 
@@ -187,6 +190,7 @@ const AdminDashboard = () => {
                         <Route path="fees" element={<ManageFees />} />
                         <Route path="results" element={<ManageResults />} />
                         <Route path="notices" element={<ManageNotices />} />
+                        <Route path="website" element={<ManageMainPage />} />
                         <Route path="gallery" element={<ManageGallery />} />
                         <Route path="/" element={<Navigate to="/admin/dashboard" />} />
                         <Route path="*" element={<Navigate to="/admin/dashboard" />} />

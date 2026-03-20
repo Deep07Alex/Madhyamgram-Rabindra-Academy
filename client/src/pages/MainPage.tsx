@@ -9,6 +9,7 @@ type GalleryItem = { src: string; caption: string };
 function MainPage() {
   const [navOpen, setNavOpen] = useState(false);
   const [notices, setNotices] = useState<string[]>([]);
+  const [bannerUrl, setBannerUrl] = useState("/dol.png");
 
   useEffect(() => {
     // Fetch public notices from API
@@ -35,6 +36,13 @@ function MainPage() {
           "📢 Parent Teacher Meeting – Sunday",
         ]);
       });
+
+    // Fetch dynamic banner
+    api.get('/system/festival-banner')
+      .then(res => {
+        if (res.data.url) setBannerUrl(res.data.url);
+      })
+      .catch(err => console.error('Failed to fetch banner:', err));
   }, []);
 
   const galleryItems: GalleryItem[] = [
@@ -63,7 +71,7 @@ function MainPage() {
       <div className="main-container">
         <Hero />
         <AdmissionSection />
-        <NoticeBoard notices={notices} />
+        <NoticeBoard bannerUrl={bannerUrl} notices={notices} />
         <Gallery items={galleryItems} />
       </div>
 
@@ -141,8 +149,8 @@ function Hero() {
         <h1>MADHYAMGRAM RABINDRA ACADEMY</h1>
         <div className="hero-level-badge">K.G. & PRIMARY SCHOOL</div>
         <div className="hero-stats-row">
-           <span>UDISE CODE: 19112601311</span>
-           <span>ESTD: 2005</span>
+          <span>UDISE CODE: 19112601311</span>
+          <span>ESTD: 2005</span>
         </div>
         <p className="hero-subtitle">Empowering Students For A Better Future</p>
       </div>
@@ -163,17 +171,14 @@ function AdmissionSection() {
 }
 
 
-function NoticeBoard({ notices }: { notices: string[] }) {
+function NoticeBoard({ bannerUrl }: { bannerUrl: string; notices: string[] }) {
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const fullUrl = bannerUrl.startsWith('/') ? `${baseUrl}${bannerUrl}` : bannerUrl;
+
   return (
     <section id="notice" className="landing-section notice">
-      <h2>Latest Notice</h2>
-      <div className="notice-board">
-        {notices.map((text, idx) => (
-          <div className="notice-item" key={idx}>
-            <p>{text}</p>
-          </div>
-        ))}
-      </div>
+      <h2>Upcoming Festivals</h2>
+      <img src={fullUrl} alt="Upcoming Festival" style={{ width: '100%', height: 'auto', maxHeight: '600px', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
     </section>
   );
 }
@@ -229,7 +234,7 @@ function Footer() {
         <a href="#" title="Instagram">📸</a>
         <a href="#" title="Twitter">🐦</a>
       </div>
-      
+
       <p className="copyright">© 2026 Madhyamgram Rabindra Academy | All Rights Reserved</p>
     </footer>
   );

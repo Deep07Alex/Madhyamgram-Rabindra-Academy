@@ -18,6 +18,7 @@ import galleryRoutes from './routes/galleryRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import noticeRoutes from './routes/noticeRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
+import systemRoutes from './routes/systemRoutes.js';
 import { db } from './lib/db.js';
 import { initDb } from './lib/initDb.js';
 import { initCronJobs } from './lib/cron.js';
@@ -133,6 +134,7 @@ app.use('/api/gallery', galleryRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notices', noticeRoutes);
 app.use('/api/uploads', uploadRoutes);
+app.use('/api/system', systemRoutes);
 
 // SSE
 app.get('/api/events', (req, res) => {

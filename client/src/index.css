@@ -1,5 +1,3 @@
-
-
 :root {
   /* Modern Premium Palette */
   --primary: #f4d394;
@@ -8,7 +6,7 @@
   --primary-rich: #5d1717;
   --primary-bold: #b45309;
   --primary-glow: rgba(244, 211, 148, 0.4);
-  
+
   /* Component Specific */
   --nav-bg: var(--primary);
   --nav-text: var(--primary-rich);
@@ -62,7 +60,7 @@
   /* Sidebar stays yellow as requested */
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  --text-on-dark: #1e293b; 
+  --text-on-dark: #1e293b;
   /* Dark text on yellow background */
   --border-soft: rgba(255, 255, 255, 0.1);
   --glass-bg: rgba(33, 33, 33, 0.8);
@@ -71,19 +69,24 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
   --shadow-premium: 0 20px 40px -10px rgba(0, 0, 0, 0.6);
-  
+
   /* Adjusted primary for better dark contrast if needed, but keeping original for now */
   --primary: #f4d394;
   --primary-glow: rgba(244, 211, 148, 0.15);
-  
+
   --accent-soft: #2d2d2d;
 
   /* Component Specific Overrides for Dark Mode */
-  --nav-bg: var(--primary); /* Tan navbar remains in dark mode */
-  --nav-text: var(--primary-rich); /* Dark red text remains for contrast on tan */
-  --footer-bg: #1a1a1a; /* Darker footer for dark mode */
-  --footer-text: var(--primary); /* Tan text on dark footer */
-  --hero-overlay: rgba(0, 0, 0, 0.65); /* Deeper overlay for dark mode */
+  --nav-bg: var(--primary);
+  /* Tan navbar remains in dark mode */
+  --nav-text: var(--primary-rich);
+  /* Dark red text remains for contrast on tan */
+  --footer-bg: #1a1a1a;
+  /* Darker footer for dark mode */
+  --footer-text: var(--primary);
+  /* Tan text on dark footer */
+  --hero-overlay: rgba(0, 0, 0, 0.65);
+  /* Deeper overlay for dark mode */
 }
 
 /* Base Styles */
@@ -118,7 +121,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-select, option {
+select,
+option {
   background-color: var(--bg-card);
   color: var(--text-main);
 }
@@ -704,6 +708,7 @@ select, option {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+
 .badge.present {
   background: var(--bg-main);
   border: 1px solid #22c55e40;
@@ -826,7 +831,7 @@ select, option {
     flex-shrink: 0;
   }
 
-  .mobile-header button, 
+  .mobile-header button,
   .mobile-header .theme-toggle-btn {
     color: var(--nav-text) !important;
   }
@@ -922,8 +927,9 @@ select, option {
     gap: 16px;
   }
 
-  .form-grid > * {
-    grid-column: 1 / -1 !important; /* Prevents span 2 from forcing an implicit second column sideways */
+  .form-grid>* {
+    grid-column: 1 / -1 !important;
+    /* Prevents span 2 from forcing an implicit second column sideways */
   }
 }
 
