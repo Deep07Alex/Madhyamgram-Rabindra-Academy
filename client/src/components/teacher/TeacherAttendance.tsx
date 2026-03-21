@@ -1,3 +1,16 @@
+/**
+ * Teacher Attendance Workcenter
+ * 
+ * The primary interface for faculty to manage classroom attendance and mark their own presence.
+ * Tabs:
+ * - Mark Attendance: Mark/edit student records for a specific class and subject.
+ * - View Class Roster: Historical overview of attendance.
+ * - Personal Check-in: Daily self-validation (Present/Absent).
+ * 
+ * Features:
+ * - Automatic session eviction if the attendance window is closed by Admin.
+ * - Real-time status toggling.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
@@ -91,6 +104,11 @@ const TeacherAttendance = () => {
     const [absentReason, setAbsentReason] = useState('');
     const [lastConfig, setLastConfig] = useState('AUTO');
 
+    /**
+     * Session Guard:
+     * Kicks the teacher back to the dashboard if the admin forces the window closed
+     * or if the AUTO window (8 AM - 5 PM) expires.
+     */
     const checkEviction = useCallback((status?: string) => {
         const currentStatus = status || lastConfig;
         if (!isAttendanceOpen(currentStatus)) {

@@ -1,3 +1,12 @@
+/**
+ * Student Financial Ledger
+ * 
+ * Provides pupils with a transparent view of their academic fees and payment history.
+ * Features:
+ * - Tally System: Real-time calculation of outstanding 'PENDING' obligations.
+ * - Digital Audit: Detailed record of paid transactions and management remarks.
+ * - Live Reactivity: Refreshes instantly when an administrator records a payment.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import useServerEvents from '../../hooks/useServerEvents';
@@ -28,6 +37,11 @@ const StudentFees = () => {
     // Live updates: refresh when admin creates or records fee payment
     useServerEvents({ 'fee:created': fetchFees, 'fee:paid': fetchFees });
 
+    /**
+     * Financial Aggregation:
+     * Sums up all fees currently in 'PENDING' status to give the student a clear
+     * picture of their total outstanding obligation.
+     */
     const totalDue = fees.filter((f: any) => f.status === 'PENDING').reduce((acc, curr: any) => acc + curr.amount, 0);
 
     return (

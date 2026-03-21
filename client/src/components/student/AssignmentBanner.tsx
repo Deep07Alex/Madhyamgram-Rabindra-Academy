@@ -1,3 +1,12 @@
+/**
+ * Interactive Assignment Alert Banner
+ * 
+ * A high-visibility component displayed on the student dashboard for pending assignments.
+ * Features:
+ * - Countdown Timer: Real-time update of remaining time until the deadline.
+ * - Status Colorization: Switches to an 'expired' state if the deadline is missed.
+ * - Navigation: Clickable area that leads directly to the homework submission portal.
+ */
 import { useState, useEffect } from 'react';
 import { BookOpen, Clock, AlertCircle, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';

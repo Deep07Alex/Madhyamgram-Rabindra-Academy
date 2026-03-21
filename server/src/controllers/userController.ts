@@ -1,3 +1,10 @@
+/**
+ * User Controller
+ * 
+ * Manages core entities: Students, Teachers (Faculty), and Classes.
+ * Handles CRUD operations, relationship management (Teachers to Classes), 
+ * and bulk data imports.
+ */
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { db } from '../lib/db.js';
@@ -7,6 +14,10 @@ import { AuthRequest } from '../middleware/auth.js';
 import { broadcast, sendToUser, sendToRole } from '../lib/sseManager.js';
 
 // Get all students
+/**
+ * Retrieves a list of students, optionally filtered by class.
+ * Includes associated class data in the response.
+ */
 export const getStudents = async (req: AuthRequest, res: Response) => {
     try {
         const { classId } = req.query;
@@ -35,6 +46,10 @@ export const getStudents = async (req: AuthRequest, res: Response) => {
 };
 
 // Get all teachers
+/**
+ * Retrieves all teachers/faculty members.
+ * Sorted by teaching status and joining date.
+ */
 export const getTeachers = async (req: Request, res: Response) => {
     try {
         const teachersRes = await db.query(`SELECT * FROM "Teacher" ORDER BY "isTeaching" DESC, "joiningDate" ASC NULLS LAST, "name" ASC`);
@@ -44,6 +59,9 @@ export const getTeachers = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Retrieves all classes with student counts and assigned teachers.
+ */
 export const getClasses = async (req: AuthRequest, res: Response) => {
     try {
         const query = `
@@ -71,6 +89,9 @@ export const getClasses = async (req: AuthRequest, res: Response) => {
 };
 
 // Assign teacher to class
+/**
+ * Links a teacher to a specific class.
+ */
 export const assignTeacherToClass = async (req: Request, res: Response) => {
     const { id: classId } = req.params;
     const { teacherId } = req.body;
@@ -102,6 +123,9 @@ export const removeTeacherFromClass = async (req: Request, res: Response) => {
 };
 
 // Create a class
+/**
+ * Creates a new class/grade.
+ */
 export const createClass = async (req: Request, res: Response) => {
     const { name, grade } = req.body;
     try {
@@ -118,6 +142,9 @@ export const createClass = async (req: Request, res: Response) => {
 };
 
 // Delete a student
+/**
+ * Hard-deletes a student record.
+ */
 export const deleteStudent = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     try {
@@ -141,6 +168,10 @@ export const deleteTeacher = async (req: Request, res: Response) => {
     }
 };
 // Delete all students
+/**
+ * Deletes EVERY student from the database. 
+ * EMERGENCY/CLEANUP ONLY.
+ */
 export const deleteAllStudents = async (req: Request, res: Response) => {
     try {
         await db.query(`DELETE FROM "Student"`);
@@ -166,6 +197,10 @@ export const deleteClass = async (req: Request, res: Response) => {
 };
 
 // Update a student (general update)
+/**
+ * Dynamically updates student fields. 
+ * Supports updating name, ID, roll number, Banglar Sikkha ID, email, password, and photo.
+ */
 export const updateStudent = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { name, studentId, rollNumber, banglarSikkhaId, email, password, photo } = req.body;
@@ -249,6 +284,10 @@ export const updateStudent = async (req: Request, res: Response) => {
 };
 
 // Update a teacher/faculty (general update)
+/**
+ * Dynamically updates teacher/faculty fields.
+ * Handles both teaching and administration staff.
+ */
 export const updateTeacher = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { 
@@ -354,6 +393,18 @@ export const updateTeacher = async (req: Request, res: Response) => {
 };
 
 // Bulk Import Students - Modernized Rebuild
+/**
+ * Massively handles student data imports from Excel files.
+ * 
+ * Logic Overview:
+ * 1. Pre-fetches classes and existing IDs for performance.
+ * 2. Normalizes text to handle messy Excel formatting reliably.
+ * 3. Uses alias-based searching to find columns (e.g., "STUDENT NAME" or "NAME").
+ * 4. Implements "Fuzzy Grade Mapping" to link rows to the correct Class ID.
+ * 5. Handles "Structural Rows" (headers/instructions) by skipping them.
+ * 6. Generates formatted Student IDs (S-...) and default passwords.
+ * 7. Performs a single batch INSERT for maximum database efficiency.
+ */
 export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
     if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
@@ -390,6 +441,10 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
         const classAliases = ['CLASS', 'GRADE', 'STANDARD', 'STD', 'SECTION'];
         const banglarAliases = ['BANGLAR SIKKHA ID', 'BANGLAR SHIKSHA ID', 'BANGLAR SHIKSHA', 'BS ID', 'PORTAL ID', 'STUDENT ID IN BANGLAR SHIKSHA PORTAL'];
 
+        /**
+         * Maps raw Excel grade names (e.g., "Class 1", "STDI") to 
+         * existing database Class IDs using exact and then fuzzy matches.
+         */
         const getMappedClassId = (rawName: any) => {
             if (!rawName) return undefined;
             const normExcel = normalize(rawName);
@@ -564,6 +619,10 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
 };
 
 // Update user password
+/**
+ * Directly updates a user's password.
+ * Supports both Student and Teacher tables via the 'type' parameter.
+ */
 export const updateUserPassword = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { password, type } = req.body; // type: 'student' | 'teacher'

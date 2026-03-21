@@ -1,3 +1,13 @@
+/**
+ * Student Homework Management Portal
+ * 
+ * Provides pupils with a centralized view of their academic assignments.
+ * Features:
+ * - Real-time Updates: Uses SSE (Server-Sent Events) to notify students of new tasks.
+ * - Submission Gateway: Multi-modal form supporting both written text and file attachments.
+ * - Progress Tracking: Persists 'recently submitted' states to ensure UI consistency.
+ * - Feedback Loop: Displays teacher critiques and grades directly on the assignment card.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
@@ -62,7 +72,12 @@ const StudentHomework = () => {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             
-            // Sync with dashboard banner instantly via localStorage
+            /**
+             * Dashboard Sync: 
+             * Update the local 'recently_submitted_homework' registry.
+             * This ensures the homepage banner reflects the change instantly
+             * without a full page reload or server roundtrip.
+             */
             const stored = localStorage.getItem('recently_submitted_homework');
             const submittedSet = stored ? new Set(JSON.parse(stored)) : new Set();
             submittedSet.add(selectedAssignment.id);

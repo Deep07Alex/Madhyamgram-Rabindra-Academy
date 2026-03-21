@@ -1,3 +1,9 @@
+/**
+ * Auth Controller
+ * 
+ * Handles user authentication (login), registration for different roles (Admin, Teacher, Student),
+ * and session management (retrieving current user profile).
+ */
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
@@ -10,6 +16,16 @@ if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
 }
 const FINAL_JWT_SECRET = JWT_SECRET || 'dev_fallback_secret_key_123_change_for_prod';
 
+/**
+ * Authenticates a user and returns a JWT token.
+ * 
+ * Logic:
+ * 1. Checks the requested role (Admin, Teacher, Student).
+ * 2. Normalizes the login ID (prepends A-, T-, or S- if missing and applicable).
+ * 3. Queries the corresponding table (Admin, Teacher, Student).
+ * 4. Compares the hashed password.
+ * 5. If valid, signs a JWT token and returns user data (excluding sensitive fields).
+ */
 export const login = async (req: Request, res: Response) => {
     // The frontend sends 'username' but it functionally acts as the login ID
     const { username: loginId, password, role: requestedRole } = req.body;
@@ -105,6 +121,18 @@ export const login = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Registers a new user based on their specific role.
+ * 
+ * Role-Specific Logic:
+ * - Admin: Formats ID as A-[phone] if not provided.
+ * - Teacher: Handles both teaching and non-teaching staff. Standardizes ID with T- or A- prefix.
+ * - Student: Validates class and roll number uniqueness. Generates formatted Student ID (S-...).
+ * 
+ * For all roles:
+ * - Automatically generates a secure password if none is provided.
+ * - Emails are treated as null if empty to avoid unique constraint issues.
+ */
 export const register = async (req: Request, res: Response) => {
     const { 
         name, password, role, email, rollNumber, teacherId, adminId, username, classId,
@@ -270,6 +298,10 @@ export const register = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Retrieves the current authenticated user's profile data.
+ * The user ID and role are decoded from the JWT token by the authentication middleware.
+ */
 export const getMe = async (req: Request, res: Response) => {
     try {
         const { id, role } = (req as any).user;

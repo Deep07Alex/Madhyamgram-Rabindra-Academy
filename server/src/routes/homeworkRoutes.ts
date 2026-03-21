@@ -1,3 +1,8 @@
+/**
+ * Homework Routes
+ * 
+ * Defines endpoints for assigning homework and managing student submissions and grading.
+ */
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';

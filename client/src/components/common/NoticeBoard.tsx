@@ -1,3 +1,11 @@
+/**
+ * Notice Board Component
+ * 
+ * Displays a list of academy announcements.
+ * Handles:
+ * - Differentiating between 'PUBLIC' and 'INTERNAL' notices.
+ * - Loading states and empty state handling.
+ */
 import { useState, useEffect } from 'react';
 import { BellRing, Calendar, Globe, Lock, Megaphone } from 'lucide-react';
 import api from '../../services/api';

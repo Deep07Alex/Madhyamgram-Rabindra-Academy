@@ -1,3 +1,18 @@
+/**
+ * Academy Announcement Engine (Notice Board)
+ * 
+ * A versatile notification system for broadcasting information to different segments
+ * of the academy community.
+ * 
+ * Channels:
+ * - PUBLIC: Visible on the main landing page for guests and parents.
+ * - INTERNAL: Targeted alerts for specific user roles (Teachers/Students).
+ * 
+ * Features:
+ * - Granular Targeting: Send notices to specific classes or even individual students.
+ * - Auto-Expiration: Schedule announcements to hide automatically after a deadline.
+ * - Real-time sync: Notifies users instantly via dashboard alerts.
+ */
 import { useState, useEffect } from 'react';
 import { 
     Plus, 
@@ -91,6 +106,11 @@ const ManageNotices = () => {
         e.preventDefault();
         try {
             const payload = { ...formData };
+            /**
+             * Business Logic: 
+             * If the notice is PUBLIC, it must be available to EVERYONE.
+             * If targeted at TEACHERS, we can't specify a class or student.
+             */
             if (payload.type === 'PUBLIC') {
                 payload.targetAudience = 'ALL';
                 payload.targetClassId = '';

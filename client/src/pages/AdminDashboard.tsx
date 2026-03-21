@@ -1,3 +1,13 @@
+/**
+ * Admin Dashboard
+ * 
+ * The central command center for school administrators.
+ * Provides a modular interface to manage students, faculty, classes, fees, results, and notices.
+ * Features:
+ * - Real-time statistics synchronization via WebSockets/SSE.
+ * - Responsive sidebar navigation.
+ * - Role-based route protection.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, NavLink, Routes, Route, Navigate } from 'react-router-dom';
 import api from '../services/api';
@@ -67,6 +77,8 @@ const AdminDashboard = () => {
         fetchStats();
     }, [fetchStats]);
 
+    // Real-time Event Handling:
+    // Automatically refreshes dashboard statistics when relevant backend events occur.
     useServerEvents({
         'connected': () => { if (import.meta.env.DEV) console.log('[SSE] Admin Control: Real-time link established'); },
         'fee:paid': () => fetchStats(true),

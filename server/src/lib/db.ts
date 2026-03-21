@@ -1,3 +1,9 @@
+/**
+ * Database Connection Pool
+ * 
+ * Manages connections to the PostgreSQL database.
+ * Uses pooling for efficient resource reuse and performance.
+ */
 import pkg from 'pg';
 const { Pool } = pkg;
 import dotenv from 'dotenv';

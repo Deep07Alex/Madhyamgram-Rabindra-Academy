@@ -1,3 +1,13 @@
+/**
+ * Student Overview Component
+ * 
+ * The main 'Home' view for students after logging in.
+ * Features:
+ * - Profile summary with photo and registration details.
+ * - Active assignment banners for immediate tasks.
+ * - Pulse-animated announcement notification.
+ * - Academic performance statistics.
+ */
 import { useNavigate } from 'react-router-dom';
 import { 
     UserCircle, 

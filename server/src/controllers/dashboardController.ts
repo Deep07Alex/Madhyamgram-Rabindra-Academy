@@ -1,9 +1,21 @@
+/**
+ * Dashboard Controller
+ * 
+ * Provides aggregated statistics and unified data summaries for different user roles
+ * (Admin, Teacher, Student) to power their respective dashboard views.
+ */
 import { Response } from 'express';
 import { db } from '../lib/db.js';
 import { AuthRequest } from '../middleware/auth.js';
 
 // REMOVED statsCache to ensure 100% real-time data sync
 
+/**
+ * Generates high-level statistics for the dashboard.
+ * - Admins get school-wide counts (Students, Teachers, Classes, projected Fees).
+ * - Teachers get their assigned class counts and pending submission stats.
+ * - Students get their personal attendance rate and academic performance overview.
+ */
 export const getDashboardStats = async (req: AuthRequest, res: Response) => {
     const role = req.user?.role;
     const userId = req.user?.id;
@@ -123,6 +135,10 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
     }
 };
 
+/**
+ * Retrieves a unified bundle of data (Profile, Stats, Notices, Assignments) 
+ * in a single request for Student and Teacher dashboards.
+ */
 export const getUnifiedDashboardData = async (req: AuthRequest, res: Response) => {
     const { id: userId, role } = req.user!;
 

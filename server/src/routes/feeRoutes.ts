@@ -1,3 +1,8 @@
+/**
+ * Fee Routes
+ * 
+ * Defines endpoints for managing student fees and tracking payments.
+ */
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { createFee, createFeesForClass, recordPayment, getFees } from '../controllers/feeController.js';

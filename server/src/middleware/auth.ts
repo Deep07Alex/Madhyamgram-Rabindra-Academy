@@ -1,3 +1,8 @@
+/**
+ * Authentication Middleware
+ * 
+ * Provides utilities for verifying JWT tokens and enforcing role-based access control (RBAC).
+ */
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
@@ -14,6 +19,11 @@ export interface AuthRequest extends Request {
     };
 }
 
+/**
+ * Mandatory Authentication Middleware
+ * Verifies the 'Authorization' bearer token. 
+ * If valid, populates req.user; otherwise, returns 401 Unauthorized.
+ */
 export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
     const token = req.headers.authorization?.split(' ')[1];
 
@@ -30,6 +40,11 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
     }
 };
 
+/**
+ * Optional Authentication Middleware
+ * Attempts to verify a token if present, but proceeds regardless.
+ * Useful for routes that have different behavior for guests vs. logged-in users (e.g., Notices).
+ */
 export const optionalAuthenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
     const token = req.headers.authorization?.split(' ')[1];
 
@@ -49,6 +64,10 @@ export const optionalAuthenticate = (req: AuthRequest, res: Response, next: Next
     }
 };
 
+/**
+ * Role-Based Authorization Factory
+ * Returns a middleware that ensures the authenticated user has one of the allowed roles.
+ */
 export const authorize = (roles: string[]) => {
     return (req: AuthRequest, res: Response, next: NextFunction) => {
         if (!req.user || !roles.includes(req.user.role)) {

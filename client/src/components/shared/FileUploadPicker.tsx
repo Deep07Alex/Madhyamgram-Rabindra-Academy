@@ -1,3 +1,15 @@
+/**
+ * Unified File Upload Picker
+ * 
+ * A reusable shared component that provides a consistent drag-and-drop or click-to-browse
+ * experience across the application.
+ * 
+ * Features:
+ * - Smart Icons: Automatically displays file-type specific icons (PDF, Word, Excel, etc.).
+ * - Visual Feedback: Changes border color and background during drag-over events.
+ * - Progress/Preview: Shows the selected file name, size, and category before upload.
+ * - Validation: Pre-configured to accept common academic assets (images, docs, archives).
+ */
 import { useState, useRef, type DragEvent } from 'react';
 import {
     Upload, X, FileText, Image, File, Sheet, Presentation

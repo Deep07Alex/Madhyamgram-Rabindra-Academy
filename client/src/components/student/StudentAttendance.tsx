@@ -1,3 +1,12 @@
+/**
+ * Student Attendance History Component
+ * 
+ * Allows students to track their personal attendance records and academic participation.
+ * Features:
+ * - Real-time statistics (Academic Days, Present, Absent, Attendance Rate).
+ * - Detailed history table with subject-wise marking.
+ * - Reactive updates via WebSocket when faculty/admin updates records.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import useServerEvents from '../../hooks/useServerEvents';

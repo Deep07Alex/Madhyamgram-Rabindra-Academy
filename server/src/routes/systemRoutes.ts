@@ -1,3 +1,9 @@
+/**
+ * System Management Routes
+ * 
+ * Handles global school configuration, such as the festival banner image.
+ * Uses image optimization (Sharp) to ensure fast loading times.
+ */
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
@@ -50,8 +56,11 @@ router.post('/festival-banner', authenticate, authorize(['ADMIN']), upload.singl
         const optimizedFilename = `opt-${req.file.filename.split('.')[0]}.webp`;
         const optimizedPath = path.join(req.file.destination, optimizedFilename);
         
+        // Use Sharp to optimize the banner:
+        // - Resize to standard banner dimensions (1200x800 Max)
+        // - Convert to WebP format for high compression/quality ratio
         await sharp(req.file.path)
-            .resize(1200, 800, { fit: 'inside', withoutEnlargement: true }) // Standard banner size
+            .resize(1200, 800, { fit: 'inside', withoutEnlargement: true })
             .webp({ quality: 85 })
             .toFile(optimizedPath);
             

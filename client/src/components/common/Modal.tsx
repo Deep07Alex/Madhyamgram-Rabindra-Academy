@@ -1,3 +1,12 @@
+/**
+ * Reusable Modal Component
+ * 
+ * Provides a consistent overlay for forms and confirmations.
+ * Features:
+ * - Keyboard accessibility (Close on Escape).
+ * - Background scroll locking when open.
+ * - Backdrop blurring and animated entry.
+ */
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 

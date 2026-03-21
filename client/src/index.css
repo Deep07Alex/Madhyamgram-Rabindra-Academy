@@ -6,6 +6,7 @@
   --primary-rich: #5d1717;
   --primary-bold: #b45309;
   --primary-glow: rgba(244, 211, 148, 0.4);
+  --text-accent-high: var(--primary-rich);
 
   /* Component Specific */
   --nav-bg: var(--primary);
@@ -81,6 +82,7 @@
   /* Tan navbar remains in dark mode */
   --nav-text: var(--primary-rich);
   /* Dark red text remains for contrast on tan */
+  --text-accent-high: var(--primary);
   --footer-bg: #1a1a1a;
   /* Darker footer for dark mode */
   --footer-text: var(--primary);

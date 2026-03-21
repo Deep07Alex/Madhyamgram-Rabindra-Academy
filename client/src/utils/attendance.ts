@@ -1,3 +1,13 @@
+/**
+ * Attendance Utilities
+ * 
+ * Logic to determine if the attendance window is currently open.
+ */
+
+/**
+ * Checks if the attendance portal should be accessible.
+ * If status is 'AUTO', it opens between 8:00 AM and 5:00 PM.
+ */
 export const isAttendanceOpen = (status: string) => {
     if (status === 'OPEN') return true;
     if (status === 'CLOSED') return false;

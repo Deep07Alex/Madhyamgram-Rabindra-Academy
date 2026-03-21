@@ -1,3 +1,12 @@
+/**
+ * Landing Page Management (CMS)
+ * 
+ * Allows administrators to update the public-facing content of the academy website.
+ * Features:
+ * - Festival Banner: Upload and deploy high-visibility institutional assets.
+ * - Live Preview: Visual feedback of the new asset before final deployment.
+ * - Global Sync: Changes are immediately visible to all visitors.
+ */
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
@@ -38,6 +47,10 @@ const ManageMainPage = () => {
         formData.append('banner', file);
 
         try {
+            /**
+             * Server-side: The 'banner' field is handled by multer on the backend,
+             * which saves the file to /uploads/system and updates the database config.
+             */
             const res = await api.post('/system/festival-banner', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });

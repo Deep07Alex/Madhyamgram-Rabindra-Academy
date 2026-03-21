@@ -1,3 +1,9 @@
+/**
+ * Attendance Controller
+ * 
+ * Manages attendance for both Students and Teachers.
+ * Supports marking attendance, retrieving history, and virtual session generation.
+ */
 import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import crypto from 'crypto';
@@ -7,6 +13,10 @@ import { emitEvent } from '../lib/socket.js';
 
 // --- Student Attendance ---
 
+/**
+ * Marks attendance for a specific student on a specific date.
+ * Logic: Checks if a record exists for the date, updates it if so, otherwise creates a new one.
+ */
 export const markStudentAttendance = async (req: AuthRequest, res: Response) => {
     const { date, status, studentId, classId, subject } = req.body;
     const userRole = req.user?.role;
@@ -64,6 +74,11 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
     }
 };
 
+/**
+ * Retrieves attendance records for students.
+ * Features "Virtual Presence": If a student has no record for a known school session date, 
+ * the system virtually assumes they were PRESENT unless an explicit record states otherwise.
+ */
 export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
     const { studentId, classId, startDate, endDate } = req.query;
     const targetStudentId = studentId || (req.user?.role === 'STUDENT' ? req.user.id : null);
@@ -161,6 +176,10 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
 
 // --- Teacher Attendance ---
 
+/**
+ * Marks attendance for a teacher.
+ * Tracks arrival time, departure time, and reasons for absence or early leave.
+ */
 export const markTeacherAttendance = async (req: AuthRequest, res: Response) => {
     const { date, status, reason, arrivalTime, departureTime, earlyLeaveReason, teacherId: bodyTeacherId } = req.body;
     const markerId = req.user?.id;
@@ -236,6 +255,9 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
 
 // --- Admin Update Attendance ---
 
+/**
+ * Admin utility to override/update a student's attendance status.
+ */
 export const updateStudentAttendance = async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const { status } = req.body;
@@ -277,6 +299,9 @@ export const updateStudentAttendance = async (req: AuthRequest, res: Response) =
     }
 };
 
+/**
+ * Admin utility to override/update a teacher's attendance status and reasons.
+ */
 export const updateTeacherAttendance = async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const { status, reason } = req.body;
@@ -318,6 +343,9 @@ export const updateTeacherAttendance = async (req: AuthRequest, res: Response) =
     }
 };
 
+/**
+ * Retrieves attendance history for teachers.
+ */
 export const getTeacherAttendance = async (req: Request, res: Response) => {
     const { teacherId, startDate, endDate } = req.query;
 

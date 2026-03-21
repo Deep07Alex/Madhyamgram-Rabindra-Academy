@@ -1,3 +1,13 @@
+/**
+ * Faculty & Staff Management Component (Admin)
+ * 
+ * Manages the academy's human resources (Teaching, Non-Teaching, and Admin).
+ * Key Features:
+ * - Dynamic ID prefixing (A- for Admin, T- for Teachers).
+ * - Role-based permissions (Teaching vs Non-Teaching).
+ * - Comprehensive profile management (Aadhar, Qualification, etc.).
+ * - Automatic password generation from Aadhar or ID.
+ */
 import { useState } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
@@ -67,6 +77,10 @@ const ManageTeachers = () => {
             const { password, plainPassword, id, ...updatePayload } = editData;
 
             // Auto-generate password on update as requested
+            /**
+             * Password Policy:
+             * Generates a password in the format: [Name]@ [Last 4 Digits of Aadhar or ID]
+             */
             const cleanName = (updatePayload.name || '').trim().toLowerCase().replace(/\s+/g, '');
             const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
             const aadhar = updatePayload.aadhar || '';

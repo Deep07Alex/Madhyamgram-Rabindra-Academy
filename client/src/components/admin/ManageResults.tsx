@@ -1,3 +1,12 @@
+/**
+ * Academic Performance Ledger (Results)
+ * 
+ * Provides an administrative interface to log and audit examination scores.
+ * Features:
+ * - Cycle Management: Track performance across First Term, Second Term, and Final Term.
+ * - Granular Records: Individual subject-wise mark entry with automatic grade calculation (on backend).
+ * - History Audit: Search and manage historical examination records.
+ */
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { MAIN_SUBJECTS } from '../../utils/constants';

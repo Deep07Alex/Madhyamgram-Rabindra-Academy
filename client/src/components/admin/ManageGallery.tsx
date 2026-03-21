@@ -1,3 +1,12 @@
+/**
+ * Academy Visual Gallery Management
+ * 
+ * Interface for curating and publishing the Academy's visual story to the public landing page.
+ * 
+ * Workflow:
+ * - Curate: Upload academic artifacts (images) with descriptive titles and context tags.
+ * - Archive: Audit and manage current live gallery assets.
+ */
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';

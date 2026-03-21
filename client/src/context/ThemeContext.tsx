@@ -1,3 +1,9 @@
+/**
+ * Theme Context
+ * 
+ * Manages the application's visual theme (Light/Dark).
+ * Persists user preference across sessions in LocalStorage.
+ */
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark';

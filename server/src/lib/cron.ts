@@ -1,7 +1,16 @@
+/**
+ * Cron Job Manager
+ * 
+ * Handles scheduled background tasks such as daily attendance resets
+ * and automatic cleanup of expired notices.
+ */
 import cron from 'node-cron';
 import { db } from './db.js';
 import crypto from 'crypto';
 
+/**
+ * Initializes all system-wide cron jobs.
+ */
 export const initCronJobs = () => {
     // Schedule a task to run every day at 6:00 AM
     // Seconds Minute Hour DayOfMonth Month DayOfWeek

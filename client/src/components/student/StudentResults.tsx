@@ -1,3 +1,12 @@
+/**
+ * Student Academic Results (Transcript)
+ * 
+ * A read-only profile-specific view of a student's examination performance.
+ * Features:
+ * - Semantic Grouping: Automatically categorizes results by examination cycle (Semester).
+ * - Performance Metrics: Displays individual subject marks versus the maximum possible score.
+ * - Authentication Guard: Filters the global results pool to ensure privacy for the logged-in user.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import useServerEvents from '../../hooks/useServerEvents';
@@ -36,6 +45,11 @@ const StudentResults = () => {
     // Live: refresh when teacher records a new result
     useServerEvents({ 'result:created': fetchResults });
 
+    /**
+     * Data Transformation:
+     * Groups the flat list of results into a semester-based dictionary for
+     * a cleaner, more organized UI layout.
+     */
     const groupedResults = results.reduce((acc: any, curr: any) => {
         if (!acc[curr.semester]) acc[curr.semester] = [];
         acc[curr.semester].push(curr);

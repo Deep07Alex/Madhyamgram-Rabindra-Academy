@@ -1,5 +1,17 @@
+/**
+ * Database Initialization and Migrations
+ * 
+ * Responsibilities:
+ * 1. Ensures all required tables and enums exist (DDL).
+ * 2. Runs idempotent migrations to update schema over time.
+ * 3. Initializes default system configurations.
+ * 4. Creates performance indexes for common queries.
+ */
 import { db } from './db.js';
 
+/**
+ * Core initialization function called on server startup.
+ */
 export const initDb = async () => {
     try {
         console.log('Initializing database tables...');

@@ -1,3 +1,9 @@
+/**
+ * Authentication Context
+ * 
+ * Manages the global authentication state, session storage, and inactivity monitoring.
+ * Note: Session restoration is disabled per user request; every refresh results in a logout.
+ */
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from './ToastContext';
 
@@ -28,6 +34,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { showToast } = useToast();
     const timeoutRef = useRef<any>(null);
 
+    // Inactivity Monitoring:
+    // Automatically logs out the user after 10 minutes of no interaction (mouse/keyboard).
     const logout = useCallback(() => {
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('user');
@@ -75,8 +83,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     useEffect(() => {
-        // PER USER REQUEST: DISABLE SESSION RESTORATION ON RELOAD
-        // Every refresh or reload will result in a fresh logout.
+        // PER USER REQUEST: SECURITY ENFORCEMENT
+        // Session restoration on page reload is explicitly disabled.
+        // Every refresh or hard reload will clear the session and force a re-login.
         logout(); 
         setLoading(false);
     }, [logout]);

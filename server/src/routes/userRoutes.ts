@@ -1,3 +1,9 @@
+/**
+ * User Management Routes
+ * 
+ * Central hub for managing Student, Teacher, and Class entities.
+ * Includes utilities for bulk imports and password resets.
+ */
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { getStudents, getTeachers, getClasses, createClass, deleteStudent, deleteTeacher, deleteClass, updateUserPassword, updateStudent, updateTeacher, assignTeacherToClass, removeTeacherFromClass, bulkStudentImport, deleteAllStudents } from '../controllers/userController.js';

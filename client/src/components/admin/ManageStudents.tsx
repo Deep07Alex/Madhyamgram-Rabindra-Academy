@@ -1,3 +1,13 @@
+/**
+ * Student Management Component (Admin)
+ * 
+ * Provides tools to enroll, edit, delete, and bulk-import students.
+ * Key Features:
+ * - Excel (.xlsx) bulk import for rapid enrollment.
+ * - Automatic password generation (Name@Last4DigitsOfID).
+ * - Class-based filtering and search.
+ * - Grade-specific fields (Banglar Sikkha ID for Grade 2+).
+ */
 import { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
@@ -136,6 +146,11 @@ const ManageStudents = () => {
         try {
             // Restore Name@1234 password generation
             const { password, plainPassword, id, ...updatePayload } = editData;
+            /**
+             * Password Policy:
+             * Generates a password in the format: [Name]@ [Last 4 Digits of Student ID]
+             * Example: Rahul@1042
+             */
             const cleanName = (updatePayload.name || '').trim().toLowerCase().replace(/\s+/g, '');
             const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
             const numericId = (updatePayload.studentId || '').replace(/\D/g, '');

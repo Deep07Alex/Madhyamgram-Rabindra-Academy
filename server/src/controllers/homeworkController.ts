@@ -1,3 +1,10 @@
+/**
+ * Homework Controller
+ * 
+ * Manages assignments and student submissions.
+ * Handles homework creation, deletion, submission by students, 
+ * and grading by teachers (conditional on deadlines).
+ */
 import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import crypto from 'crypto';
@@ -6,6 +13,10 @@ import { broadcast, sendToUser, sendToRole, sendToClass } from '../lib/sseManage
 
 // --- Homework Management ---
 
+/**
+ * Creates a new homework assignment.
+ * Automatically sets the due date to the end of the specified day (23:59:59).
+ */
 export const createHomework = async (req: AuthRequest, res: Response) => {
     try {
         const { title, description, dueDate, classId, subject, allowFileUpload } = req.body;
@@ -39,6 +50,9 @@ export const createHomework = async (req: AuthRequest, res: Response) => {
     }
 };
 
+/**
+ * Deletes a homework assignment and all its associated student submissions.
+ */
 export const deleteHomework = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
@@ -55,6 +69,10 @@ export const deleteHomework = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Retrieves homework assignments, filtered by class.
+ * If the user is a student, it also fetches their specific submission status for each assignment.
+ */
 export const getHomeworks = async (req: AuthRequest, res: Response) => {
     try {
         const { classId } = req.query;
@@ -108,6 +126,10 @@ export const getHomeworks = async (req: AuthRequest, res: Response) => {
 
 // --- Submissions Management ---
 
+/**
+ * Submits homework for a student. 
+ * Allows resubmission (updates the existing record) until the work is graded.
+ */
 export const submitHomework = async (req: AuthRequest, res: Response) => {
     try {
         const { homeworkId, content } = req.body;
@@ -171,6 +193,9 @@ export const submitHomework = async (req: AuthRequest, res: Response) => {
     }
 };
 
+/**
+ * Retrieves submissions for a specific homework or student.
+ */
 export const getSubmissions = async (req: Request, res: Response) => {
     try {
         // Support both /homework/:id/submissions (params.id) and /homework/submissions?homeworkId=...
@@ -206,6 +231,11 @@ export const getSubmissions = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Grades a student's submission and provides feedback.
+ * Enforcement: Grading is only allowed AFTER the submission deadline has passed 
+ * to ensure all students have an equal opportunity to submit.
+ */
 export const gradeSubmission = async (req: AuthRequest, res: Response) => {
     try {
         const id = req.params.id as string;

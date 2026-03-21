@@ -1,3 +1,8 @@
+/**
+ * Result Controller
+ * 
+ * Manages academic results/marks for students across different semesters and subjects.
+ */
 import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import crypto from 'crypto';
@@ -5,6 +10,9 @@ import { AuthRequest } from '../middleware/auth.js';
 import { broadcast, sendToRole, sendToUser } from '../lib/sseManager.js';
 import { emitEvent } from '../lib/socket.js';
 
+/**
+ * Records a new academic result for a student.
+ */
 export const createResult = async (req: Request, res: Response) => {
     try {
         const { semester, subject, marks, totalMarks, grade, studentId } = req.body;
@@ -25,6 +33,9 @@ export const createResult = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Retrieves academic results, optionally filtered by student and semester.
+ */
 export const getResults = async (req: AuthRequest, res: Response) => {
     try {
         const { studentId, semester } = req.query;

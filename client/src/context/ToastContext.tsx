@@ -1,3 +1,9 @@
+/**
+ * Toast Notification Context
+ * 
+ * Provides a global system for displaying ephemeral messages (success, error, info, etc.).
+ * Supports multi-toast queuing and automatic dismissal.
+ */
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { CheckCircle2, XCircle, AlertCircle, Info, X } from 'lucide-react';
 

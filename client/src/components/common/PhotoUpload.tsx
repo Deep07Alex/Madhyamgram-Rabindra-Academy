@@ -1,3 +1,12 @@
+/**
+ * Photo Upload Component
+ * 
+ * Handles client-side image selection, validation, and server-side upload.
+ * Validates:
+ * - File type (images only).
+ * - File size (5MB limit).
+ * Automatically updates view with the returned permanent URL.
+ */
 import React, { useState, useRef } from 'react';
 import { Camera, Upload, X, Loader2 } from 'lucide-react';
 import api from '../../services/api';

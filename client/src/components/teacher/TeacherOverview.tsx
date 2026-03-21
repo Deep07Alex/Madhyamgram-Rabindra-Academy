@@ -1,3 +1,13 @@
+/**
+ * Teacher Overview Component
+ * 
+ * The workspace summary for faculty members.
+ * Features:
+ * - Real-time daily attendance status tracking.
+ * - Privacy-focused Aadhar display (masked by default).
+ * - Comprehensive profile details including qualifications and designation.
+ * - Classroom and submission metrics.
+ */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -170,6 +180,7 @@ const TeacherOverview = ({
                                             : 'N/A'}
                                     </p>
                                     <div style={{ marginTop: '8px' }}>
+                                        {/* Badge Logic: Identifies if the faculty is Teaching, Non-Teaching, or Admin */}
                                         <span style={{
                                             padding: '2px 8px',
                                             borderRadius: '6px',

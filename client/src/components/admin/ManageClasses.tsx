@@ -1,3 +1,12 @@
+/**
+ * Grade & Class Management (Admin)
+ * 
+ * Provides an interface for administrators to define and manage academic classes.
+ * Features:
+ * - Dynamic Listing: Shows all classes with their respective grade levels.
+ * - Population Tracking: Displays total students currently enrolled in each class.
+ * - Resource Safety: Uses AbortController to prevent memory leaks during data fetching.
+ */
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import api from '../../services/api';
@@ -16,6 +25,11 @@ const ManageClasses = () => {
         }
     };
 
+    /**
+     * Data Lifecycle: 
+     * Uses AbortController to cancel any pending requests if the component unmounts
+     * before the API responds, ensuring stability.
+     */
     useEffect(() => {
         const controller = new AbortController();
         fetchData(controller.signal);

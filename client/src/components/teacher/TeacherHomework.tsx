@@ -1,3 +1,13 @@
+/**
+ * Teacher Homework/Assignment Manager
+ * 
+ * Allows faculty to deploy assignments and review student submissions.
+ * Features:
+ * - Assignment Deployment: Multi-field form with file attachments.
+ * - Submission Review: Detailed modal to grade work and provide academic feedback.
+ * - Privacy Guard: Grading is locked until the submission deadline passes.
+ * - Real-time sync: Updates the list when students submit new work.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
@@ -430,6 +440,7 @@ const TeacherHomework = () => {
                                                         }}>
                                                         <CheckCircle2 size={16} /> Finalize Grading
                                                     </button>
+                                                    {/* Grace Period Guard: Teachers can only finalize grades after the submission deadline */}
                                                     {!isPastDue && (
                                                         <p style={{ margin: '4px 0 0 0', fontSize: '0.65rem', color: 'var(--error)', fontWeight: '700' }}>
                                                             UNAVAILABLE UNTIL DEADLINE EXPIRES

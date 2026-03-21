@@ -1,3 +1,9 @@
+/**
+ * Notice Routes
+ * 
+ * Defines endpoints for school-wide notices and announcements.
+ * Supports public access for landing page visibility.
+ */
 import express from 'express';
 import { createNotice, getNotices, deleteNotice } from '../controllers/noticeController.js';
 import { authenticate, authorize, optionalAuthenticate } from '../middleware/auth.js';

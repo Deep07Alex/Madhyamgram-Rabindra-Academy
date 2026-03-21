@@ -1,3 +1,13 @@
+/**
+ * Student Dashboard
+ * 
+ * The primary portal for students to track their academic journey.
+ * Features:
+ * - Unified data fetching for profile, stats, and assignments.
+ * - Real-time notifications for new homework and results.
+ * - Attendance and fee tracking.
+ * - Automatic background syncing.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
@@ -45,6 +55,11 @@ const StudentDashboard = () => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [pendingAssignments, setPendingAssignments] = useState<any[]>([]);
 
+    /**
+     * Unified Refresh:
+     * Fetches student profile, academic stats, notices, and pending assignments in one call.
+     * Updates global state and local states simultaneously.
+     */
     const refreshData = useCallback(async (silent = false) => {
         if (!silent) setIsRefreshing(true);
         try {
@@ -125,6 +140,8 @@ const StudentDashboard = () => {
 
     const { showToast } = useToast();
 
+    // Real-time Event Subscriptions:
+    // Listens for academic updates (homework, results, notices) and triggers silent refreshes.
     useServerEvents({
         'connected': () => { if (import.meta.env.DEV) console.log('[SSE] System confirmed: Live connection established'); },
         'attendance:updated': () => refreshData(true),

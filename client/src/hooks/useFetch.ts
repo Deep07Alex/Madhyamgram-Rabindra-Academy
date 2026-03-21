@@ -1,3 +1,12 @@
+/**
+ * Custom Fetch Hook
+ * 
+ * Provides a standardized way to fetch data with built-in:
+ * - Automatic retries with exponential backoff.
+ * - Request cancellation (AbortController) to prevent race conditions.
+ * - Global error handling via Toast notifications.
+ * - Loading and error states.
+ */
 import { useState, useCallback, useEffect, useRef } from 'react';
 import axios from 'axios';
 import api from '../services/api';
@@ -31,6 +40,8 @@ export const useFetch = <T>(url: string, options: any = DEFAULT_OPTIONS) => {
 
         setState(prev => ({ ...prev, loading: true, error: null }));
 
+        // Retry Logic:
+        // Automatically attempts to refetch up to 3 times if the connection fails.
         let attempts = 0;
         const maxAttempts = 3;
 

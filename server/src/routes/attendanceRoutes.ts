@@ -1,3 +1,9 @@
+/**
+ * Attendance Routes
+ * 
+ * Defines endpoints for tracking student and teacher presence.
+ * Access is strictly role-based (Admin/Teacher for marking, Student for viewing).
+ */
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import {

@@ -1,3 +1,9 @@
+/**
+ * Theme Toggle Component
+ * 
+ * A simple button to switch between Light and Dark modes.
+ * Utilizes the global ThemeContext for state persistence.
+ */
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 

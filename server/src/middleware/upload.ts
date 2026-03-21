@@ -1,3 +1,9 @@
+/**
+ * File Upload Middleware
+ * 
+ * Provides a standard Multer instance for handling multi-part form data (files).
+ * Automatically handles directory creation and unique filename generation.
+ */
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';

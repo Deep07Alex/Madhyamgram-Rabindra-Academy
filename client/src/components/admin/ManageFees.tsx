@@ -1,3 +1,13 @@
+/**
+ * Financial Management Center (Fees)
+ * 
+ * Centralized interface for issuing fee requirements and recording manual collections.
+ * 
+ * Operations:
+ * - Generation: Issue fees to an entire class (batch) or a specific student.
+ * - Collection: Manually record cash/bank payments with internal verification notes.
+ * - Ledger: Comprehensive table tracking payment statuses (PENDING/PAID).
+ */
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
@@ -35,6 +45,10 @@ const ManageFees = () => {
         e.preventDefault();
         try {
             if (newFee.classId) {
+                /**
+                 * Batch Mode: Backend iterates through all students in the class
+                 * and creates individual fee records for each.
+                 */
                 await api.post('/fees/batch', {
                     amount: newFee.amount, dueDate: newFee.dueDate, type: newFee.type, classId: newFee.classId
                 });

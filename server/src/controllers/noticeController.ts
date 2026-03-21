@@ -1,8 +1,18 @@
+/**
+ * Notice Controller
+ * 
+ * Manages school-wide and targeted notices.
+ * Handles role-based visibility, expiration dates, and real-time announcements.
+ */
 import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import { v4 as uuidv4 } from 'uuid';
 import { broadcast, sendToRole } from '../lib/sseManager.js';
 
+/**
+ * Creates a new notice.
+ * Can be public or internal, and optionally targeted at specific audiences or classes.
+ */
 export const createNotice = async (req: Request, res: Response) => {
     try {
         const { title, content, type, targetAudience, targetClassId, targetStudentId, expiresAt } = req.body;
@@ -34,6 +44,15 @@ export const createNotice = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Retrieves notices based on the current user's role and permissions.
+ * 
+ * Visibility Logic:
+ * - Public: Visible to everyone.
+ * - Admin: Visible to all administrators.
+ * - Internal (Teacher): Visible only to faculty if not targeted specifically.
+ * - Internal (Student): Visible to students if targeted at their class or their specific ID.
+ */
 export const getNotices = async (req: Request, res: Response) => {
     try {
         const user = (req as any).user;
@@ -106,6 +125,9 @@ export const getNotices = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Deletes a notice.
+ */
 export const deleteNotice = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;

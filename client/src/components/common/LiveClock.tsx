@@ -1,3 +1,12 @@
+/**
+ * Live Digital Clock Component
+ * 
+ * Displays the current time in a 12-hour format with a ticking seconds indicator.
+ * Features:
+ * - Real-time updates via 1-second interval.
+ * - Pulse animation synced with the clock.
+ * - Responsive design for dashboard headers.
+ */
 import { useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
 
@@ -12,6 +21,8 @@ const LiveClock = () => {
         return () => clearInterval(timer);
     }, []);
 
+    // Formatting Logic:
+    // Converts 24-hour Date object to human-readable 12-hour AM/PM format.
     const hours = time.getHours();
     const minutes = time.getMinutes();
     const seconds = time.getSeconds();

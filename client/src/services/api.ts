@@ -1,3 +1,12 @@
+/**
+ * Central API Service (Axios Instance)
+ * 
+ * Provides a pre-configured Axios client for all backend communication.
+ * Features:
+ * - Automatic JWT token attachment via request interceptors.
+ * - Global 401 (Unauthorized) handling via response interceptors.
+ * - Base URL management from environment variables.
+ */
 import axios from 'axios';
 import type { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
@@ -17,7 +26,9 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     return Promise.reject(error);
 });
 
-// Add a response interceptor to handle 401 errors
+// Response Interceptor:
+// Checks every outgoing response. If a 401 Unauthorized error is detected,
+// it means the session has expired; thus, we clear the token and redirect to login.
 api.interceptors.response.use((response: AxiosResponse) => {
     return response;
 }, (error: any) => {

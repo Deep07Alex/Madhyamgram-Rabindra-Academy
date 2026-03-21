@@ -1,9 +1,19 @@
+/**
+ * Main Landing Page
+ * 
+ * The entry point for the public-facing website.
+ * Features:
+ * - Dynamic school notices
+ * - Festival banner management
+ * - Admission information
+ * - Responsive navigation
+ */
 import { useState, useEffect } from "react";
 import "./MainPage.css";
 import api from "../services/api";
 import ThemeToggle from "../components/common/ThemeToggle";
 import { useAuth } from '../context/AuthContext';
-// Adjusting path from App.tsx (../photos) to pages/MainPage.tsx (../../photos)
+
 type GalleryItem = { src: string; caption: string };
 
 function MainPage() {
@@ -82,6 +92,15 @@ function MainPage() {
 
 // --- components ---
 
+/**
+ * Navbar Component
+ * 
+ * Standardizes primary navigation across the landing page.
+ * Logic:
+ * - Responsive: Toggles a slide-out menu on mobile devices.
+ * - Dynamic Login: Replaces the 'Login' CTA with a 'Dashboard' link if a session is active.
+ * - Role-Aware: Correctly routes the user to Admin, Teacher, or Student portals.
+ */
 function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const { user } = useAuth();
 
@@ -116,7 +135,7 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
       <div className={"landing-nav-menu" + (open ? " open" : "")}>
         <a href="#">Home</a>
         <a href="#admission">Admission</a>
-        <a href="#notice">Notice</a>
+        <a href="#notice">Upcoming Festivals</a>
         <a href="#gallery">Gallery</a>
         <a href="#contact">Contact</a>
         <div style={{ marginLeft: '12px', display: 'flex', alignItems: 'center' }}>
@@ -132,6 +151,10 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   );
 }
 
+/**
+ * Hero Section
+ * Displays the school name, tagline, and main banner image.
+ */
 function Hero() {
   return (
     <section className="hero">
@@ -171,6 +194,13 @@ function AdmissionSection() {
 }
 
 
+/**
+ * Notice Board / Festival Section
+ * 
+ * The main engagement area for public announcements.
+ * - Displays a dynamic banner managed by administrators in the 'ManageMainPage' CMS.
+ * - Provides a fallback institution asset ('/dol.png') if no custom banner is set.
+ */
 function NoticeBoard({ bannerUrl }: { bannerUrl: string; notices: string[] }) {
   const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const fullUrl = bannerUrl.startsWith('/') ? `${baseUrl}${bannerUrl}` : bannerUrl;

@@ -1,3 +1,9 @@
+/**
+ * SSE (Server-Sent Events) Manager
+ * 
+ * Manages real-time event broadcasting to clients.
+ * Note: This system works alongside WebSockets for dual-stack real-time compatibility.
+ */
 import { Response } from 'express';
 import { emitEvent } from './socket.js';
 
@@ -10,6 +16,9 @@ interface SSEClient {
 
 let clients: SSEClient[] = [];
 
+/**
+ * Registers a new SSE client connection.
+ */
 export const addClient = (res: Response, userId?: string, role?: string) => {
     const id = Date.now().toString();
     const newClient: SSEClient = { id, res, userId, role };
@@ -26,6 +35,9 @@ export const addClient = (res: Response, userId?: string, role?: string) => {
     return id;
 };
 
+/**
+ * Removes a disconnected SSE client.
+ */
 export const removeClient = (id: string) => {
     clients = clients.filter(c => c.id !== id);
 };
@@ -50,6 +62,9 @@ export type SSEEventType =
 /**
  * Broadcast to all connected clients
  */
+/**
+ * Broadcasts an event to EVERY connected client (Sockets + SSE).
+ */
 export const broadcast = (event: SSEEventType, data: Record<string, unknown> = {}) => {
     // Sockets (Primary)
     emitEvent(event, data);
@@ -68,6 +83,9 @@ export const broadcast = (event: SSEEventType, data: Record<string, unknown> = {
 /**
  * Send event to a specific user
  */
+/**
+ * Sends an event to a specific User ID.
+ */
 export const sendToUser = (userId: string, event: SSEEventType, data: Record<string, unknown> = {}) => {
     // Sockets (Primary)
     emitEvent(event, data, `user:${userId}`);
@@ -85,6 +103,9 @@ export const sendToUser = (userId: string, event: SSEEventType, data: Record<str
 
 /**
  * Send event to a specific role
+ */
+/**
+ * Sends an event to all users with a specific Role.
  */
 export const sendToRole = (role: string, event: SSEEventType, data: Record<string, unknown> = {}) => {
     // Sockets (Primary)

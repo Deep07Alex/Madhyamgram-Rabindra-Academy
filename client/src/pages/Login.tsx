@@ -1,3 +1,12 @@
+/**
+ * Unified Login Page
+ * 
+ * A single entry point for Students, Teachers, and Administrators.
+ * Features:
+ * - Role-switching tabs
+ * - Dynamic ID labeling and iconography
+ * - Automatic pre-login redirection
+ */
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -15,16 +24,8 @@ const Login = () => {
 
     const [activeRole, setActiveRole] = useState<'STUDENT' | 'TEACHER' | 'ADMIN'>('STUDENT');
 
-    // Auto-redirect if already logged in
-    useState(() => {
-        if (user) {
-            if (user.role === 'ADMIN') navigate('/admin');
-            else if (user.role === 'TEACHER') navigate('/teacher');
-            else navigate('/student');
-        }
-    });
-
-    // Also use useEffect for dynamic changes
+    // Auto-redirect Logic:
+    // If a session already exists, push the user straight to their portal.
     useEffect(() => {
         if (user) {
             if (user.role === 'ADMIN') navigate('/admin');
@@ -39,6 +40,10 @@ const Login = () => {
         ADMIN: { label: 'Admin Identifier', placeholder: 'e.g. A-7228273901 or Username', icon: <Lock className="input-icon" size={20} /> }
     };
 
+    /**
+     * Handles the login form submission.
+     * Authenticates via AuthService and updates the global AuthContext.
+     */
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');

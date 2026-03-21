@@ -1,3 +1,9 @@
+/**
+ * Profile Photo Upload Routes
+ * 
+ * Manages photo uploads for students and teachers.
+ * Automatically optimizes and standardizes images (400x400 WebP) upon upload.
+ */
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';

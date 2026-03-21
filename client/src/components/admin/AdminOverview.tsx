@@ -1,3 +1,11 @@
+/**
+ * Admin Overview Component
+ * 
+ * Displays high-level statistics for the academy management.
+ * Features:
+ * - Dynamic color-coding for different metrics.
+ * - Currency formatting with shorthand for large amounts (e.g., ₹1.2L).
+ */
 interface AdminOverviewProps {
     stats: {
         students: number;

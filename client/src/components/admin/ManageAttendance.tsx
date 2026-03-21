@@ -1,3 +1,13 @@
+/**
+ * Attendance Management System (Admin)
+ * 
+ * The central hub for tracking and overriding attendance for all academy members.
+ * Features:
+ * - Daily Logging: Real-time status toggling for individual dates.
+ * - Monthly Overview: Aggregated summaries of presence/absence.
+ * - System Override: Global control to Force Open/Close the attendance window.
+ * - Unified View: Shows everyone in the database, matching records where they exist.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import api from '../../services/api';
@@ -239,6 +249,13 @@ const ManageAttendance = () => {
         fetchConfig();
     }, [fetchConfig]);
 
+    /**
+     * System Override Logic:
+     * Cycles through 3 states:
+     * 1. AUTO: Respects the default timing (e.g., 8 AM - 5 PM).
+     * 2. OPEN: Forces the portal to be accessible regardless of time.
+     * 3. CLOSED: Locks the portal completely.
+     */
     const handleToggleOverride = async () => {
         setTogglingOverride(true);
         try {

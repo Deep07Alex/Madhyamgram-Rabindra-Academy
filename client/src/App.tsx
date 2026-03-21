@@ -1,3 +1,13 @@
+/**
+ * Application Entry Point (App.tsx)
+ * 
+ * The root component of the Madhyamgram Rabindra Academy web application.
+ * Responsibilities:
+ * - Routing: Defines public paths, dashboard routes, and role-based access control.
+ * - Context Orchestration: Wraps the app in Auth, Theme, and Toast providers.
+ * - Performance: Implements lazy loading and background preloading for dashboards.
+ * - Global Redirects: Ensures unauthenticated users are safely returned to the landing page.
+ */
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastProvider } from './context/ToastContext';
@@ -35,19 +45,25 @@ const LoadingFallback = () => (
     </div>
 );
 
+/**
+ * Access Control Guard:
+ * Protects dashboard routes by checking for a valid session and matching user roles.
+ * Redirects to the landing page ('/') if validation fails — meeting the security
+ * requirement to avoid exposing internal paths to guests.
+ */
 const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: string[] }) => {
     const { user, token, loading } = useAuth();
 
     if (loading) return <LoadingFallback />;
 
-    // Redirect to login if NO session exists
+    // Redirect to login (or home) if NO session exists
     if (!token || !user) {
-        return <Navigate to="/login" replace />;
+        return <Navigate to="/" replace />;
     }
 
     // Redirect to login (or home) if role is WRONG
     if (!allowedRoles.includes(user.role)) {
-        return <Navigate to="/login" replace />;
+        return <Navigate to="/" replace />;
     }
 
     return <>{children}</>;

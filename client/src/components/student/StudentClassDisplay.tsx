@@ -1,3 +1,9 @@
+/**
+ * Dynamic Class Name Display
+ * 
+ * A utility component that resolves a Class ID into its human-readable name.
+ * Benefit: Reduces database load by relying on the global class list if already fetched.
+ */
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 

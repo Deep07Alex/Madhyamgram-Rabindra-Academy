@@ -147,6 +147,9 @@ const TeacherDashboard = () => {
         setUnreadCount(0);
     };
 
+    /**
+     * Records the teacher's check-in status (Present/Absent) for the current day.
+     */
     const handleCheckIn = async (data: { status: string, reason?: string }) => {
         setIsSubmittingAttendance(true);
         try {
@@ -367,6 +370,10 @@ const TeacherDashboard = () => {
     );
 };
 
+/**
+ * Clock Out Modal Component
+ * Prompted when a teacher ends their day.
+ */
 const ClockOutModal = ({ onClockOut, onCancel, isSubmitting }: { onClockOut: (reason?: string) => void, onCancel: () => void, isSubmitting: boolean }) => {
     const [reason, setReason] = useState('');
 
@@ -428,6 +435,10 @@ const ClockOutModal = ({ onClockOut, onCancel, isSubmitting }: { onClockOut: (re
     );
 };
 
+/**
+ * Daily Check-In Modal Component
+ * Mandatory popup shown to teachers upon first visit of the day.
+ */
 const CheckInModal = ({ onCheckIn, isSubmitting }: { onCheckIn: (data: any) => void, isSubmitting: boolean }) => {
     const [status, setStatus] = useState('PRESENT');
     const [reason, setReason] = useState('');

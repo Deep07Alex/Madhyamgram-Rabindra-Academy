@@ -1,8 +1,16 @@
+/**
+ * WebSocket (Socket.io) Manager
+ * 
+ * Initialized with the HTTP server to provide low-latency real-time communication.
+ */
 import { Server } from 'socket.io';
 import { Server as HttpServer } from 'http';
 
 let io: Server;
 
+/**
+ * Bootstraps the Socket.io server.
+ */
 export const initSocket = (server: HttpServer) => {
     io = new Server(server, {
         cors: {
@@ -27,6 +35,9 @@ export const initSocket = (server: HttpServer) => {
     return io;
 };
 
+/**
+ * Synchronous accessor for the IO instance.
+ */
 export const getIO = () => {
     if (!io) {
         throw new Error('Socket.io not initialized!');
@@ -34,6 +45,9 @@ export const getIO = () => {
     return io;
 };
 
+/**
+ * Emits an event to a specific room or to everyone.
+ */
 export const emitEvent = (event: string, data: any, room?: string) => {
     if (io) {
         if (room) {

@@ -1,3 +1,9 @@
+/**
+ * Fee Controller
+ * 
+ * Manages school fees, including individual fee creation, 
+ * bulk creation for entire classes, and payment recording.
+ */
 import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import crypto from 'crypto';
@@ -5,6 +11,9 @@ import { AuthRequest } from '../middleware/auth.js';
 import { broadcast, sendToUser, sendToRole } from '../lib/sseManager.js';
 import { emitEvent } from '../lib/socket.js';
 
+/**
+ * Creates a new fee record for a single student.
+ */
 export const createFee = async (req: Request, res: Response) => {
     try {
         const { amount, dueDate, type, studentId } = req.body;
@@ -25,6 +34,9 @@ export const createFee = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Creates identical fee records for every student in a specific class.
+ */
 export const createFeesForClass = async (req: Request, res: Response) => {
     try {
         const { amount, dueDate, type, classId } = req.body;
@@ -51,6 +63,10 @@ export const createFeesForClass = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Records a payment against an existing fee.
+ * Updates the fee status and logs the payment details.
+ */
 export const recordPayment = async (req: Request, res: Response) => {
     try {
         const id = req.params.id as string;
@@ -74,6 +90,10 @@ export const recordPayment = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Retrieves fee records, filtered by student, class, or status.
+ * Students can only view their own fees.
+ */
 export const getFees = async (req: AuthRequest, res: Response) => {
     try {
         const { studentId, classId, status } = req.query;

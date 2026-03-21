@@ -1,3 +1,12 @@
+/**
+ * Server Events Hook
+ * 
+ * Manages WebSocket (Socket.io) subscriptions for real-time updates.
+ * Features:
+ * - Event debouncing to prevent UI flicker during rapid updates.
+ * - Automatic room management based on user role and class.
+ * - Type-safe event handling.
+ */
 import { useEffect, useRef } from 'react';
 import { socket } from '../services/socket';
 import { useAuth } from '../context/AuthContext';
@@ -37,6 +46,8 @@ const useServerEvents = (handlers: EventHandlers) => {
         if (!user) return;
 
         // Debounced event wrapper
+        // Debounced event wrapper:
+        // Prevents processing the same event multiple times within a 200ms window.
         const handleEvent = (type: SSEEventType, data: any) => {
             const now = Date.now();
             const lastTime = lastEventsRef.current[type] || 0;
@@ -55,6 +66,8 @@ const useServerEvents = (handlers: EventHandlers) => {
         });
 
         // Join relevant rooms for targeted updates
+        // Targeted Subscriptions:
+        // Join specific rooms to receive private updates (e.g., individual results or class homework).
         socket.emit('join_room', `user:${user.id}`);
         socket.emit('join_room', `role:${user.role}`);
         if (user.classId) {
