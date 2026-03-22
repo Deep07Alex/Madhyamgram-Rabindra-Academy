@@ -1,19 +1,28 @@
--- Madhyamgram Rabindra Academy - Consolidated Production Database Setup Script
--- This script is idempotent and can be run multiple times without errors.
+-- PostgreSQL Production Setup Script
+-- Madhyamgram Rabindra Academy
 
--- 1. Create ENUM Types
+-- 1. Create Database and User (Run these separately if needed)
+-- CREATE DATABASE "Madhyamgram-Rabindra-Academy";
+-- CREATE USER aritrada420 WITH PASSWORD 'Aritradutta@2005';
+-- GRANT ALL PRIVILEGES ON DATABASE "Madhyamgram-Rabindra-Academy" TO aritrada420;
+
+-- Connect to the database before running the rest of the script
+-- \c "Madhyamgram-Rabindra-Academy"
+
+-- 2. Enums
 DO $$ BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'AttendanceStatus') THEN
-        CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'SubmissionStatus') THEN
-        CREATE TYPE "SubmissionStatus" AS ENUM ('PENDING', 'SUBMITTED', 'GRADED');
-    END IF;
+    CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
--- 2. Create Tables
+DO $$ BEGIN
+    CREATE TYPE "SubmissionStatus" AS ENUM ('PENDING', 'SUBMITTED', 'GRADED');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- 3. Tables
 
 -- Admin Table
 CREATE TABLE IF NOT EXISTS "Admin" (
@@ -27,6 +36,29 @@ CREATE TABLE IF NOT EXISTS "Admin" (
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Teacher Table
+CREATE TABLE IF NOT EXISTS "Teacher" (
+    "id" TEXT PRIMARY KEY,
+    "password" TEXT, -- Nullable for non-teaching staff
+    "name" TEXT NOT NULL,
+    "email" TEXT UNIQUE,
+    "teacherId" TEXT UNIQUE, -- Optional/Null for non-teaching staff
+    "phone" TEXT,
+    "aadhar" TEXT,
+    "photo" TEXT, -- URL to uploaded photo
+    "address" TEXT,
+    "dob" DATE,
+    "qualification" TEXT,
+    "extraQualification" TEXT,
+    "designation" TEXT,
+    "caste" TEXT,
+    "joiningDate" DATE,
+    "isTeaching" BOOLEAN DEFAULT TRUE,
+    "plainPassword" TEXT, -- Storing for admin visibility
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Class Table
 CREATE TABLE IF NOT EXISTS "Class" (
     "id" TEXT PRIMARY KEY,
@@ -34,37 +66,29 @@ CREATE TABLE IF NOT EXISTS "Class" (
     "grade" INTEGER NOT NULL
 );
 
--- Teacher Table (Includes Non-Teaching Staff fields)
-CREATE TABLE IF NOT EXISTS "Teacher" (
-    "id" TEXT PRIMARY KEY,
-    "teacherId" TEXT UNIQUE,
-    "password" TEXT,
-    "name" TEXT NOT NULL,
-    "email" TEXT UNIQUE,
-    "phone" TEXT,
-    "aadhar" TEXT,
-    "designation" TEXT,
-    "joiningDate" DATE,
-    "isTeaching" BOOLEAN DEFAULT TRUE,
-    "plainPassword" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+-- Implicit M:N join table for Classes and Teachers
+CREATE TABLE IF NOT EXISTS "_ClassToTeacher" (
+    "A" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    "B" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
+CREATE UNIQUE INDEX IF NOT EXISTS "_ClassToTeacher_AB_unique" ON "_ClassToTeacher"("A", "B");
+CREATE INDEX IF NOT EXISTS "_ClassToTeacher_B_index" ON "_ClassToTeacher"("B");
 
 -- Student Table
 CREATE TABLE IF NOT EXISTS "Student" (
     "id" TEXT PRIMARY KEY,
     "studentId" TEXT UNIQUE NOT NULL,
     "password" TEXT NOT NULL,
-    "plainPassword" TEXT,
     "name" TEXT NOT NULL,
     "email" TEXT UNIQUE,
     "rollNumber" TEXT NOT NULL,
     "banglarSikkhaId" TEXT,
     "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    "photo" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE UNIQUE INDEX IF NOT EXISTS "Student_banglarSikkhaId_unique" ON "Student"("banglarSikkhaId") WHERE ("banglarSikkhaId" IS NOT NULL);
 
 -- Attendance Table
 CREATE TABLE IF NOT EXISTS "Attendance" (
@@ -76,16 +100,20 @@ CREATE TABLE IF NOT EXISTS "Attendance" (
     "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     "subject" TEXT
 );
+CREATE UNIQUE INDEX IF NOT EXISTS "Attendance_student_date_unique" ON "Attendance"("studentId", "date");
 
 -- TeacherAttendance Table
 CREATE TABLE IF NOT EXISTS "TeacherAttendance" (
     "id" TEXT PRIMARY KEY,
     "date" DATE NOT NULL DEFAULT CURRENT_DATE,
     "status" "AttendanceStatus" NOT NULL,
+    "arrivalTime" TIME,
+    "departureTime" TIME,
     "reason" TEXT,
+    "earlyLeaveReason" TEXT,
     "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
-
+CREATE UNIQUE INDEX IF NOT EXISTS "TeacherAttendance_teacher_date_unique" ON "TeacherAttendance"("teacherId", "date");
 
 -- Homework Table
 CREATE TABLE IF NOT EXISTS "Homework" (
@@ -95,7 +123,6 @@ CREATE TABLE IF NOT EXISTS "Homework" (
     "subject" TEXT,
     "fileUrl" TEXT,
     "dueDate" TIMESTAMP(3) NOT NULL,
-    "allowFileUpload" BOOLEAN NOT NULL DEFAULT FALSE,
     "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -106,6 +133,7 @@ CREATE TABLE IF NOT EXISTS "Submission" (
     "id" TEXT PRIMARY KEY,
     "content" TEXT,
     "fileUrl" TEXT,
+    "feedback" TEXT,
     "status" "SubmissionStatus" NOT NULL DEFAULT 'PENDING',
     "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     "homeworkId" TEXT NOT NULL REFERENCES "Homework"("id") ON DELETE CASCADE ON UPDATE CASCADE,
@@ -119,9 +147,11 @@ CREATE TABLE IF NOT EXISTS "Result" (
     "subject" TEXT NOT NULL,
     "marks" DOUBLE PRECISION NOT NULL,
     "totalMarks" DOUBLE PRECISION NOT NULL,
+    "academicYear" INTEGER NOT NULL DEFAULT 2025,
     "grade" TEXT,
     "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "result_unique_entry" UNIQUE ("studentId", "subject", "semester", "academicYear")
 );
 
 -- Gallery Table
@@ -146,40 +176,41 @@ CREATE TABLE IF NOT EXISTS "Notice" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- _ClassToTeacher Relation Table
-CREATE TABLE IF NOT EXISTS "_ClassToTeacher" (
-    "A" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    "B" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE
+-- SystemConfig Table
+CREATE TABLE IF NOT EXISTS "SystemConfig" (
+    "key" TEXT PRIMARY KEY,
+    "value" TEXT NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Create Indexes
-CREATE UNIQUE INDEX IF NOT EXISTS "_ClassToTeacher_AB_unique" ON "_ClassToTeacher"("A", "B");
-CREATE INDEX IF NOT EXISTS "_ClassToTeacher_B_index" ON "_ClassToTeacher"("B");
-CREATE UNIQUE INDEX IF NOT EXISTS "Attendance_student_date_unique" ON "Attendance"("studentId", "date");
-CREATE UNIQUE INDEX IF NOT EXISTS "TeacherAttendance_teacher_date_unique" ON "TeacherAttendance"("teacherId", "date");
+-- 4. Initial System Configurations
+INSERT INTO "SystemConfig" ("key", "value") VALUES ('attendance_override', 'AUTO')
+ON CONFLICT ("key") DO NOTHING;
 
--- Performance Indexes for Production
+-- 5. Performance Indexes
 CREATE INDEX IF NOT EXISTS "idx_student_class" ON "Student"("classId");
+CREATE INDEX IF NOT EXISTS "idx_student_rollNumber" ON "Student"("rollNumber");
+CREATE INDEX IF NOT EXISTS "idx_student_name" ON "Student"("name");
 CREATE INDEX IF NOT EXISTS "idx_attendance_date" ON "Attendance"("date");
-CREATE INDEX IF NOT EXISTS "idx_homework_class" ON "Homework"("classId");
-CREATE INDEX IF NOT EXISTS "idx_notice_expires" ON "Notice"("expiresAt");
+CREATE INDEX IF NOT EXISTS "idx_attendance_class" ON "Attendance"("classId");
+CREATE INDEX IF NOT EXISTS "idx_teacher_phone" ON "Teacher"("phone");
+CREATE INDEX IF NOT EXISTS "idx_teacher_aadhar" ON "Teacher"("aadhar");
+CREATE INDEX IF NOT EXISTS "idx_teacher_name" ON "Teacher"("name");
 CREATE INDEX IF NOT EXISTS "idx_result_student" ON "Result"("studentId");
+CREATE INDEX IF NOT EXISTS "idx_homework_class" ON "Homework"("classId");
+CREATE INDEX IF NOT EXISTS "idx_homework_teacher" ON "Homework"("teacherId");
+CREATE INDEX IF NOT EXISTS "idx_submission_status" ON "Submission"("status");
+CREATE INDEX IF NOT EXISTS "idx_submission_homework" ON "Submission"("homeworkId");
+CREATE INDEX IF NOT EXISTS "idx_submission_student" ON "Submission"("studentId");
+CREATE INDEX IF NOT EXISTS "idx_notice_createdAt" ON "Notice"("createdAt");
+CREATE INDEX IF NOT EXISTS "idx_notice_audience" ON "Notice"("targetAudience");
+CREATE INDEX IF NOT EXISTS "idx_notice_type" ON "Notice"("type");
 
--- 4. Initial Seed Data
+-- 6. Initial Admin User (Default Password: adminpassword)
+-- NOTE: In production, the first admin is typically created via an initial setup script or manual registration.
+-- For convenience, uncomment below to create a direct admin entry with a simple ID.
+-- INSERT INTO "Admin" ("id", "adminId", "username", "password", "name", "email") 
+-- VALUES ('setup-admin-uuid', 'ADM-DEFAULT', 'admin', '$2b$10$YourHashedPasswordHere', 'System Administrator', 'admin@rabindraacademy.com')
+-- ON CONFLICT DO NOTHING;
 
--- Admin
-INSERT INTO "Admin" (id, "adminId", username, password, name, email, "createdAt", "updatedAt") 
-VALUES ('28bf7bb7-9fe1-45a5-9352-eec9bdf00d24', '8100474669', 'aritrada420', '$2b$10$Z7qqcHuHmteO3ZRQ3rtrg.rCfkVbNRs1PK5KqxAg3bdtuETa8IwhC', 'Aritra Dutta', 'aritradatt39@gmail.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-ON CONFLICT (id) DO NOTHING;
-
--- Classes
-INSERT INTO "Class" (id, name, grade) VALUES 
-('class-nursery', 'Nursery', 0),
-('class-kg1', 'KG-I', 1),
-('class-kg2-a', 'KG-II A', 2),
-('class-kg2-b', 'KG-II B', 3),
-('class-1', 'STD-I', 4),
-('class-2', 'STD-II', 5),
-('class-3', 'STD-III', 6),
-('class-4', 'STD-IV', 7)
-ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, grade = EXCLUDED.grade;
+-- End of Setup Script
