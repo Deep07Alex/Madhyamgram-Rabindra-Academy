@@ -160,7 +160,7 @@ const TeacherDashboard = () => {
                 status: data.status,
                 arrivalTime: data.status === 'PRESENT' ? timeStr : null,
                 reason: data.status === 'ABSENT' ? data.reason : null,
-                date: new Date().toISOString().split('T')[0]
+                date: new Date().toLocaleDateString('en-CA')
             });
             await refreshData(true);
             setShowCheckInModal(false);
@@ -180,7 +180,7 @@ const TeacherDashboard = () => {
             await api.post('/attendance/teacher/mark', {
                 departureTime: timeStr,
                 earlyLeaveReason,
-                date: new Date().toISOString().split('T')[0]
+                date: new Date().toLocaleDateString('en-CA')
             });
             await refreshData(true);
             setShowClockOutModal(false);

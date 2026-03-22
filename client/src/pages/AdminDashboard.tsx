@@ -186,7 +186,7 @@ const AdminDashboard = () => {
 
                 <div className="page-view">
                     <Routes>
-                        <Route path="dashboard" element={<AdminOverview stats={stats} />} />
+                        <Route path="dashboard" element={<AdminOverview user={user} stats={stats} />} />
                         <Route path="students" element={<ManageStudents />} />
                         <Route path="faculty" element={<ManageTeachers />} />
                         <Route path="classes" element={<ManageClasses />} />

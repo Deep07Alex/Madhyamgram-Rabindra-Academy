@@ -32,7 +32,7 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
     }
 
     try {
-        const attendanceDateStr = new Date(date).toISOString().split('T')[0];
+        const attendanceDateStr = new Date(date).toLocaleDateString('en-CA');
 
         // Ensure we only have one record per student per calendar date
         const existingCheck = await db.query(
@@ -95,7 +95,7 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
             ) as session_union
             ORDER BY session_date DESC
         `);
-        const sessionDates = allSessionsRes.rows.map(r => r.session_date.toISOString().split('T')[0]);
+        const sessionDates = allSessionsRes.rows.map(r => new Date(r.session_date).toLocaleDateString('en-CA'));
         const totalSessions = sessionDates.length;
 
         // 2. Get explicit records for this student
@@ -121,7 +121,7 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
         }
         if (startDate && endDate) {
             query += ` AND a.date >= $${paramCount++} AND a.date <= $${paramCount++}`;
-            params.push(new Date(startDate as string).toISOString().split('T')[0], new Date(endDate as string).toISOString().split('T')[0]);
+            params.push(new Date(startDate as string).toLocaleDateString('en-CA'), new Date(endDate as string).toLocaleDateString('en-CA'));
         }
         query += ` ORDER BY a.date DESC`;
 
@@ -138,7 +138,7 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
 
         const recordMap = new Map();
         realRecords.forEach(r => {
-            const dateStr = new Date(r.date).toISOString().split('T')[0];
+            const dateStr = new Date(r.date).toLocaleDateString('en-CA');
             recordMap.set(dateStr, r);
         });
 
@@ -191,7 +191,7 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
     const targetTeacherId = (userRole === 'ADMIN' && bodyTeacherId) ? bodyTeacherId : markerId;
 
     try {
-        const attendanceDateStr = new Date(date || new Date()).toISOString().split('T')[0];
+        const attendanceDateStr = new Date(date || new Date()).toLocaleDateString('en-CA');
 
         const existingCheck = await db.query(
             `SELECT id, "arrivalTime", "departureTime" FROM "TeacherAttendance" 
@@ -365,7 +365,7 @@ export const getTeacherAttendance = async (req: Request, res: Response) => {
 
         if (startDate && endDate) {
             query += ` AND ta.date >= $${paramCount++} AND ta.date <= $${paramCount++}`;
-            params.push(new Date(startDate as string).toISOString().split('T')[0], new Date(endDate as string).toISOString().split('T')[0]);
+            params.push(new Date(startDate as string).toLocaleDateString('en-CA'), new Date(endDate as string).toLocaleDateString('en-CA'));
         }
 
         query += ` ORDER BY ta.date DESC`;

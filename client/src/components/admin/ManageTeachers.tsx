@@ -32,7 +32,7 @@ const ManageTeachers = () => {
 
     const [newUser, setNewUser] = useState({
         name: '', email: '', teacherId: '', password: '',
-        phone: '', aadhar: '', designation: 'A. TEACHER', joiningDate: new Date().toISOString().split('T')[0],
+        phone: '', aadhar: '', designation: 'A. TEACHER', joiningDate: new Date().toLocaleDateString('en-CA'),
         isTeaching: true,
         photo: '', address: '', qualification: '', extraQualification: '', caste: 'GENERAL'
     });
@@ -48,7 +48,7 @@ const ManageTeachers = () => {
             showToast('Faculty member enrolled successfully', 'success');
             setNewUser({
                 name: '', email: '', teacherId: '', password: '',
-                phone: '', aadhar: '', designation: 'A. TEACHER', joiningDate: new Date().toISOString().split('T')[0],
+                phone: '', aadhar: '', designation: 'A. TEACHER', joiningDate: new Date().toLocaleDateString('en-CA'),
                 isTeaching: true,
                 photo: '', address: '', qualification: '', extraQualification: '', caste: 'GENERAL'
             });
@@ -529,7 +529,7 @@ const ManageTeachers = () => {
                             </div>
                             <div className="form-group">
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} /> Date of Joining</label>
-                                <input type="date" value={editData.joiningDate ? editData.joiningDate.split('T')[0] : ''} onChange={e => setEditData({ ...editData, joiningDate: e.target.value })} />
+                                <input type="date" value={editData.joiningDate ? new Date(editData.joiningDate).toLocaleDateString('en-CA') : ''} onChange={e => setEditData({ ...editData, joiningDate: e.target.value })} />
                             </div>
                             <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} /> Residential Address</label>

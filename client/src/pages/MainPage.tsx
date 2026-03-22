@@ -151,7 +151,6 @@ function Hero({ bannerUrl }: { bannerUrl: string }) {
           <span>UDISE CODE: 19112601311</span>
           <span>ESTD: 2005</span>
         </div>
-        <p className="hero-subtitle">Empowering Students For A Better Future</p>
       </div>
     </section>
   );
