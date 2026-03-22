@@ -21,15 +21,10 @@ export type SSEEventType =
     | 'homework_graded'
     | 'result:created'
     | 'result_published'
-    | 'fee:created'
-    | 'fee:paid'
-    | 'fee_created'
-    | 'fee_updated'
     | 'user:created'
     | 'user:deleted'
     | 'class:updated'
     | 'profile_updated'
-    | 'system:config_updated'
     | 'new_notice'
     | 'notice_deleted';
 

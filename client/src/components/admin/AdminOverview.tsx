@@ -11,7 +11,6 @@ interface AdminOverviewProps {
         students: number;
         teachers: number;
         classes: number;
-        projectedFees: number;
     };
 }
 
@@ -29,14 +28,6 @@ const AdminOverview = ({ stats }: AdminOverviewProps) => {
             <div className="stat-card" style={{ borderLeftColor: 'var(--accent)' }}>
                 <h3>{stats.classes}</h3>
                 <p>Grade Levels</p>
-            </div>
-            <div className="stat-card" style={{ borderLeftColor: '#8b5cf6' }}>
-                <h3>
-                    {stats.projectedFees >= 100000
-                        ? `₹${(stats.projectedFees / 100000).toFixed(1)}L`
-                        : `₹${stats.projectedFees.toLocaleString('en-IN')}`}
-                </h3>
-                <p>Fees Projected</p>
             </div>
         </div>
     );

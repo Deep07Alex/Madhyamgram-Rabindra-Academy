@@ -46,6 +46,48 @@ const upload = multer({
     }
 });
 
+// Update Hero Banner
+router.post('/hero-banner', authenticate, authorize(['ADMIN']), upload.single('banner'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+    }
+    
+    try {
+        const optimizedFilename = `hero-${req.file.filename.split('.')[0]}.webp`;
+        const optimizedPath = path.join(req.file.destination, optimizedFilename);
+        
+        await sharp(req.file.path)
+            .resize(1920, 1080, { fit: 'inside', withoutEnlargement: true })
+            .webp({ quality: 90 })
+            .toFile(optimizedPath);
+            
+        fs.unlinkSync(req.file.path);
+        const relativePath = `/uploads/system/${optimizedFilename}`;
+        
+        await db.query(
+            'INSERT INTO "SystemConfig" (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2, "updatedAt" = CURRENT_TIMESTAMP',
+            ['hero_banner_url', relativePath]
+        );
+        
+        res.json({ url: relativePath });
+    } catch (error) {
+        console.error('Hero Banner upload error:', error);
+        res.status(500).json({ message: 'Error processing hero banner upload' });
+    }
+});
+
+// Get Hero Banner
+router.get('/hero-banner', async (req, res) => {
+    try {
+        const result = await db.query('SELECT value FROM "SystemConfig" WHERE key = $1', ['hero_banner_url']);
+        const url = result.rows.length > 0 ? result.rows[0].value : '/banner.png';
+        res.json({ url });
+    } catch (error) {
+        console.error('Error fetching hero banner:', error);
+        res.status(500).json({ message: 'Error fetching hero banner' });
+    }
+});
+
 // Update Festival Banner
 router.post('/festival-banner', authenticate, authorize(['ADMIN']), upload.single('banner'), async (req, res) => {
     if (!req.file) {
@@ -53,23 +95,17 @@ router.post('/festival-banner', authenticate, authorize(['ADMIN']), upload.singl
     }
     
     try {
-        const optimizedFilename = `opt-${req.file.filename.split('.')[0]}.webp`;
+        const optimizedFilename = `fest-${req.file.filename.split('.')[0]}.webp`;
         const optimizedPath = path.join(req.file.destination, optimizedFilename);
         
-        // Use Sharp to optimize the banner:
-        // - Resize to standard banner dimensions (1200x800 Max)
-        // - Convert to WebP format for high compression/quality ratio
         await sharp(req.file.path)
             .resize(1200, 800, { fit: 'inside', withoutEnlargement: true })
             .webp({ quality: 85 })
             .toFile(optimizedPath);
             
-        // Delete original file
         fs.unlinkSync(req.file.path);
-        
         const relativePath = `/uploads/system/${optimizedFilename}`;
         
-        // Update DB
         await db.query(
             'INSERT INTO "SystemConfig" (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2, "updatedAt" = CURRENT_TIMESTAMP',
             ['festival_banner_url', relativePath]
@@ -77,8 +113,8 @@ router.post('/festival-banner', authenticate, authorize(['ADMIN']), upload.singl
         
         res.json({ url: relativePath });
     } catch (error) {
-        console.error('Sharp/DB error:', error);
-        res.status(500).json({ message: 'Error processing banner upload' });
+        console.error('Festival Banner upload error:', error);
+        res.status(500).json({ message: 'Error processing festival banner upload' });
     }
 });
 
@@ -86,11 +122,11 @@ router.post('/festival-banner', authenticate, authorize(['ADMIN']), upload.singl
 router.get('/festival-banner', async (req, res) => {
     try {
         const result = await db.query('SELECT value FROM "SystemConfig" WHERE key = $1', ['festival_banner_url']);
-        const url = result.rows.length > 0 ? result.rows[0].value : '/dol.png'; // Default fallback
+        const url = result.rows.length > 0 ? result.rows[0].value : '/dol.png';
         res.json({ url });
     } catch (error) {
-        console.error('Error fetching banner:', error);
-        res.status(500).json({ message: 'Error fetching banner' });
+        console.error('Error fetching festival banner:', error);
+        res.status(500).json({ message: 'Error fetching festival banner' });
     }
 });
 

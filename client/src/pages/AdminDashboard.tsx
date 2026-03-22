@@ -2,7 +2,7 @@
  * Admin Dashboard
  * 
  * The central command center for school administrators.
- * Provides a modular interface to manage students, faculty, classes, fees, results, and notices.
+ * Provides a modular interface to manage students, faculty, classes, results, and notices.
  * Features:
  * - Real-time statistics synchronization via WebSockets/SSE.
  * - Responsive sidebar navigation.
@@ -14,22 +14,20 @@ import api from '../services/api';
 import ManageStudents from '../components/admin/ManageStudents';
 import ManageTeachers from '../components/admin/ManageTeachers';
 import ManageClasses from '../components/admin/ManageClasses';
-import ManageFees from '../components/admin/ManageFees';
+
 import ManageResults from '../components/admin/ManageResults';
-import ManageGallery from '../components/admin/ManageGallery';
+import ManageAssets from '../components/admin/ManageAssets';
 import ManageAttendance from '../components/admin/ManageAttendance';
 import ManageNotices from '../components/admin/ManageNotices';
 import LiveClock from '../components/common/LiveClock';
 import ThemeToggle from '../components/common/ThemeToggle';
 import AdminOverview from '../components/admin/AdminOverview';
-import ManageMainPage from '../components/admin/ManageMainPage';
 import useServerEvents from '../hooks/useServerEvents';
 import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard,
     Users,
     BookOpen,
-    CreditCard,
     FileText,
     Image as ImageIcon,
     ClipboardCheck,
@@ -38,8 +36,7 @@ import {
     Menu,
     X,
     UserCircle,
-    Loader2,
-    Monitor
+    Loader2
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -57,8 +54,7 @@ const AdminDashboard = () => {
     const [stats, setStats] = useState({
         students: 0,
         teachers: 0,
-        classes: 0,
-        projectedFees: 0
+        classes: 0
     });
 
     const fetchStats = useCallback(async (silent = false) => {
@@ -81,8 +77,6 @@ const AdminDashboard = () => {
     // Automatically refreshes dashboard statistics when relevant backend events occur.
     useServerEvents({
         'connected': () => { if (import.meta.env.DEV) console.log('[SSE] Admin Control: Real-time link established'); },
-        'fee:paid': () => fetchStats(true),
-        'fee:created': () => fetchStats(true),
         'attendance:updated': () => fetchStats(true),
         'user:created': () => fetchStats(true),
         'user:deleted': () => fetchStats(true),
@@ -106,11 +100,9 @@ const AdminDashboard = () => {
         { path: '/admin/faculty', icon: <UserCircle size={20} />, label: 'Manage Faculty' },
         { path: '/admin/classes', icon: <BookOpen size={20} />, label: 'See Classes' },
         { path: '/admin/attendance', icon: <ClipboardCheck size={20} />, label: 'Attendance' },
-        { path: '/admin/fees', icon: <CreditCard size={20} />, label: 'Fee Records' },
         { path: '/admin/results', icon: <FileText size={20} />, label: 'Results' },
         { path: '/admin/notices', icon: <BellRing size={20} />, label: 'Notices' },
-        { path: '/admin/website', icon: <Monitor size={20} />, label: 'Manage Main page photo' },
-        { path: '/admin/gallery', icon: <ImageIcon size={20} />, label: 'Manage Gallery' },
+        { path: '/admin/assets', icon: <ImageIcon size={20} />, label: 'Manage Assets' },
     ];
 
     return (
@@ -199,11 +191,9 @@ const AdminDashboard = () => {
                         <Route path="faculty" element={<ManageTeachers />} />
                         <Route path="classes" element={<ManageClasses />} />
                         <Route path="attendance" element={<ManageAttendance />} />
-                        <Route path="fees" element={<ManageFees />} />
                         <Route path="results" element={<ManageResults />} />
                         <Route path="notices" element={<ManageNotices />} />
-                        <Route path="website" element={<ManageMainPage />} />
-                        <Route path="gallery" element={<ManageGallery />} />
+                        <Route path="assets" element={<ManageAssets />} />
                         <Route path="/" element={<Navigate to="/admin/dashboard" />} />
                         <Route path="*" element={<Navigate to="/admin/dashboard" />} />
                     </Routes>

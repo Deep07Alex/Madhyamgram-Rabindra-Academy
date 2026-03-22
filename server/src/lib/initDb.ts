@@ -30,11 +30,6 @@ export const initDb = async () => {
                 WHEN duplicate_object THEN null;
             END $$;
 
-            DO $$ BEGIN
-                CREATE TYPE "FeeStatus" AS ENUM ('PENDING', 'PAID', 'PARTIAL');
-            EXCEPTION
-                WHEN duplicate_object THEN null;
-            END $$;
 
             -- Admin Table
             CREATE TABLE IF NOT EXISTS "Admin" (
@@ -175,19 +170,6 @@ export const initDb = async () => {
                 "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            -- Fee Table
-            CREATE TABLE IF NOT EXISTS "Fee" (
-                "id" TEXT PRIMARY KEY,
-                "amount" DOUBLE PRECISION NOT NULL,
-                "dueDate" TIMESTAMP(3) NOT NULL,
-                "paidAt" TIMESTAMP(3),
-                "status" "FeeStatus" NOT NULL DEFAULT 'PENDING',
-                "type" TEXT NOT NULL,
-                "paymentMethod" TEXT,
-                "transactionId" TEXT,
-                "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-                "remark" TEXT
-            );
 
             -- Result Table
             CREATE TABLE IF NOT EXISTS "Result" (
@@ -196,10 +178,13 @@ export const initDb = async () => {
                 "subject" TEXT NOT NULL,
                 "marks" DOUBLE PRECISION NOT NULL,
                 "totalMarks" DOUBLE PRECISION NOT NULL,
+                "academicYear" INTEGER NOT NULL DEFAULT 2025,
                 "grade" TEXT,
                 "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE,
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+
+            -- Gallery Table
 
             -- Gallery Table
             CREATE TABLE IF NOT EXISTS "Gallery" (
@@ -368,10 +353,25 @@ export const initDb = async () => {
             END $$;
         `);
 
+        // 6. Update Result Table Schema (Academic Year & Unique Constraint)
+        await db.query(`
+            DO $$ BEGIN
+                -- Add academicYear if missing
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Result' AND column_name = 'academicYear') THEN
+                    ALTER TABLE "Result" ADD COLUMN "academicYear" INTEGER NOT NULL DEFAULT 2025;
+                END IF;
+
+                -- Add unique constraint if missing
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'result_unique_entry') THEN
+                    ALTER TABLE "Result" ADD CONSTRAINT "result_unique_entry" UNIQUE ("studentId", "subject", "semester", "academicYear");
+                END IF;
+            END $$;
+        `);
+
         // 6. Create unique and performance indexes if they don't exist
         await db.query(`
-            CREATE UNIQUE INDEX IF NOT EXISTS "Attendance_student_date_unique" ON "Attendance"("studentId", date);
-            CREATE UNIQUE INDEX IF NOT EXISTS "TeacherAttendance_teacher_date_unique" ON "TeacherAttendance"("teacherId", date);
+            CREATE UNIQUE INDEX IF NOT EXISTS "Attendance_student_date_unique" ON "Attendance"("studentId", "date");
+            CREATE UNIQUE INDEX IF NOT EXISTS "TeacherAttendance_teacher_date_unique" ON "TeacherAttendance"("teacherId", "date");
             
             -- Performance Indexes for common lookups
             CREATE INDEX IF NOT EXISTS "idx_student_class" ON "Student"("classId");
@@ -382,7 +382,6 @@ export const initDb = async () => {
             CREATE INDEX IF NOT EXISTS "idx_teacher_phone" ON "Teacher"("phone");
             CREATE INDEX IF NOT EXISTS "idx_teacher_aadhar" ON "Teacher"("aadhar");
             CREATE INDEX IF NOT EXISTS "idx_teacher_name" ON "Teacher"("name");
-            CREATE INDEX IF NOT EXISTS "idx_fee_student" ON "Fee"("studentId");
             CREATE INDEX IF NOT EXISTS "idx_result_student" ON "Result"("studentId");
             CREATE INDEX IF NOT EXISTS "idx_homework_class" ON "Homework"("classId");
             CREATE INDEX IF NOT EXISTS "idx_homework_teacher" ON "Homework"("teacherId");

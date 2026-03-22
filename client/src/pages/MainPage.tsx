@@ -18,70 +18,43 @@ type GalleryItem = { src: string; caption: string };
 
 function MainPage() {
   const [navOpen, setNavOpen] = useState(false);
-  const [notices, setNotices] = useState<string[]>([]);
-  const [bannerUrl, setBannerUrl] = useState("/dol.png");
+  const [heroBanner, setHeroBanner] = useState("/banner.png");
+  const [festivalBanner, setFestivalBanner] = useState("/dol.png");
+  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
 
   useEffect(() => {
-    // Fetch public notices from API
-    api.get('/notices')
-      .then((res: { data: any[] }) => {
-        const data = res.data;
-        if (Array.isArray(data) && data.length > 0) {
-          setNotices(data.map((n: any) => `📢 ${n.title} - ${n.content}`));
-        } else {
-          setNotices([
-            "📢 Annual Sports Day – 25 March",
-            "📢 Saraswati Puja Celebration",
-            "📢 Admission Open For 2026",
-            "📢 Parent Teacher Meeting – Sunday",
-          ]);
-        }
+    // Fetch dynamic assets
+    api.get('/system/hero-banner')
+      .then(res => {
+        if (res.data.url) setHeroBanner(res.data.url);
       })
-      .catch((err: any) => {
-        console.error('Failed to fetch notices:', err);
-        setNotices([
-          "📢 Annual Sports Day – 25 March",
-          "📢 Saraswati Puja Celebration",
-          "📢 Admission Open For 2026",
-          "📢 Parent Teacher Meeting – Sunday",
-        ]);
-      });
+      .catch(err => console.error('Failed to fetch hero banner:', err));
 
-    // Fetch dynamic banner
     api.get('/system/festival-banner')
       .then(res => {
-        if (res.data.url) setBannerUrl(res.data.url);
+        if (res.data.url) setFestivalBanner(res.data.url);
       })
-      .catch(err => console.error('Failed to fetch banner:', err));
-  }, []);
+      .catch(err => console.error('Failed to fetch festival banner:', err));
 
-  const galleryItems: GalleryItem[] = [
-    {
-      src: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b",
-      caption: "Classroom Learning",
-    },
-    {
-      src: "https://images.unsplash.com/photo-1588072432836-e10032774350",
-      caption: "School Activities",
-    },
-    {
-      src: "https://images.unsplash.com/photo-1523240795612-9a054b0db644",
-      caption: "Students Event",
-    },
-    {
-      src: "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b",
-      caption: "Sports Program",
-    },
-  ];
+    api.get('/gallery')
+      .then(res => {
+        if (Array.isArray(res.data)) {
+          setGalleryItems(res.data.map((item: any) => ({
+            src: item.imageUrl,
+            caption: item.title
+          })));
+        }
+      })
+      .catch(err => console.error('Failed to fetch gallery:', err));
+  }, []);
 
   return (
     <div className="main-page-wrapper">
       <Navbar open={navOpen} onToggle={() => setNavOpen(!navOpen)} />
 
       <div className="main-container">
-        <Hero />
-        <AdmissionSection />
-        <NoticeBoard bannerUrl={bannerUrl} notices={notices} />
+        <Hero bannerUrl={heroBanner} />
+        <FestivalSection bannerUrl={festivalBanner} />
         <Gallery items={galleryItems} />
       </div>
 
@@ -155,16 +128,19 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
  * Hero Section
  * Displays the school name, tagline, and main banner image.
  */
-function Hero() {
+function Hero({ bannerUrl }: { bannerUrl: string }) {
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const fullUrl = bannerUrl.startsWith('/') ? `${baseUrl}${bannerUrl}` : bannerUrl;
+
   return (
     <section className="hero">
       <img
-        src="/banner.png"
+        src={fullUrl}
         alt="School building"
         loading="eager"
         fetchPriority="high"
         onError={(e) => {
-          e.currentTarget.src = "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1200";
+          e.currentTarget.src = "/banner.png";
         }}
       />
       <div className="hero-content">
@@ -181,27 +157,15 @@ function Hero() {
   );
 }
 
-function AdmissionSection() {
-  return (
-    <section id="admission" className="landing-section admission">
-      <h2>Admission Form</h2>
-      <p>Click the button below to download the admission application form.</p>
-      <a href="/form 2025.pdf" download className="download-btn">
-        Download PDF
-      </a>
-    </section>
-  );
-}
 
 
 /**
- * Notice Board / Festival Section
+ * Festival Section
  * 
  * The main engagement area for public announcements.
- * - Displays a dynamic banner managed by administrators in the 'ManageMainPage' CMS.
- * - Provides a fallback institution asset ('/dol.png') if no custom banner is set.
+ * - Displays a dynamic banner managed by administrators in the 'ManageAssets' CMS.
  */
-function NoticeBoard({ bannerUrl }: { bannerUrl: string; notices: string[] }) {
+function FestivalSection({ bannerUrl }: { bannerUrl: string }) {
   const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const fullUrl = bannerUrl.startsWith('/') ? `${baseUrl}${bannerUrl}` : bannerUrl;
 
@@ -214,13 +178,15 @@ function NoticeBoard({ bannerUrl }: { bannerUrl: string; notices: string[] }) {
 }
 
 function Gallery({ items }: { items: GalleryItem[] }) {
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
   return (
     <section id="gallery" className="landing-section gallery">
       <h2>School Gallery</h2>
       <div className="gallery-grid">
         {items.map((item, idx) => (
           <div className="gallery-card" key={idx}>
-            <img src={item.src} alt={item.caption} loading="lazy" />
+            <img src={item.src.startsWith('/') ? `${baseUrl}${item.src}` : item.src} alt={item.caption} loading="lazy" />
             <p>{item.caption}</p>
           </div>
         ))}

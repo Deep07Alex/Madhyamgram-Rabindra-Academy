@@ -5,14 +5,14 @@
  * Features:
  * - Unified data fetching for profile, stats, and assignments.
  * - Real-time notifications for new homework and results.
- * - Attendance and fee tracking.
+ * - Attendance tracking.
  * - Automatic background syncing.
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import StudentAttendance from '../components/student/StudentAttendance';
-import StudentFees from '../components/student/StudentFees';
+
 import StudentHomework from '../components/student/StudentHomework';
 import StudentResults from '../components/student/StudentResults';
 import NoticeBoard from '../components/common/NoticeBoard';
@@ -25,7 +25,6 @@ import { useToast } from '../context/ToastContext';
 import {
     LayoutDashboard,
     CalendarCheck,
-    Wallet,
     BookOpenCheck,
     GraduationCap,
     LogOut,
@@ -167,8 +166,6 @@ const StudentDashboard = () => {
         },
         'notice_deleted': () => refreshData(true),
         'profile_updated': () => refreshData(true),
-        'fee_created': () => refreshData(true),
-        'fee_updated': () => refreshData(true),
         'result_published': () => {
             showToast('🎓 New academic record published!', 'success');
             refreshData(true);
@@ -192,7 +189,6 @@ const StudentDashboard = () => {
     const navItems = [
         { path: '/student/dashboard', icon: <LayoutDashboard size={20} />, label: 'Overview' },
         { path: '/student/attendance', icon: <CalendarCheck size={20} />, label: 'My Attendance' },
-        { path: '/student/fees', icon: <Wallet size={20} />, label: 'Fee Portal' },
         { path: '/student/homework', icon: <BookOpenCheck size={20} />, label: 'Class Tasks' },
         { path: '/student/results', icon: <GraduationCap size={20} />, label: 'My Academic Record' },
         { path: '/student/notices', icon: <BellRing size={20} />, label: 'Notices' },
@@ -288,7 +284,6 @@ const StudentDashboard = () => {
                             />
                         } />
                         <Route path="attendance" element={<StudentAttendance />} />
-                        <Route path="fees" element={<StudentFees />} />
                         <Route path="homework" element={<StudentHomework />} />
                         <Route path="results" element={<StudentResults />} />
                         <Route path="notices" element={<NoticeBoard />} />

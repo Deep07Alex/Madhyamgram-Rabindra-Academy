@@ -12,7 +12,7 @@ import { AuthRequest } from '../middleware/auth.js';
 
 /**
  * Generates high-level statistics for the dashboard.
- * - Admins get school-wide counts (Students, Teachers, Classes, projected Fees).
+ * - Admins get school-wide counts (Students, Teachers, Classes).
  * - Teachers get their assigned class counts and pending submission stats.
  * - Students get their personal attendance rate and academic performance overview.
  */
@@ -24,11 +24,10 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
         let statsData: any;
 
         if (role === 'ADMIN') {
-            const [studentRes, teacherRes, classRes, feeRes, configRes] = await Promise.all([
+            const [studentRes, teacherRes, classRes, configRes] = await Promise.all([
                 db.query(`SELECT COUNT(*) FROM "Student"`),
                 db.query(`SELECT COUNT(*) FROM "Teacher"`),
                 db.query(`SELECT COUNT(*) FROM "Class"`),
-                db.query(`SELECT SUM(amount) FROM "Fee"`),
                 db.query('SELECT value FROM "SystemConfig" WHERE key = $1', ['attendance_override'])
             ]);
 
@@ -36,7 +35,6 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
                 students: parseInt(studentRes.rows[0].count, 10),
                 teachers: parseInt(teacherRes.rows[0].count, 10),
                 classes: parseInt(classRes.rows[0].count, 10),
-                projectedFees: parseFloat(feeRes.rows[0].sum || '0'),
                 config: {
                     attendance_override: configRes.rows.length > 0 ? configRes.rows[0].value : 'AUTO'
                 }

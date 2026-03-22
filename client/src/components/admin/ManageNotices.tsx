@@ -22,7 +22,6 @@ import {
     Megaphone, 
     X, 
     Send, 
-    Globe, 
     Lock,
     Calendar,
     Target,
@@ -34,7 +33,7 @@ interface Notice {
     id: string;
     title: string;
     content: string;
-    type: 'PUBLIC' | 'INTERNAL';
+    type: 'INTERNAL';
     targetAudience: 'ALL' | 'TEACHER' | 'STUDENT';
     targetClassId: string | null;
     targetStudentId: string | null;
@@ -63,7 +62,7 @@ const ManageNotices = () => {
     const [formData, setFormData] = useState({
         title: '',
         content: '',
-        type: 'PUBLIC' as 'PUBLIC' | 'INTERNAL',
+        type: 'INTERNAL' as const,
         targetAudience: 'ALL' as 'ALL' | 'TEACHER' | 'STUDENT',
         targetClassId: '',
         targetStudentId: '',
@@ -111,11 +110,7 @@ const ManageNotices = () => {
              * If the notice is PUBLIC, it must be available to EVERYONE.
              * If targeted at TEACHERS, we can't specify a class or student.
              */
-            if (payload.type === 'PUBLIC') {
-                payload.targetAudience = 'ALL';
-                payload.targetClassId = '';
-                payload.targetStudentId = '';
-            }
+            payload.type = 'INTERNAL';
             if (payload.targetAudience !== 'STUDENT') {
                 payload.targetClassId = '';
                 payload.targetStudentId = '';
@@ -127,7 +122,7 @@ const ManageNotices = () => {
             setFormData({
                 title: '',
                 content: '',
-                type: 'PUBLIC',
+                type: 'INTERNAL',
                 targetAudience: 'ALL',
                 targetClassId: '',
                 targetStudentId: '',
@@ -240,49 +235,30 @@ const ManageNotices = () => {
                             />
                         </div>
 
+                        {/* Visibility Type Removed - All notices are INTERNAL */}
+
                         <div className="form-group">
-                            <label>Visibility Type</label>
+                            <label>Target Audience</label>
                             <div style={{ position: 'relative' }}>
                                 <select 
-                                    value={formData.type}
-                                    onChange={e => setFormData({...formData, type: e.target.value as 'PUBLIC' | 'INTERNAL'})}
+                                    value={formData.targetAudience}
+                                    onChange={e => setFormData({
+                                        ...formData, 
+                                        targetAudience: e.target.value as 'ALL' | 'TEACHER' | 'STUDENT',
+                                        targetClassId: '',
+                                        targetStudentId: ''
+                                    })}
                                     style={{ paddingLeft: '40px' }}
                                 >
-                                    <option value="PUBLIC">Public (Landing Page)</option>
-                                    <option value="INTERNAL">Internal (Dashboard Only)</option>
+                                    <option value="ALL">Everyone</option>
+                                    <option value="TEACHER">Teaching Staff</option>
+                                    <option value="STUDENT">Students</option>
                                 </select>
-                                {formData.type === 'PUBLIC' ? (
-                                    <Globe size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-bold)' }} />
-                                ) : (
-                                    <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-bold)' }} />
-                                )}
+                                <Target size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-bold)' }} />
                             </div>
                         </div>
 
-                        {formData.type === 'INTERNAL' && (
-                            <div className="form-group">
-                                <label>Target Audience</label>
-                                <div style={{ position: 'relative' }}>
-                                    <select 
-                                        value={formData.targetAudience}
-                                        onChange={e => setFormData({
-                                            ...formData, 
-                                            targetAudience: e.target.value as 'ALL' | 'TEACHER' | 'STUDENT',
-                                            targetClassId: '',
-                                            targetStudentId: ''
-                                        })}
-                                        style={{ paddingLeft: '40px' }}
-                                    >
-                                        <option value="ALL">Everyone</option>
-                                        <option value="TEACHER">Teaching Staff</option>
-                                        <option value="STUDENT">Students</option>
-                                    </select>
-                                    <Target size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-bold)' }} />
-                                </div>
-                            </div>
-                        )}
-
-                        {formData.type === 'INTERNAL' && formData.targetAudience === 'STUDENT' && (
+                        {formData.targetAudience === 'STUDENT' && (
                             <>
                                 <div className="form-group">
                                     <label>Filter by Class (Optional)</label>
@@ -391,11 +367,11 @@ const ManageNotices = () => {
                                                 fontWeight: '700',
                                                 padding: '2px 8px',
                                                 borderRadius: '20px',
-                                                background: notice.type === 'PUBLIC' ? 'var(--primary-soft)' : '#fef3c7',
-                                                color: notice.type === 'PUBLIC' ? 'var(--primary-bold)' : '#b45309'
+                                                background: '#fef3c7',
+                                                color: '#b45309'
                                             }}>
-                                                {notice.type === 'PUBLIC' ? <Globe size={10} /> : <Lock size={10} />}
-                                                {notice.type === 'PUBLIC' ? 'PUBLIC DOMAIN' : 'INTERNAL NETWORK'}
+                                                <Lock size={10} />
+                                                INTERNAL NETWORK
                                             </span>
                                         </td>
                                         <td>

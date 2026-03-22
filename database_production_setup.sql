@@ -6,9 +6,6 @@ DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'AttendanceStatus') THEN
         CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE');
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'FeeStatus') THEN
-        CREATE TYPE "FeeStatus" AS ENUM ('PENDING', 'PAID', 'PARTIAL');
-    END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'SubmissionStatus') THEN
         CREATE TYPE "SubmissionStatus" AS ENUM ('PENDING', 'SUBMITTED', 'GRADED');
     END IF;
@@ -89,19 +86,6 @@ CREATE TABLE IF NOT EXISTS "TeacherAttendance" (
     "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
--- Fee Table
-CREATE TABLE IF NOT EXISTS "Fee" (
-    "id" TEXT PRIMARY KEY,
-    "amount" DOUBLE PRECISION NOT NULL,
-    "dueDate" TIMESTAMP(3) NOT NULL,
-    "paidAt" TIMESTAMP(3),
-    "status" "FeeStatus" NOT NULL DEFAULT 'PENDING',
-    "type" TEXT NOT NULL,
-    "paymentMethod" TEXT,
-    "transactionId" TEXT,
-    "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    "remark" TEXT
-);
 
 -- Homework Table
 CREATE TABLE IF NOT EXISTS "Homework" (
@@ -177,8 +161,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS "TeacherAttendance_teacher_date_unique" ON "Te
 -- Performance Indexes for Production
 CREATE INDEX IF NOT EXISTS "idx_student_class" ON "Student"("classId");
 CREATE INDEX IF NOT EXISTS "idx_attendance_date" ON "Attendance"("date");
-CREATE INDEX IF NOT EXISTS "idx_fee_student" ON "Fee"("studentId");
-CREATE INDEX IF NOT EXISTS "idx_fee_status" ON "Fee"("status");
 CREATE INDEX IF NOT EXISTS "idx_homework_class" ON "Homework"("classId");
 CREATE INDEX IF NOT EXISTS "idx_notice_expires" ON "Notice"("expiresAt");
 CREATE INDEX IF NOT EXISTS "idx_result_student" ON "Result"("studentId");
