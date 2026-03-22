@@ -16,6 +16,7 @@ router.use(authenticate);
 router.post('/', authorize(['ADMIN']), createResult);
 router.post('/bulk', authorize(['ADMIN', 'TEACHER']), upload.single('file'), bulkUploadResults);
 router.get('/', authorize(['ADMIN', 'TEACHER', 'STUDENT']), getResults);
+router.get('/report', authorize(['ADMIN', 'TEACHER', 'STUDENT']), getConsolidatedReport);
 router.get('/report/:studentId', authorize(['ADMIN', 'TEACHER', 'STUDENT']), getConsolidatedReport);
 router.delete('/:id', authorize(['ADMIN']), deleteResult);
 

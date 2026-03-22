@@ -55,7 +55,10 @@ export const bulkUploadResults = async (req: Request, res: Response) => {
 
         const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
         const sheetName = workbook.SheetNames[0];
-        const dataRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]) as any[];
+        const worksheet = sheetName ? workbook.Sheets[sheetName] : null;
+        if (!worksheet) return res.status(400).json({ message: 'Workbook contains no valid sheets' });
+        
+        const dataRows = XLSX.utils.sheet_to_json(worksheet) as any[];
 
         if (dataRows.length === 0) {
             return res.status(400).json({ message: 'Excel sheet is empty' });
@@ -157,7 +160,10 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
                 COUNT(CASE WHEN status = 'PRESENT' THEN 1 END) as present_days,
                 COUNT(CASE WHEN status = 'ABSENT' THEN 1 END) as absent_days
              FROM "Attendance" 
-             WHERE "studentId" = $1 AND EXTRACT(YEAR FROM date) = $2`,
+             WHERE "studentId" = $1 AND (
+                (EXTRACT(YEAR FROM date) = $2 AND EXTRACT(MONTH FROM date) >= 1) OR 
+                (EXTRACT(YEAR FROM date) = $2 + 1 AND EXTRACT(MONTH FROM date) <= 12)
+             )`,
             [studentId, academicYear]
         );
 
