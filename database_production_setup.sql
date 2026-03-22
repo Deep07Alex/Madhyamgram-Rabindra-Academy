@@ -2,12 +2,12 @@
 -- Madhyamgram Rabindra Academy
 
 -- 1. Create Database and User (Run these separately if needed)
--- CREATE DATABASE "Madhyamgram-Rabindra-Academy";
+CREATE DATABASE "Madhyamgram-Rabindra-Academy";
 -- CREATE USER aritrada420 WITH PASSWORD 'Aritradutta@2005';
 -- GRANT ALL PRIVILEGES ON DATABASE "Madhyamgram-Rabindra-Academy" TO aritrada420;
 
 -- Connect to the database before running the rest of the script
--- \c "Madhyamgram-Rabindra-Academy"
+\c "Madhyamgram-Rabindra-Academy"
 
 -- 2. Enums
 DO $$ BEGIN
@@ -187,7 +187,19 @@ CREATE TABLE IF NOT EXISTS "SystemConfig" (
 INSERT INTO "SystemConfig" ("key", "value") VALUES ('attendance_override', 'AUTO')
 ON CONFLICT ("key") DO NOTHING;
 
--- 5. Performance Indexes
+-- 5. Initial Classes
+INSERT INTO "Class" ("id", "name", "grade") VALUES
+('class-nursery', 'Nursery', 0),
+('class-kg-i', 'KG-I', 1),
+('class-kg-ii-a', 'KG-II A', 2),
+('class-kg-ii-b', 'KG-II B', 2),
+('class-std-i', 'STD-I', 3),
+('class-std-ii', 'STD-II', 4),
+('class-std-iii', 'STD-III', 5),
+('class-std-iv', 'STD-IV', 6)
+ON CONFLICT ("name") DO NOTHING;
+
+-- 6. Performance Indexes
 CREATE INDEX IF NOT EXISTS "idx_student_class" ON "Student"("classId");
 CREATE INDEX IF NOT EXISTS "idx_student_rollNumber" ON "Student"("rollNumber");
 CREATE INDEX IF NOT EXISTS "idx_student_name" ON "Student"("name");
@@ -206,11 +218,16 @@ CREATE INDEX IF NOT EXISTS "idx_notice_createdAt" ON "Notice"("createdAt");
 CREATE INDEX IF NOT EXISTS "idx_notice_audience" ON "Notice"("targetAudience");
 CREATE INDEX IF NOT EXISTS "idx_notice_type" ON "Notice"("type");
 
--- 6. Initial Admin User (Default Password: adminpassword)
--- NOTE: In production, the first admin is typically created via an initial setup script or manual registration.
--- For convenience, uncomment below to create a direct admin entry with a simple ID.
--- INSERT INTO "Admin" ("id", "adminId", "username", "password", "name", "email") 
--- VALUES ('setup-admin-uuid', 'ADM-DEFAULT', 'admin', '$2b$10$YourHashedPasswordHere', 'System Administrator', 'admin@rabindraacademy.com')
--- ON CONFLICT DO NOTHING;
+-- 7. Initial Admin User
+INSERT INTO "Admin" ("id", "adminId", "username", "password", "name", "email") 
+VALUES (
+    'admin-aritra-uuid', 
+    'A-8100474669', 
+    'aritrada420', 
+    '$2b$10$TZtbcOHow1SbhWx5azR2eOiMUpvUwylmmipL9wYmApi5d4IL/KuAi', 
+    'Aritra Dutta', 
+    'aritrada420@gmail.com'
+)
+ON CONFLICT ("adminId") DO NOTHING;
 
 -- End of Setup Script
