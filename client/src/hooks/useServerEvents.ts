@@ -26,7 +26,8 @@ export type SSEEventType =
     | 'class:updated'
     | 'profile_updated'
     | 'new_notice'
-    | 'notice_deleted';
+    | 'notice_deleted'
+    | 'system:config_updated';
 
 type EventHandlers = Partial<Record<SSEEventType, (data: any) => void>>;
 

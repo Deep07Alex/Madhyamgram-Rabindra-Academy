@@ -34,7 +34,7 @@ const ManageTeachers = () => {
         name: '', email: '', teacherId: '', password: '',
         phone: '', aadhar: '', designation: 'A. TEACHER', joiningDate: new Date().toISOString().split('T')[0],
         isTeaching: true,
-        photo: '', address: '', dob: '', qualification: '', extraQualification: '', caste: 'GENERAL'
+        photo: '', address: '', qualification: '', extraQualification: '', caste: 'GENERAL'
     });
 
     const handleCreateTeacher = async (e: React.FormEvent) => {
@@ -50,7 +50,7 @@ const ManageTeachers = () => {
                 name: '', email: '', teacherId: '', password: '',
                 phone: '', aadhar: '', designation: 'A. TEACHER', joiningDate: new Date().toISOString().split('T')[0],
                 isTeaching: true,
-                photo: '', address: '', dob: '', qualification: '', extraQualification: '', caste: 'GENERAL'
+                photo: '', address: '', qualification: '', extraQualification: '', caste: 'GENERAL'
             });
             refreshTeachers();
         } catch (error: any) {
@@ -213,10 +213,6 @@ const ManageTeachers = () => {
                     <div className="form-group">
                         <label>Date of Joining</label>
                         <input type="date" value={newUser.joiningDate} onChange={e => setNewUser({ ...newUser, joiningDate: e.target.value })} />
-                    </div>
-                    <div className="form-group">
-                        <label>Date of Birth</label>
-                        <input type="date" value={newUser.dob} onChange={e => setNewUser({ ...newUser, dob: e.target.value })} />
                     </div>
                     <div className="form-group">
                         <label>Caste</label>
@@ -520,10 +516,6 @@ const ManageTeachers = () => {
                                     <option value="DANCE TEACHER">DANCE TEACHER</option>
                                     <option value="NON-TEACHING STAFF">NON-TEACHING STAFF</option>
                                 </select>
-                            </div>
-                            <div className="form-group">
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} /> Date of Birth</label>
-                                <input type="date" value={editData.dob ? editData.dob.split('T')[0] : ''} onChange={e => setEditData({ ...editData, dob: e.target.value })} />
                             </div>
                             <div className="form-group">
                                 <label>Caste Category</label>

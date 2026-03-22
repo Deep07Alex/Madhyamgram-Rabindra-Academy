@@ -84,14 +84,14 @@ const TeacherAttendance = () => {
 
     // ── Mark Attendance tab ───────────────────────────────────────────────────
     const [markClass, setMarkClass] = useState('');
-    const [markDate, setMarkDate] = useState(new Date().toISOString().split('T')[0]);
+    const [markDate, setMarkDate] = useState(new Date().toLocaleDateString('en-CA'));
     const [markSubject, setMarkSubject] = useState('');
     const [students, setStudents] = useState<any[]>([]);
     const [attendanceData, setAttendanceData] = useState<Record<string, string>>({});
 
     // ── History tab ──────────────────────────────────────────────────────────
     const [histClass, setHistClass] = useState('');
-    const [histDate, setHistDate] = useState(new Date().toISOString().split('T')[0]);
+    const [histDate, setHistDate] = useState(new Date().toLocaleDateString('en-CA'));
     const [histSearch, setHistSearch] = useState('');
     const [histRows, setHistRows] = useState<Array<{
         id: string; name: string; studentId: string; rollNumber: string;
@@ -179,7 +179,7 @@ const TeacherAttendance = () => {
             const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
             
             attRecords.forEach((a: any) => {
-                attMap[a.studentId] = a.status;
+                if (!attMap[a.studentId]) attMap[a.studentId] = a.status;
             });
 
             stuRes.data.forEach((s: any) => {
@@ -211,7 +211,7 @@ const TeacherAttendance = () => {
 
             const attMap: Record<string, any> = {};
             const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
-            attRecords.forEach((a: any) => { attMap[a.studentId] = a; });
+            attRecords.forEach((a: any) => { if (!attMap[a.studentId]) attMap[a.studentId] = a; });
 
             setHistRows(stuRes.data.map((s: any) => {
                 const att = attMap[s.id] || null;
@@ -269,7 +269,7 @@ const TeacherAttendance = () => {
 
         try {
             await api.post('/attendance/teacher', {
-                date: new Date().toISOString().split('T')[0], status, reason
+                date: new Date().toLocaleDateString('en-CA'), status, reason
             });
             showToast(`Your attendance marked as ${status}`, 'info');
             setShowAbsentForm(false);

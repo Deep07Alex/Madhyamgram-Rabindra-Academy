@@ -85,6 +85,7 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
 
     try {
         // 1. Get all unique school session dates
+        // This makes the history grow "one by one" as requested
         const allSessionsRes = await db.query(`
             SELECT DISTINCT date::date as session_date 
             FROM (
@@ -127,16 +128,14 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
         const attendanceRes = await db.query(query, params);
         const realRecords = attendanceRes.rows;
         
-        // If we are NOT querying for a single student (e.g. Admin view), 
-        // just return all real records found for the filters without virtualization.
+        // 3. Merge real records with virtual PRESENT records for all sessions (for single student history)
         if (!targetStudentId) {
             return res.json({
                 records: realRecords,
-                totalSessions: realRecords.length // Not applicable for multi-student view
+                totalSessions: realRecords.length
             });
         }
 
-        // 3. Merge real records with virtual PRESENT records for all sessions (for single student history)
         const recordMap = new Map();
         realRecords.forEach(r => {
             const dateStr = new Date(r.date).toISOString().split('T')[0];

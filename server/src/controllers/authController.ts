@@ -140,6 +140,9 @@ export const register = async (req: Request, res: Response) => {
         photo, address, dob, qualification, extraQualification, caste
     } = req.body;
 
+    // Helper to sanitize date strings: treat empty or whitespace-only as NULL for PostgreSQL
+    const sanitizeDate = (date: any) => (date && typeof date === 'string' && date.trim()) ? date.trim() : null;
+
     // Basic validation
     if (!name || !name.trim()) {
         return res.status(400).json({ message: 'Name is required' });
@@ -213,6 +216,8 @@ export const register = async (req: Request, res: Response) => {
 
             const safePhone = (phone && phone.trim()) ? phone.trim() : null;
             const safeAadhar = (aadhar && aadhar.trim()) ? aadhar.trim() : null;
+            const safeJoiningDate = sanitizeDate(joiningDate);
+            const safeDob = sanitizeDate(dob);
 
             await db.query(
                 `INSERT INTO "Teacher" (
@@ -222,8 +227,8 @@ export const register = async (req: Request, res: Response) => {
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
                 [
                     newUserId, hashedPassword, req.body.password || password, name, safeEmail, uniqueId, safePhone, safeAadhar, 
-                    designation, joiningDate, isTeaching ?? true,
-                    photo, address, dob, qualification, extraQualification, caste
+                    designation, safeJoiningDate, isTeaching ?? true,
+                    photo, address, safeDob, qualification, extraQualification, caste
                 ]
             );
         } else if (role === 'STUDENT') {
@@ -292,9 +297,18 @@ export const register = async (req: Request, res: Response) => {
         }
 
         res.status(201).json({ message: 'User created successfully', userId: newUserId });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Registration error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        
+        // Handle specific PostgreSQL errors for more professional user feedback
+        if (error.code === '22007') {
+            return res.status(400).json({ message: 'Invalid date format provided. Please check all date fields.' });
+        }
+        if (error.code === '23505') {
+            return res.status(400).json({ message: 'A record with these details already exists.' });
+        }
+
+        res.status(500).json({ message: 'Failed to complete registration. Please check all fields and try again.' });
     }
 };
 

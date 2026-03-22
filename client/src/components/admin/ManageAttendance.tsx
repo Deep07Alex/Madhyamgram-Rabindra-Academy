@@ -289,7 +289,7 @@ const ManageAttendance = () => {
     const [teacherRows, setTeacherRows] = useState<TeacherRow[]>([]);
 
     // Shared
-    const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+    const [dateFilter, setDateFilter] = useState(new Date().toLocaleDateString('en-CA'));
     const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
     const [search, setSearch] = useState('');
 
@@ -312,7 +312,8 @@ const ManageAttendance = () => {
             const attMap: Record<string, any> = {};
             const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
             attRecords.forEach((a: any) => {
-                attMap[a.studentId] = a;
+                // Ensure we keep the newest record if multiple are returned (e.g. when All Dates is selected)
+                if (!attMap[a.studentId]) attMap[a.studentId] = a;
             });
 
             // Get class name lookup

@@ -1,17 +1,12 @@
--- PostgreSQL Production Setup Script
--- Madhyamgram Rabindra Academy
-
--- 1. Create Database and User (Run these separately if needed)
+-- 1. Setup
 CREATE DATABASE "Madhyamgram-Rabindra-Academy";
--- CREATE USER aritrada420 WITH PASSWORD 'Aritradutta@2005';
--- GRANT ALL PRIVILEGES ON DATABASE "Madhyamgram-Rabindra-Academy" TO aritrada420;
-
--- Connect to the database before running the rest of the script
 \c "Madhyamgram-Rabindra-Academy"
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- 2. Enums
 DO $$ BEGIN
-    CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE');
+    CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE', 'EXCUSED');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
