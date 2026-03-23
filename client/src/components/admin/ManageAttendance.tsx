@@ -9,7 +9,6 @@
  * - Unified View: Shows everyone in the database, matching records where they exist.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import useServerEvents from '../../hooks/useServerEvents';
@@ -28,8 +27,7 @@ import {
     ShieldCheck,
     School,
     ChevronLeft,
-    ChevronRight,
-    Loader2
+    ChevronRight
 } from 'lucide-react';
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT';
@@ -361,7 +359,6 @@ const ManageAttendance = () => {
     const { showToast } = useToast();
     const [tab, setTab] = useState<'students' | 'teachers' | 'staff'>('students');
     const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
-    const [loading, setLoading] = useState(false);
     const [attendanceStatus, setAttendanceStatus] = useState<'AUTO' | 'OPEN' | 'CLOSED'>('AUTO');
     const [togglingOverride, setTogglingOverride] = useState(false);
 
@@ -433,7 +430,7 @@ const ManageAttendance = () => {
     // ── Fetch students + attendance for date ──────────────────────────────
     const fetchStudentData = useCallback(async (silent = false) => {
         if (viewMode !== 'daily') return;
-        if (!silent) setLoading(true);
+        if (!silent) {}
         try {
             const [stuRes, attRes, clsRes] = await Promise.all([
                 api.get('/users/students', {
@@ -485,19 +482,14 @@ const ManageAttendance = () => {
             });
 
             setStudentRows(rows);
-        } catch (err: any) {
-            if (axios.isCancel(err)) return;
-            console.error('Error loading student data:', err);
-            showToast('Failed to load student data.', 'error');
         } finally {
-            setLoading(false);
         }
     }, [dateFilter, viewMode, showToast, page, limit, selectedClass, search]);
 
     // ── Fetch teachers + attendance for date ──────────────────────────────
     const fetchTeacherData = useCallback(async (silent = false) => {
         if (viewMode !== 'daily') return;
-        if (!silent) setLoading(true);
+        if (!silent) {}
         try {
             const [teachRes, attRes] = await Promise.all([
                 api.get('/users/teachers', {
@@ -540,11 +532,7 @@ const ManageAttendance = () => {
             });
 
             setTeacherRows(rows);
-        } catch (err: any) {
-            if (axios.isCancel(err)) return;
-            showToast('Failed to load teacher data.', 'error');
         } finally {
-            setLoading(false);
         }
     }, [dateFilter, viewMode, showToast, page, limit, search]);
 
@@ -566,7 +554,7 @@ const ManageAttendance = () => {
             return;
         }
 
-        if (!silent) setLoading(true);
+        if (!silent) {}
         try {
             // Calculate start and end dates
             let startDate = `${monthFilter}-01`;
@@ -638,7 +626,6 @@ const ManageAttendance = () => {
             console.error('Monthly fetch error:', err);
             showToast('Failed to load monthly data.', 'error');
         } finally {
-            if (!silent) setLoading(false);
         }
     }, [viewMode, tab, monthFilter, selectedClass, classes.length, showToast, page, limit, search]);
 
@@ -863,8 +850,8 @@ const ManageAttendance = () => {
                 minHeight: '400px'
             }}>
                 {/* Table Header/Body */}
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
+                <div className="table-responsive">
+                    <table className="data-table">
                         <thead>
                             <tr style={{ background: 'var(--bg-main)', borderBottom: '2px solid var(--border-soft)' }}>
                                 {tab === 'students' ? (
@@ -889,58 +876,49 @@ const ManageAttendance = () => {
                                 {tab !== 'students' && <th style={thStyle}>Leave Info</th>}
                             </tr>
                         </thead>
-                        <tbody>
-                            {!loading && (tab === 'students' ? filteredStudents : filteredTeachers).map((row: any) => (
-                                tab === 'students' ? (
-                                    <StudentAttendanceRow
-                                        key={row.id}
-                                        row={row}
-                                        viewMode={viewMode}
-                                        dateFilter={dateFilter}
-                                        monthlyDataMap={monthlyDataMap}
-                                        fetchStudentData={fetchStudentData}
-                                    />
-                                ) : (
-                                    <TeacherAttendanceRow
-                                        key={row.id}
-                                        row={row}
-                                        viewMode={viewMode}
-                                        dateFilter={dateFilter}
-                                        monthlyDataMap={monthlyDataMap}
-                                        fetchTeacherData={fetchTeacherData}
-                                        tab={tab}
-                                    />
-                                )
-                            ))}
+                        <tbody key={page} className="animate-fade-in">
+                            {(tab === 'students' ? filteredStudents : filteredTeachers).length > 0 ? 
+                                (tab === 'students' ? filteredStudents : filteredTeachers).map((row: any) => (
+                                    tab === 'students' ? (
+                                        <StudentAttendanceRow
+                                            key={row.id}
+                                            row={row}
+                                            viewMode={viewMode}
+                                            dateFilter={dateFilter}
+                                            monthlyDataMap={monthlyDataMap}
+                                            fetchStudentData={fetchStudentData}
+                                        />
+                                    ) : (
+                                        <TeacherAttendanceRow
+                                            key={row.id}
+                                            row={row}
+                                            viewMode={viewMode}
+                                            dateFilter={dateFilter}
+                                            monthlyDataMap={monthlyDataMap}
+                                            fetchTeacherData={fetchTeacherData}
+                                            tab={tab}
+                                        />
+                                    )
+                                )) : (
+                                <tr>
+                                    <td colSpan={tab === 'students' ? 4 : 5} style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                                            <Users size={48} style={{ opacity: 0.1 }} />
+                                            <div>
+                                                <p style={{ fontWeight: '600', fontSize: '1.1rem', margin: 0 }}>No records matches your criteria</p>
+                                                <p style={{ fontSize: '0.85rem', margin: '4px 0 0' }}>Try adjusting your filters or search query</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
 
-                {/* Empty State */}
-                {!loading && (tab === 'students' ? filteredStudents.length === 0 : filteredTeachers.length === 0) && (
-                    <div style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                        <Users size={48} style={{ opacity: 0.1, marginBottom: '16px' }} />
-                        <p style={{ fontWeight: '600', fontSize: '1.1rem' }}>No records matches your criteria</p>
-                        <p style={{ fontSize: '0.85rem' }}>Try adjusting your filters or search query</p>
-                    </div>
-                )}
-
-                {/* Loading Overlay */}
-                {loading && (
-                    <div style={{
-                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                        background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(2px)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10
-                    }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                            <Loader2 className="animate-spin" size={32} color="var(--primary-bold)" />
-                            <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--primary-bold)' }}>Syncing Records...</span>
-                        </div>
-                    </div>
-                )}
 
                 {/* Pagination Footer */}
-                {!loading && totalPages > 1 && (
+                {totalPages > 1 && (
                     <div style={{
                         padding: '24px',
                         display: 'flex',

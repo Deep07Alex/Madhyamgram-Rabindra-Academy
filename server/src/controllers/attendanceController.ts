@@ -77,8 +77,15 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
  * the system virtually assumes they were PRESENT unless an explicit record states otherwise.
  */
 export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
-    const { studentId, classId, startDate, endDate } = req.query;
+    const { studentId, studentIds, classId, startDate, endDate } = req.query;
     const targetStudentId = studentId || (req.user?.role === 'STUDENT' ? req.user.id : null);
+    
+    // Normalize studentIds if it's a string or array
+    let targetStudentIds: string[] | null = null;
+    if (studentIds) {
+        const rawIds = Array.isArray(studentIds) ? studentIds : [studentIds];
+        targetStudentIds = rawIds.filter((id): id is string => typeof id === 'string');
+    }
 
     try {
         // 1. Get all unique school session dates
@@ -117,7 +124,11 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
         if (targetStudentId) {
             query += ` AND a."studentId" = $${paramCount++}`;
             params.push(targetStudentId);
+        } else if (targetStudentIds && targetStudentIds.length > 0) {
+            query += ` AND a."studentId" = ANY($${paramCount++})`;
+            params.push(targetStudentIds);
         }
+
         if (classId) {
             query += ` AND a."classId" = $${paramCount++}`;
             params.push(classId);
@@ -132,7 +143,7 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
         const realRecords = attendanceRes.rows;
         
         // 3. Merge real records with virtual PRESENT records for all sessions (for single student history)
-        if (!targetStudentId) {
+        if (!targetStudentId && (!targetStudentIds || targetStudentIds.length === 0)) {
             return res.json({
                 records: realRecords,
                 totalSessions: realRecords.length

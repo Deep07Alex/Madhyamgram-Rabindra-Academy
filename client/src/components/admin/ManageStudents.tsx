@@ -447,7 +447,7 @@ const ManageStudents = () => {
                                 <th>ACTIONS</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody key={page} className="animate-fade-in">
                             {students.length > 0 ? students.map((user: any) => (
                                 <tr key={user.id}>
                                     <td style={{ padding: '24px 20px', verticalAlign: 'middle' }}>
@@ -554,28 +554,60 @@ const ManageStudents = () => {
                     </table>
                 </div>
 
-                {/* Pagination Controls */}
+                {/* Pagination Footer */}
                 {totalPages > 1 && (
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px', padding: '16px', borderTop: '1px solid var(--border-soft)' }}>
-                        <button 
-                            onClick={() => setPage(p => Math.max(1, p - 1))}
-                            disabled={page === 1}
-                            className="btn-secondary"
-                            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', opacity: page === 1 ? 0.5 : 1 }}
-                        >
-                            <ChevronLeft size={18} /> Previous
-                        </button>
-                        <span style={{ fontWeight: '700', color: 'var(--text-main)' }}>
-                            Page {page} of {totalPages}
+                    <div style={{
+                        padding: '24px',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: '20px',
+                        borderTop: '1px solid var(--border-soft)',
+                        background: 'var(--bg-main)'
+                    }}>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button
+                                onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }}
+                                disabled={page === 1}
+                                style={{
+                                    padding: '10px 20px', borderRadius: '30px',
+                                    border: '1px solid var(--border-soft)',
+                                    background: 'var(--bg-card)',
+                                    cursor: page === 1 ? 'not-allowed' : 'pointer',
+                                    opacity: page === 1 ? 0.3 : 1,
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-main)',
+                                    transition: 'all 0.2s',
+                                    boxShadow: 'var(--shadow-sm)'
+                                }}
+                            >
+                                <ChevronLeft size={18} /> Previous
+                            </button>
+                        </div>
+
+                        <span style={{ fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: '800' }}>
+                            Page <span style={{ color: 'var(--primary-bold)' }}>{page}</span> of {totalPages}
                         </span>
-                        <button 
-                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                            disabled={page === totalPages}
-                            className="btn-secondary"
-                            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', opacity: page === totalPages ? 0.5 : 1 }}
-                        >
-                            Next <ChevronRight size={18} />
-                        </button>
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button
+                                onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }}
+                                disabled={page === totalPages}
+                                style={{
+                                    padding: '10px 20px', borderRadius: '30px',
+                                    border: '1px solid var(--border-soft)',
+                                    background: 'var(--bg-card)',
+                                    cursor: page === totalPages ? 'not-allowed' : 'pointer',
+                                    opacity: page === totalPages ? 0.3 : 1,
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-main)',
+                                    transition: 'all 0.2s',
+                                    boxShadow: 'var(--shadow-sm)'
+                                }}
+                            >
+                                Next <ChevronRight size={18} />
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

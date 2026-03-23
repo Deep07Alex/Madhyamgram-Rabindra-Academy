@@ -299,6 +299,7 @@ export const initDb = async () => {
             CREATE INDEX IF NOT EXISTS "idx_teacher_name" ON "Teacher"("name");
             CREATE INDEX IF NOT EXISTS "idx_attendance_date" ON "Attendance"("date");
             CREATE INDEX IF NOT EXISTS "idx_attendance_class" ON "Attendance"("classId");
+            CREATE INDEX IF NOT EXISTS "idx_attendance_studentId" ON "Attendance"("studentId");
             CREATE INDEX IF NOT EXISTS "idx_attendance_date_student" ON "Attendance"("date", "studentId");
             CREATE INDEX IF NOT EXISTS "idx_result_student" ON "Result"("studentId");
             CREATE INDEX IF NOT EXISTS "idx_result_student_exam" ON "Result"("studentId", "semester");
