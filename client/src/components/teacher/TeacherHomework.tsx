@@ -278,7 +278,7 @@ const TeacherHomework = () => {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <span>{hw.title}</span>
                                             {hw.fileUrl && (
-                                                <a href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${hw.fileUrl}`} target="_blank" rel="noreferrer"
+                                                <a href={`${import.meta.env.VITE_API_URL || ''}${hw.fileUrl}`} target="_blank" rel="noreferrer"
                                                     title="View attached file"
                                                     style={{ color: 'var(--primary-bold)', display: 'flex', alignItems: 'center' }}>
                                                     <Paperclip size={13} />
@@ -378,7 +378,7 @@ const TeacherHomework = () => {
             {/* Submission Review Modal */}
             {selectedSubmission && (() => {
                 const s = selectedSubmission;
-                const fileUrl = s.fileUrl ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${s.fileUrl}` : null;
+                const fileUrl = s.fileUrl ? `${import.meta.env.VITE_API_URL || ''}${s.fileUrl}` : null;
                 const fileName = s.fileUrl ? s.fileUrl.split('/').pop() : '';
                 const ext = fileName?.split('.').pop()?.toLowerCase() || '';
                 const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);

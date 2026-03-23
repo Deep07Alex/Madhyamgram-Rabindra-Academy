@@ -11,8 +11,8 @@ import axios from 'axios';
 import type { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
-    timeout: 30000,
+    baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+    timeout: 120000, // 2 minutes (Needed for large media uploads)
 });
 
 // Add a request interceptor to include the JWT token

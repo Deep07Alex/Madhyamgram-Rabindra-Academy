@@ -37,7 +37,7 @@ const ManageAssets = () => {
     const [galleryForm, setGalleryForm] = useState({ title: '', description: '' });
     const [galleryFile, setGalleryFile] = useState<File | null>(null);
 
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || '';
 
     const fetchData = async () => {
         try {
@@ -74,9 +74,7 @@ const ManageAssets = () => {
 
         try {
             const endpoint = type === 'hero' ? '/system/hero-banner' : '/system/festival-banner';
-            const res = await api.post(endpoint, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            const res = await api.post(endpoint, formData);
             
             if (type === 'hero') setHeroBanner(res.data.url);
             else setFestivalBanner(res.data.url);
@@ -84,8 +82,19 @@ const ManageAssets = () => {
             setBannerFile(null);
             setPreviewUrl('');
             showToast(`${type === 'hero' ? 'Hero' : 'Festival'} banner updated!`, 'success');
-        } catch (error) {
-            showToast('Upload failed.', 'error');
+        } catch (error: any) {
+            console.error('FULL UPLOAD ERROR:', error);
+            const status = error.response?.status;
+            const code = error.code;
+            const serverMsg = error.response?.data?.message;
+            
+            let msg = 'Upload failed.';
+            if (code === 'ECONNABORTED') msg = 'Upload timed out (too slow).';
+            else if (status === 413) msg = 'File too large for server (413).';
+            else if (status) msg = `Server Error (${status}): ${serverMsg || 'Unknown'}`;
+            else if (code) msg = `Network Error: ${code}`;
+
+            showToast(msg, 'error');
         } finally {
             setIsUploading(false);
         }
@@ -104,15 +113,24 @@ const ManageAssets = () => {
         formData.append('image', galleryFile);
 
         try {
-            await api.post('/gallery', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            await api.post('/gallery', formData);
             setGalleryForm({ title: '', description: '' });
             setGalleryFile(null);
             fetchData();
             showToast('Gallery image added!', 'success');
-        } catch (error) {
-            showToast('Gallery upload failed.', 'error');
+        } catch (error: any) {
+            console.error('GALLERY UPLOAD ERROR:', error);
+            const status = error.response?.status;
+            const code = error.code;
+            const serverMsg = error.response?.data?.message;
+
+            let msg = 'Gallery upload failed.';
+            if (code === 'ECONNABORTED') msg = 'Gallery upload timed out.';
+            else if (status === 413) msg = 'Image too large (413).';
+            else if (status) msg = `Server Error (${status}): ${serverMsg || 'Unknown'}`;
+            else if (code) msg = `Network Error: ${code}`;
+
+            showToast(msg, 'error');
         }
     };
 

@@ -38,7 +38,7 @@ export const generateResultPDF = async (data: any) => {
         const getStudentPhotoData = async () => {
             if (!student.photo) return null;
             try {
-                const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+                const baseUrl = import.meta.env.VITE_API_URL || '';
                 const url = student.photo.startsWith('http') ? student.photo : `${baseUrl}${student.photo}`;
                 const response = await fetch(url);
                 if (!response.ok) return null;

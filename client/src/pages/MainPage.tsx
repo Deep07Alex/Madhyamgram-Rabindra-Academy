@@ -129,8 +129,8 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
  * Displays the school name, tagline, and main banner image.
  */
 function Hero({ bannerUrl }: { bannerUrl: string }) {
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-  const fullUrl = bannerUrl.startsWith('/') ? `${baseUrl}${bannerUrl}` : bannerUrl;
+  const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || '';
+  const fullUrl = (bannerUrl.startsWith('/') ? `${baseUrl}${bannerUrl}` : bannerUrl) + `?t=${Date.now()}`;
 
   return (
     <section className="hero">
@@ -165,8 +165,8 @@ function Hero({ bannerUrl }: { bannerUrl: string }) {
  * - Displays a dynamic banner managed by administrators in the 'ManageAssets' CMS.
  */
 function FestivalSection({ bannerUrl }: { bannerUrl: string }) {
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-  const fullUrl = bannerUrl.startsWith('/') ? `${baseUrl}${bannerUrl}` : bannerUrl;
+  const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || '';
+  const fullUrl = (bannerUrl.startsWith('/') ? `${baseUrl}${bannerUrl}` : bannerUrl) + `?t=${Date.now()}`;
 
   return (
     <section id="notice" className="landing-section notice">
@@ -182,18 +182,21 @@ function FestivalSection({ bannerUrl }: { bannerUrl: string }) {
 }
 
 function Gallery({ items }: { items: GalleryItem[] }) {
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || '';
 
   return (
     <section id="gallery" className="landing-section gallery">
       <h2>School Gallery</h2>
       <div className="gallery-grid">
-        {items.map((item, idx) => (
-          <div className="gallery-card" key={idx}>
-            <img src={item.src.startsWith('/') ? `${baseUrl}${item.src}` : item.src} alt={item.caption} loading="lazy" />
-            <p>{item.caption}</p>
-          </div>
-        ))}
+        {items.map((item, idx) => {
+          const imgSrc = (item.src.startsWith('/') ? `${baseUrl}${item.src}` : item.src) + `?t=${Date.now()}`;
+          return (
+            <div className="gallery-card" key={idx}>
+              <img src={imgSrc} alt={item.caption} loading="lazy" />
+              <p>{item.caption}</p>
+            </div>
+          );
+        })}
       </div>
     </section>
   );

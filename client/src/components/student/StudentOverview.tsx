@@ -62,7 +62,7 @@ const StudentOverview = ({
                     <div style={{ flex: '0 0 160px' }}>
                         <div style={{ width: '160px', height: '160px', borderRadius: '20px', overflow: 'hidden', border: '4px solid var(--bg-main)', boxShadow: 'var(--shadow-lg)' }}>
                             {user?.photo ? (
-                                <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${user.photo}?t=${Date.now()}`} alt="Student Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                                <img src={`${import.meta.env.VITE_API_URL || ''}${user.photo}?t=${Date.now()}`} alt="Student Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                             ) : (
                                 <div style={{ width: '100%', height: '100%', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <UserCircle size={100} color="var(--primary-bold)" />

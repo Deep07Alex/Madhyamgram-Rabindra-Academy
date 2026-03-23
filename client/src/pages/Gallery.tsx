@@ -92,7 +92,7 @@ const Gallery = () => {
                         }}>
                             <div style={{ overflow: 'hidden', height: '240px' }}>
                                 <img
-                                    src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${img.imageUrl}`}
+                                    src={`${import.meta.env.VITE_API_URL || ''}${img.imageUrl}`}
                                     alt={img.title}
                                     style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease' }}
                                     className="gallery-img"

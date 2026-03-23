@@ -340,7 +340,7 @@ const ManageTeachers = () => {
                                     <td style={{ padding: '24px 20px', verticalAlign: 'middle' }}>
                                          <div style={{ width: '45px', height: '45px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-soft)', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                             {user.photo ? (
-                                                <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${user.photo}?t=${Date.now()}`} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                <img src={`${import.meta.env.VITE_API_URL || ''}${user.photo}?t=${Date.now()}`} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                             ) : (
                                                 <UserCircle size={24} color="var(--primary-bold)" />
                                             )}

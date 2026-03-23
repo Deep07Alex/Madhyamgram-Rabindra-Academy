@@ -35,6 +35,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust Nginx Proxy (Required for rate-limiting and real IP detection)
+app.set('trust proxy', 1);
+
 // Environment Validation
 const REQUIRED_ENV = ['JWT_SECRET', 'DATABASE_URL'];
 REQUIRED_ENV.forEach(key => {

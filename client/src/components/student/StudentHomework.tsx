@@ -162,7 +162,7 @@ const StudentHomework = () => {
 
                                 <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid var(--border-soft)' }}>
                                     {hw.fileUrl ? (
-                                        <a href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${hw.fileUrl}`} target="_blank" rel="noreferrer" style={{
+                                        <a href={`${import.meta.env.VITE_API_URL || ''}${hw.fileUrl}`} target="_blank" rel="noreferrer" style={{
                                             fontSize: '0.75rem', color: 'var(--primary-bold)', fontWeight: 700,
                                             textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px'
                                         }}>

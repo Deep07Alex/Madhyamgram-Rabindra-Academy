@@ -98,7 +98,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({ value, currentUrl, onChange, 
                 {actualValue ? (
                     <>
                         <img 
-                            src={actualValue.startsWith('http') ? actualValue : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${actualValue}`} 
+                            src={actualValue.startsWith('http') ? actualValue : `${import.meta.env.VITE_API_URL || ''}${actualValue}`} 
                             alt="Preview" 
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
