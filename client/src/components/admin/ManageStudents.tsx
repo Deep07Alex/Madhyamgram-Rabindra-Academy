@@ -16,22 +16,39 @@ import * as XLSX from 'xlsx';
 import PhotoUpload from '../common/PhotoUpload';
 import Modal from '../common/Modal';
 import { useFetch } from '../../hooks/useFetch';
+import { useDebounce } from '../../hooks/useDebounce';
 import useServerEvents from '../../hooks/useServerEvents';
 import CustomSelect from '../common/CustomSelect';
 import ConfirmModal from '../common/ConfirmModal';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const ManageStudents = () => {
     const { showToast } = useToast();
-    const { data: studentsData, refetch: refreshStudents } = useFetch<any[]>('/users/students');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedClassId, setSelectedClassId] = useState<string>('');
+    const [page, setPage] = useState(1);
+    const debouncedSearch = useDebounce(searchQuery, 500);
+
+    const { data: studentsData, refetch: refreshStudents } = useFetch<any>('/users/students', {
+        params: { 
+            classId: selectedClassId, 
+            search: debouncedSearch,
+            page: page,
+            limit: 20
+        }
+    });
+
     const { data: classesData } = useFetch<any[]>('/users/classes');
-    const students = studentsData || [];
+    
+    // Handle new response format
+    const students = studentsData?.students || [];
+    const totalStudents = studentsData?.total || 0;
+    const totalPages = Math.ceil(totalStudents / 20);
     const classes = classesData || [];
 
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedClassId, setSelectedClassId] = useState<string>('');
     const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
     const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -190,13 +207,10 @@ const ManageStudents = () => {
         }
     };
 
-    const filteredStudents = students.filter((s: any) => {
-        const matchesSearch =
-            (s.studentId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (s.name || '').toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesClass = selectedClassId ? s.classId === selectedClassId : true;
-        return matchesSearch && matchesClass;
-    });
+    // Reset to page 1 when search or class changes
+    useEffect(() => {
+        setPage(1);
+    }, [debouncedSearch, selectedClassId]);
 
     return (
         <div className="manage-section">
@@ -434,7 +448,7 @@ const ManageStudents = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredStudents.map((user: any) => (
+                            {students.length > 0 ? students.map((user: any) => (
                                 <tr key={user.id}>
                                     <td style={{ padding: '24px 20px', verticalAlign: 'middle' }}>
                                         <div style={{ width: '45px', height: '45px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-soft)', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -529,10 +543,41 @@ const ManageStudents = () => {
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                            )) : (
+                                <tr>
+                                    <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                                        No students found matching your criteria.
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px', padding: '16px', borderTop: '1px solid var(--border-soft)' }}>
+                        <button 
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                            className="btn-secondary"
+                            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', opacity: page === 1 ? 0.5 : 1 }}
+                        >
+                            <ChevronLeft size={18} /> Previous
+                        </button>
+                        <span style={{ fontWeight: '700', color: 'var(--text-main)' }}>
+                            Page {page} of {totalPages}
+                        </span>
+                        <button 
+                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            disabled={page === totalPages}
+                            className="btn-secondary"
+                            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', opacity: page === totalPages ? 0.5 : 1 }}
+                        >
+                            Next <ChevronRight size={18} />
+                        </button>
+                    </div>
+                )}
             </div>
 
             <Modal

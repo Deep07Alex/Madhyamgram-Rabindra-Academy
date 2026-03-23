@@ -20,7 +20,9 @@ import { broadcast, sendToUser, sendToRole } from '../lib/sseManager.js';
  */
 export const getStudents = async (req: AuthRequest, res: Response) => {
     try {
-        const { classId } = req.query;
+        const { classId, page = 1, limit = 20, search = '' } = req.query;
+        const offset = (Number(page) - 1) * Number(limit);
+
         let query = `
             SELECT s.*, row_to_json(c.*) as class 
             FROM "Student" s 
@@ -35,10 +37,29 @@ export const getStudents = async (req: AuthRequest, res: Response) => {
             params.push(classId);
         }
 
-        query += ` ORDER BY c.grade ASC, CAST(s."rollNumber" AS INTEGER) ASC NULLS LAST`;
+        if (search) {
+            query += ` AND (s.name ILIKE $${paramCount} OR s."studentId" ILIKE $${paramCount})`;
+            params.push(`%${search}%`);
+            paramCount++;
+        }
 
-        const studentsRes = await db.query(query, params);
-        res.json(studentsRes.rows);
+        const countQuery = query.replace('s.*, row_to_json(c.*) as class', 'COUNT(*) as total');
+        
+        query += ` ORDER BY c.grade ASC, CAST(s."rollNumber" AS INTEGER) ASC NULLS LAST`;
+        query += ` LIMIT $${paramCount++} OFFSET $${paramCount++}`;
+        params.push(Number(limit), offset);
+
+        const [studentsRes, countRes] = await Promise.all([
+            db.query(query, params),
+            db.query(countQuery, params.slice(0, paramCount - 3))
+        ]);
+
+        res.json({
+            students: studentsRes.rows,
+            total: parseInt(countRes.rows[0].total, 10),
+            page: Number(page),
+            limit: Number(limit)
+        });
     } catch (error) {
         console.error('Error fetching students:', error);
         res.status(500).json({ message: 'Error fetching students' });
@@ -52,15 +73,34 @@ export const getStudents = async (req: AuthRequest, res: Response) => {
  */
 export const getTeachers = async (req: Request, res: Response) => {
     try {
-        const query = `
-            SELECT id, name, email, "teacherId", phone, aadhar, photo, address, dob, qualification, "extraQualification", designation, caste, "joiningDate", "isTeaching", "plainPassword", 'TEACHER' as role FROM "Teacher"
-            UNION ALL
-            SELECT id, name, email, "adminId" as "teacherId", phone, aadhar, photo, address, dob, qualification, "extraQualification", designation, caste, "joiningDate", TRUE as "isTeaching", "plainPassword", 'ADMIN' as role FROM "Admin"
-            WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS')
-            ORDER BY "isTeaching" DESC, "joiningDate" ASC NULLS LAST, "name" ASC
+        const { page = 1, limit = 20, search = '' } = req.query;
+        const offset = (Number(page) - 1) * Number(limit);
+        
+        const baseQuery = `
+            FROM (
+                SELECT id, name, email, "teacherId", phone, aadhar, photo, address, dob, qualification, "extraQualification", designation, caste, "joiningDate", "isTeaching", "plainPassword", 'TEACHER' as role FROM "Teacher"
+                UNION ALL
+                SELECT id, name, email, "adminId" as "teacherId", phone, aadhar, photo, address, dob, qualification, "extraQualification", designation, caste, "joiningDate", TRUE as "isTeaching", "plainPassword", 'ADMIN' as role FROM "Admin"
+                WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS')
+            ) staff
+            WHERE (name ILIKE $1 OR "teacherId" ILIKE $1 OR designation ILIKE $1)
         `;
-        const teachersRes = await db.query(query);
-        res.json(teachersRes.rows);
+
+        const searchParam = `%${search}%`;
+
+        const countRes = await db.query(`SELECT COUNT(*) as total ${baseQuery}`, [searchParam]);
+        const teachersRes = await db.query(`
+            SELECT * ${baseQuery}
+            ORDER BY "isTeaching" DESC, "joiningDate" ASC NULLS LAST, "name" ASC
+            LIMIT $2 OFFSET $3
+        `, [searchParam, Number(limit), offset]);
+
+        res.json({
+            teachers: teachersRes.rows,
+            total: parseInt(countRes.rows[0].total, 10),
+            page: Number(page),
+            limit: Number(limit)
+        });
     } catch (error) {
         console.error('Error fetching teachers:', error);
         res.status(500).json({ message: 'Error fetching teachers' });

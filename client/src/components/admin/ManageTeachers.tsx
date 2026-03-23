@@ -8,13 +8,14 @@
  * - Comprehensive profile management (Aadhar, Qualification, etc.).
  * - Automatic password generation from Aadhar or ID.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
-import { UserCircle, UserPlus, List, Eye, EyeOff, Save, Phone, Fingerprint, MapPin, GraduationCap, Calendar, Users as UsersIcon } from 'lucide-react';
+import { UserCircle, UserPlus, List, Eye, EyeOff, Save, Phone, Fingerprint, MapPin, GraduationCap, Calendar, Users as UsersIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import PhotoUpload from '../common/PhotoUpload';
 import Modal from '../common/Modal';
 import { useFetch } from '../../hooks/useFetch';
+import { useDebounce } from '../../hooks/useDebounce';
 import useServerEvents from '../../hooks/useServerEvents';
 import CustomSelect from '../common/CustomSelect';
 import ConfirmModal from '../common/ConfirmModal';
@@ -28,10 +29,22 @@ const CASTES = ['GENERAL', 'SC', 'ST', 'OBC-A', 'OBC-B'];
 
 const ManageTeachers = () => {
     const { showToast } = useToast();
-    const { data: teachersData, refetch: refreshTeachers } = useFetch<any[]>('/users/teachers');
-    const teachers = teachersData || [];
-    
     const [searchQuery, setSearchQuery] = useState('');
+    const [page, setPage] = useState(1);
+    const debouncedSearch = useDebounce(searchQuery, 500);
+
+    const { data: teachersData, refetch: refreshTeachers } = useFetch<any>('/users/teachers', {
+        params: {
+            search: debouncedSearch,
+            page: page,
+            limit: 20
+        }
+    });
+
+    const teachers = teachersData?.teachers || [];
+    const totalTeachers = teachersData?.total || 0;
+    const totalPages = Math.ceil(totalTeachers / 20);
+    
     const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
     const [editData, setEditData] = useState<any>({});
     const [selectedTeacher, setSelectedTeacher] = useState<any | null>(null);
@@ -39,6 +52,11 @@ const ManageTeachers = () => {
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: '' });
 
     useServerEvents({ 'profile_updated': refreshTeachers });
+
+    // Reset to page 1 when search changes
+    useEffect(() => {
+        setPage(1);
+    }, [debouncedSearch]);
 
     const [newUser, setNewUser] = useState({
         name: '', email: '', teacherId: '', password: '',
@@ -121,12 +139,6 @@ const ManageTeachers = () => {
         }
         setVisiblePasswords(newVisible);
     };
-
-    const filteredTeachers = teachers.filter((t: any) =>
-        (t.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.teacherId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.designation || '').toLowerCase().includes(searchQuery.toLowerCase())
-    );
 
     return (
         <div className="manage-section">
@@ -322,9 +334,9 @@ const ManageTeachers = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredTeachers.map((user: any, index: number) => (
+                            {teachers.length > 0 ? teachers.map((user: any, index: number) => (
                                 <tr key={user.id}>
-                                    <td style={{ fontWeight: '500', color: 'var(--text-main)', padding: '24px 20px' }}>{index + 1}</td>
+                                    <td style={{ fontWeight: '500', color: 'var(--text-main)', padding: '24px 20px' }}>{(page - 1) * 20 + index + 1}</td>
                                     <td style={{ padding: '24px 20px', verticalAlign: 'middle' }}>
                                          <div style={{ width: '45px', height: '45px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-soft)', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                             {user.photo ? (
@@ -426,10 +438,41 @@ const ManageTeachers = () => {
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                            )) : (
+                                <tr>
+                                    <td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                                        No faculty or staff found matching your criteria.
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px', padding: '16px', borderTop: '1px solid var(--border-soft)' }}>
+                        <button 
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                            className="btn-secondary"
+                            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', opacity: page === 1 ? 0.5 : 1 }}
+                        >
+                            <ChevronLeft size={18} /> Previous
+                        </button>
+                        <span style={{ fontWeight: '700', color: 'var(--text-main)' }}>
+                            Page {page} of {totalPages}
+                        </span>
+                        <button 
+                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            disabled={page === totalPages}
+                            className="btn-secondary"
+                            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', opacity: page === totalPages ? 0.5 : 1 }}
+                        >
+                            Next <ChevronRight size={18} />
+                        </button>
+                    </div>
+                )}
             </div>
 
             <Modal

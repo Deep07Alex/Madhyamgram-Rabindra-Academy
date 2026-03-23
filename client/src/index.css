@@ -1124,3 +1124,12 @@ textarea:focus {
     padding-bottom: 40px !important;
   }
 }
+/* Skeleton Loading Animation */
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.skeleton-loader {
+    animation: skeleton-loading 1.5s infinite linear;
+}

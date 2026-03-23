@@ -255,3 +255,12 @@ ON CONFLICT ("adminId") DO NOTHING;
 DELETE FROM "Teacher" WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS');
 
 -- End of Setup Script
+
+-- PERFORMANCE INDEXES ---------------------------------------
+-- Optimized for search and dashboard statistics
+CREATE INDEX IF NOT EXISTS idx_student_id ON "Student" ("studentId");
+CREATE INDEX IF NOT EXISTS idx_student_class ON "Student" ("classId");
+CREATE INDEX IF NOT EXISTS idx_teacher_id ON "Teacher" ("teacherId");
+CREATE INDEX IF NOT EXISTS idx_attendance_date_student ON "Attendance" ("date", "studentId");
+CREATE INDEX IF NOT EXISTS idx_result_student_exam ON "Result" ("studentId", "examType");
+--------------------------------------------------------------

@@ -8,20 +8,23 @@
  * - Responsive sidebar navigation.
  * - Role-based route protection.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { useNavigate, NavLink, Routes, Route, Navigate } from 'react-router-dom';
 import api from '../services/api';
-import ManageStudents from '../components/admin/ManageStudents';
-import ManageTeachers from '../components/admin/ManageTeachers';
-import ManageClasses from '../components/admin/ManageClasses';
+import { StatsSkeleton } from '../components/common/Skeleton';
 
-import ManageResults from '../components/admin/ManageResults';
-import ManageAssets from '../components/admin/ManageAssets';
-import ManageAttendance from '../components/admin/ManageAttendance';
-import ManageNotices from '../components/admin/ManageNotices';
+// Admin Sub-modules (Lazy Loaded for performance)
+const ManageStudents = lazy(() => import('../components/admin/ManageStudents'));
+const ManageTeachers = lazy(() => import('../components/admin/ManageTeachers'));
+const ManageClasses = lazy(() => import('../components/admin/ManageClasses'));
+const ManageResults = lazy(() => import('../components/admin/ManageResults'));
+const ManageAssets = lazy(() => import('../components/admin/ManageAssets'));
+const ManageAttendance = lazy(() => import('../components/admin/ManageAttendance'));
+const ManageNotices = lazy(() => import('../components/admin/ManageNotices'));
+const AdminOverview = lazy(() => import('../components/admin/AdminOverview'));
+
 import LiveClock from '../components/common/LiveClock';
 import ThemeToggle from '../components/common/ThemeToggle';
-import AdminOverview from '../components/admin/AdminOverview';
 import useServerEvents from '../hooks/useServerEvents';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -185,18 +188,25 @@ const AdminDashboard = () => {
                 </header>
 
                 <div className="page-view">
-                    <Routes>
-                        <Route path="dashboard" element={<AdminOverview user={user} stats={stats} />} />
-                        <Route path="students" element={<ManageStudents />} />
-                        <Route path="faculty" element={<ManageTeachers />} />
-                        <Route path="classes" element={<ManageClasses />} />
-                        <Route path="attendance" element={<ManageAttendance />} />
-                        <Route path="results" element={<ManageResults />} />
-                        <Route path="notices" element={<ManageNotices />} />
-                        <Route path="assets" element={<ManageAssets />} />
-                        <Route path="/" element={<Navigate to="/admin/dashboard" />} />
-                        <Route path="*" element={<Navigate to="/admin/dashboard" />} />
-                    </Routes>
+                    <Suspense fallback={
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', width: '100%', color: 'var(--primary-bold)' }}>
+                            <Loader2 className="animate-spin" size={32} />
+                            <span style={{ marginLeft: '12px', fontWeight: '600' }}>Loading Module...</span>
+                        </div>
+                    }>
+                        <Routes>
+                            <Route path="dashboard" element={stats ? <AdminOverview user={user} stats={stats} /> : <StatsSkeleton />} />
+                            <Route path="students" element={<ManageStudents />} />
+                            <Route path="faculty" element={<ManageTeachers />} />
+                            <Route path="classes" element={<ManageClasses />} />
+                            <Route path="attendance" element={<ManageAttendance />} />
+                            <Route path="results" element={<ManageResults />} />
+                            <Route path="notices" element={<ManageNotices />} />
+                            <Route path="assets" element={<ManageAssets />} />
+                            <Route path="/" element={<Navigate to="/admin/dashboard" />} />
+                            <Route path="*" element={<Navigate to="/admin/dashboard" />} />
+                        </Routes>
+                    </Suspense>
                 </div>
             </main>
         </div>
