@@ -1,18 +1,25 @@
+-- Madhyamgram Rabindra Academy - Production Database Setup Script
+-- This script initializes the database schema, default data, and performance indexes.
+
 -- 1. Setup
-CREATE DATABASE "Madhyamgram-Rabindra-Academy";
-\c "Madhyamgram-Rabindra-Academy"
+-- CREATE DATABASE "Madhyamgram-Rabindra-Academy";
+-- \c "Madhyamgram-Rabindra-Academy"
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- 2. Enums
 DO $$ BEGIN
-    CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE');
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'AttendanceStatus') THEN
+        CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE');
+    END IF;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
 DO $$ BEGIN
-    CREATE TYPE "SubmissionStatus" AS ENUM ('PENDING', 'SUBMITTED', 'GRADED');
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'SubmissionStatus') THEN
+        CREATE TYPE "SubmissionStatus" AS ENUM ('PENDING', 'SUBMITTED', 'GRADED');
+    END IF;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
@@ -45,13 +52,13 @@ CREATE TABLE IF NOT EXISTS "Admin" (
 -- Teacher Table
 CREATE TABLE IF NOT EXISTS "Teacher" (
     "id" TEXT PRIMARY KEY,
-    "password" TEXT, -- Nullable for non-teaching staff
+    "password" TEXT,
     "name" TEXT NOT NULL,
     "email" TEXT UNIQUE,
-    "teacherId" TEXT UNIQUE, -- Optional/Null for non-teaching staff
+    "teacherId" TEXT UNIQUE,
     "phone" TEXT,
     "aadhar" TEXT,
-    "photo" TEXT, -- URL to uploaded photo
+    "photo" TEXT,
     "address" TEXT,
     "dob" DATE,
     "qualification" TEXT,
@@ -60,7 +67,7 @@ CREATE TABLE IF NOT EXISTS "Teacher" (
     "caste" TEXT,
     "joiningDate" DATE,
     "isTeaching" BOOLEAN DEFAULT TRUE,
-    "plainPassword" TEXT, -- Storing for admin visibility
+    "plainPassword" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -72,7 +79,7 @@ CREATE TABLE IF NOT EXISTS "Class" (
     "grade" INTEGER NOT NULL
 );
 
--- Implicit M:N join table for Classes and Teachers
+-- _ClassToTeacher (Implicit M:N join table from Prisma)
 CREATE TABLE IF NOT EXISTS "_ClassToTeacher" (
     "A" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     "B" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -98,18 +105,20 @@ CREATE TABLE IF NOT EXISTS "Student" (
 CREATE UNIQUE INDEX IF NOT EXISTS "Student_banglarSikkhaId_unique" ON "Student"("banglarSikkhaId") WHERE ("banglarSikkhaId" IS NOT NULL);
 
 -- Attendance Table
+-- NOTE: teacherId is NOT constrained by FK to Teacher because it can be an Admin (Principal/HM)
 CREATE TABLE IF NOT EXISTS "Attendance" (
     "id" TEXT PRIMARY KEY,
     "date" DATE NOT NULL DEFAULT CURRENT_DATE,
     "status" "AttendanceStatus" NOT NULL,
     "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    "teacherId" TEXT NOT NULL, -- Flexible for Teacher or Admin (Principal/HM)
+    "teacherId" TEXT NOT NULL, 
     "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     "subject" TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "Attendance_student_date_unique" ON "Attendance"("studentId", "date");
 
 -- TeacherAttendance Table
+-- NOTE: teacherId is NOT constrained by FK to Teacher because it can be an Admin (Principal/HM)
 CREATE TABLE IF NOT EXISTS "TeacherAttendance" (
     "id" TEXT PRIMARY KEY,
     "date" DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -118,7 +127,7 @@ CREATE TABLE IF NOT EXISTS "TeacherAttendance" (
     "departureTime" TIME,
     "reason" TEXT,
     "earlyLeaveReason" TEXT,
-    "teacherId" TEXT NOT NULL -- Flexible for Teacher or Admin (Principal/HM)
+    "teacherId" TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "TeacherAttendance_teacher_date_unique" ON "TeacherAttendance"("teacherId", "date");
 
@@ -207,38 +216,45 @@ INSERT INTO "Class" ("id", "name", "grade") VALUES
 ('class-std-iv', 'STD-IV', 6)
 ON CONFLICT ("name") DO NOTHING;
 
--- 6. Performance Indexes
-CREATE INDEX IF NOT EXISTS "idx_student_class" ON "Student"("classId");
-CREATE INDEX IF NOT EXISTS "idx_student_rollNumber" ON "Student"("rollNumber");
-CREATE INDEX IF NOT EXISTS "idx_student_name" ON "Student"("name");
-CREATE INDEX IF NOT EXISTS "idx_attendance_date" ON "Attendance"("date");
-CREATE INDEX IF NOT EXISTS "idx_attendance_class" ON "Attendance"("classId");
-CREATE INDEX IF NOT EXISTS "idx_teacher_phone" ON "Teacher"("phone");
-CREATE INDEX IF NOT EXISTS "idx_teacher_aadhar" ON "Teacher"("aadhar");
-CREATE INDEX IF NOT EXISTS "idx_teacher_name" ON "Teacher"("name");
-CREATE INDEX IF NOT EXISTS "idx_result_student" ON "Result"("studentId");
-CREATE INDEX IF NOT EXISTS "idx_homework_class" ON "Homework"("classId");
-CREATE INDEX IF NOT EXISTS "idx_homework_teacher" ON "Homework"("teacherId");
-CREATE INDEX IF NOT EXISTS "idx_submission_status" ON "Submission"("status");
-CREATE INDEX IF NOT EXISTS "idx_submission_homework" ON "Submission"("homeworkId");
-CREATE INDEX IF NOT EXISTS "idx_submission_student" ON "Submission"("studentId");
-CREATE INDEX IF NOT EXISTS "idx_notice_createdAt" ON "Notice"("createdAt");
-CREATE INDEX IF NOT EXISTS "idx_notice_audience" ON "Notice"("targetAudience");
-CREATE INDEX IF NOT EXISTS "idx_notice_type" ON "Notice"("type");
-
--- 7. Initial Admin User
-INSERT INTO "Admin" ("id", "adminId", "username", "password", "name", "email") 
+-- 6. Initial Admin User
+INSERT INTO "Admin" ("id", "adminId", "username", "password", "name", "email", "designation") 
 VALUES (
     'admin-aritra-uuid', 
     'A-8100474669', 
     'aritrada420', 
     '$2b$10$TZtbcOHow1SbhWx5azR2eOiMUpvUwylmmipL9wYmApi5d4IL/KuAi', 
     'Aritra Dutta', 
-    'aritrada420@gmail.com'
+    'aritrada420@gmail.com',
+    'DEVELOPER'
 )
 ON CONFLICT ("adminId") DO NOTHING;
 
--- 8. Migration: Move Principal and Headmistress to Admin table if they exist in Teacher
+-- 7. Performance Indexes
+CREATE INDEX IF NOT EXISTS "idx_student_class" ON "Student"("classId");
+CREATE INDEX IF NOT EXISTS "idx_student_rollNumber" ON "Student"("rollNumber");
+CREATE INDEX IF NOT EXISTS "idx_student_name" ON "Student"("name");
+CREATE INDEX IF NOT EXISTS "idx_student_id" ON "Student"("studentId");
+CREATE INDEX IF NOT EXISTS "idx_teacher_id" ON "Teacher"("teacherId");
+CREATE INDEX IF NOT EXISTS "idx_teacher_name" ON "Teacher"("name");
+CREATE INDEX IF NOT EXISTS "idx_attendance_date" ON "Attendance"("date");
+CREATE INDEX IF NOT EXISTS "idx_attendance_class" ON "Attendance"("classId");
+CREATE INDEX IF NOT EXISTS "idx_attendance_date_student" ON "Attendance"("date", "studentId");
+CREATE INDEX IF NOT EXISTS "idx_result_student" ON "Result"("studentId");
+CREATE INDEX IF NOT EXISTS "idx_result_student_exam" ON "Result"("studentId", "semester");
+CREATE INDEX IF NOT EXISTS "idx_homework_class" ON "Homework"("classId");
+CREATE INDEX IF NOT EXISTS "idx_submission_status" ON "Submission"("status");
+CREATE INDEX IF NOT EXISTS "idx_notice_createdAt" ON "Notice"("createdAt");
+
+-- 8. Migration Logic: Fix Leadership roles if script is run on existing data
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Attendance_teacherId_fkey') THEN
+        ALTER TABLE "Attendance" DROP CONSTRAINT "Attendance_teacherId_fkey";
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'TeacherAttendance_teacherId_fkey') THEN
+        ALTER TABLE "TeacherAttendance" DROP CONSTRAINT "TeacherAttendance_teacherId_fkey";
+    END IF;
+END $$;
+
 INSERT INTO "Admin" (
     id, "adminId", password, "plainPassword", name, email, 
     designation, phone, aadhar, photo, address, dob, 
@@ -250,17 +266,18 @@ SELECT
     qualification, "extraQualification", caste, "joiningDate"
 FROM "Teacher"
 WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS')
-ON CONFLICT ("adminId") DO NOTHING;
+ON CONFLICT ("adminId") DO UPDATE SET
+    designation = EXCLUDED.designation,
+    phone = EXCLUDED.phone,
+    aadhar = EXCLUDED.aadhar,
+    photo = EXCLUDED.photo,
+    address = EXCLUDED.address,
+    dob = EXCLUDED.dob,
+    qualification = EXCLUDED.qualification,
+    "extraQualification" = EXCLUDED."extraQualification",
+    caste = EXCLUDED.caste,
+    "joiningDate" = EXCLUDED."joiningDate";
 
 DELETE FROM "Teacher" WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS');
 
 -- End of Setup Script
-
--- PERFORMANCE INDEXES ---------------------------------------
--- Optimized for search and dashboard statistics
-CREATE INDEX IF NOT EXISTS idx_student_id ON "Student" ("studentId");
-CREATE INDEX IF NOT EXISTS idx_student_class ON "Student" ("classId");
-CREATE INDEX IF NOT EXISTS idx_teacher_id ON "Teacher" ("teacherId");
-CREATE INDEX IF NOT EXISTS idx_attendance_date_student ON "Attendance" ("date", "studentId");
-CREATE INDEX IF NOT EXISTS idx_result_student_exam ON "Result" ("studentId", "semester");
---------------------------------------------------------------

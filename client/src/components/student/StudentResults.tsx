@@ -101,7 +101,7 @@ const StudentResults = () => {
                         options={ACADEMIC_YEARS.map(y => ({ value: y.toString(), label: y.toString() }))}
                         icon={<Calendar size={16} />}
                     />
-                    <button onClick={() => generateResultPDF(reportData)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 24px' }}>
+                    <button onClick={async () => await generateResultPDF(reportData)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 24px' }}>
                         <Download size={18} /> Download official PDF
                     </button>
                 </div>

@@ -206,11 +206,22 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
         const rankInfo = rankRes.rows.find(r => r.studentId === studentId);
         const myRank = rankInfo ? String(rankInfo.rank) : '-';
 
+        // Fetch Highest Marks per Subject in Class for the year/semester
+        const highestMarksRes = await db.query(
+            `SELECT subject, semester, MAX(marks) as max_marks
+             FROM "Result"
+             WHERE "academicYear" = $1 AND "studentId" IN (SELECT id FROM "Student" WHERE "classId" = $2)
+             GROUP BY subject, semester`,
+            [academicYear, student.classId]
+        );
+        const highestMarks = highestMarksRes.rows;
+
         res.json({
             student,
             results: resultsRes.rows,
             attendance: attendanceData,
-            rank: myRank
+            rank: myRank,
+            highestMarks
         });
     } catch (error) {
         console.error('Report fetch error:', error);

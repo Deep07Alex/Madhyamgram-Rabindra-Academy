@@ -11,11 +11,12 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
 import { MAIN_SUBJECTS, EXAMINATION_TERMS, ACADEMIC_YEARS } from '../../utils/constants';
-import { FilePlus, List, Trash2, Download, Upload, FileSpreadsheet, Loader2, Search, X, Calendar, GraduationCap, School } from 'lucide-react';
+import { FilePlus, List, Trash2, Download, Upload, FileSpreadsheet, Loader2, Search, X, Calendar, GraduationCap, School, FileCheck } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import * as XLSX from 'xlsx';
 import CustomSelect from '../common/CustomSelect';
 import ConfirmModal from '../common/ConfirmModal';
+import { generateResultPDF } from '../../utils/resultUtils';
 
 interface Student {
     id: string;
@@ -575,11 +576,29 @@ const ManageResults = () => {
                             </table>
                         </div>
 
-                        <div style={{ padding: '24px', borderTop: '1px solid var(--border-soft)', background: 'var(--bg-main)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ padding: '24px', borderTop: '1px solid var(--border-soft)', background: 'var(--bg-main)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                             <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>
-                                Aggregate Score: <span style={{ color: 'var(--primary-bold)', fontSize: '1.2rem', marginLeft: '8px' }}>{selectedStudent.totalObtained}</span> / {selectedStudent.totalPossible}
+                                Term Aggregate: <span style={{ color: 'var(--primary-bold)', fontSize: '1.2rem', marginLeft: '8px' }}>{selectedStudent.totalObtained}</span> / {selectedStudent.totalPossible}
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} className="btn-secondary" style={{ padding: '8px 24px' }}>Close View</button>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button 
+                                    onClick={async () => {
+                                        try {
+                                            showToast('Generating consolidated report...', 'info');
+                                            const res = await api.get(`/results/report?studentId=${selectedStudent.student.id}&academicYear=${selectedYear}`);
+                                            await generateResultPDF(res.data);
+                                            showToast('Report generated successfully', 'success');
+                                        } catch (err) {
+                                            showToast('Failed to generate report', 'error');
+                                        }
+                                    }} 
+                                    className="btn-primary" 
+                                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}
+                                >
+                                    <FileCheck size={18} /> Download Official PDF
+                                </button>
+                                <button onClick={() => setIsModalOpen(false)} className="btn-secondary" style={{ padding: '8px 24px' }}>Close View</button>
+                            </div>
                         </div>
                     </div>
                 </div>

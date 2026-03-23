@@ -14,29 +14,35 @@ import { db } from './db.js';
  */
 export const initDb = async () => {
     try {
-        console.log('Initializing database tables...');
+        console.log('Initializing database tables and migrations...');
 
         await db.query(`
-            -- Enums
+            -- 1. Enums
             DO $$ BEGIN
-                CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE');
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'AttendanceStatus') THEN
+                    CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE');
+                END IF;
             EXCEPTION
                 WHEN duplicate_object THEN null;
             END $$;
 
             DO $$ BEGIN
-                CREATE TYPE "SubmissionStatus" AS ENUM ('PENDING', 'SUBMITTED', 'GRADED');
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'SubmissionStatus') THEN
+                    CREATE TYPE "SubmissionStatus" AS ENUM ('PENDING', 'SUBMITTED', 'GRADED');
+                END IF;
             EXCEPTION
                 WHEN duplicate_object THEN null;
             END $$;
 
-
+            -- 2. Core Tables
+            
             -- Admin Table
             CREATE TABLE IF NOT EXISTS "Admin" (
                 "id" TEXT PRIMARY KEY,
                 "adminId" TEXT UNIQUE NOT NULL,
                 "username" TEXT UNIQUE,
                 "password" TEXT NOT NULL,
+                "plainPassword" TEXT,
                 "name" TEXT NOT NULL,
                 "email" TEXT UNIQUE,
                 "designation" TEXT,
@@ -56,13 +62,13 @@ export const initDb = async () => {
             -- Teacher Table
             CREATE TABLE IF NOT EXISTS "Teacher" (
                 "id" TEXT PRIMARY KEY,
-                "password" TEXT, -- Nullable for non-teaching staff
+                "password" TEXT,
                 "name" TEXT NOT NULL,
                 "email" TEXT UNIQUE,
-                "teacherId" TEXT UNIQUE, -- Optional/Null for non-teaching staff
+                "teacherId" TEXT UNIQUE,
                 "phone" TEXT,
                 "aadhar" TEXT,
-                "photo" TEXT, -- URL to uploaded photo
+                "photo" TEXT,
                 "address" TEXT,
                 "dob" DATE,
                 "qualification" TEXT,
@@ -71,33 +77,10 @@ export const initDb = async () => {
                 "caste" TEXT,
                 "joiningDate" DATE,
                 "isTeaching" BOOLEAN DEFAULT TRUE,
-                "plainPassword" TEXT, -- Storing for admin visibility
+                "plainPassword" TEXT,
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
-
-            -- Add missing columns if they don't exist
-            DO $$ 
-            BEGIN 
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Teacher' AND column_name='photo') THEN
-                    ALTER TABLE "Teacher" ADD COLUMN "photo" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Teacher' AND column_name='address') THEN
-                    ALTER TABLE "Teacher" ADD COLUMN "address" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Teacher' AND column_name='dob') THEN
-                    ALTER TABLE "Teacher" ADD COLUMN "dob" DATE;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Teacher' AND column_name='qualification') THEN
-                    ALTER TABLE "Teacher" ADD COLUMN "qualification" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Teacher' AND column_name='extraQualification') THEN
-                    ALTER TABLE "Teacher" ADD COLUMN "extraQualification" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Teacher' AND column_name='caste') THEN
-                    ALTER TABLE "Teacher" ADD COLUMN "caste" TEXT;
-                END IF;
-            END $$;
 
             -- Class Table
             CREATE TABLE IF NOT EXISTS "Class" (
@@ -106,7 +89,7 @@ export const initDb = async () => {
                 "grade" INTEGER NOT NULL
             );
 
-            -- _ClassToTeacher (Implicit M:N join table from Prisma)
+            -- _ClassToTeacher (Implicit M:N join table)
             CREATE TABLE IF NOT EXISTS "_ClassToTeacher" (
                 "A" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
                 "B" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -125,24 +108,27 @@ export const initDb = async () => {
                 "banglarSikkhaId" TEXT,
                 "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
                 "photo" TEXT,
+                "plainPassword" TEXT,
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE UNIQUE INDEX IF NOT EXISTS "Student_banglarSikkhaId_unique" ON "Student"("banglarSikkhaId") WHERE ("banglarSikkhaId" IS NOT NULL);
 
-            -- Attendance Table (create with date stored as DATE for one-per-day)
+            -- Attendance Table
+            -- Note: teacherId is NOT constrained by FK to Teacher because it can be an Admin (Principal/HM)
             CREATE TABLE IF NOT EXISTS "Attendance" (
                 "id" TEXT PRIMARY KEY,
                 "date" DATE NOT NULL DEFAULT CURRENT_DATE,
                 "status" "AttendanceStatus" NOT NULL,
                 "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-                "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+                "teacherId" TEXT NOT NULL,
                 "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
                 "subject" TEXT
             );
-            -- One attendance record per student per day
             CREATE UNIQUE INDEX IF NOT EXISTS "Attendance_student_date_unique" ON "Attendance"("studentId", "date");
 
             -- TeacherAttendance Table
+            -- Note: teacherId is NOT constrained by FK to Teacher because it can be an Admin (Principal/HM)
             CREATE TABLE IF NOT EXISTS "TeacherAttendance" (
                 "id" TEXT PRIMARY KEY,
                 "date" DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -151,9 +137,8 @@ export const initDb = async () => {
                 "departureTime" TIME,
                 "reason" TEXT,
                 "earlyLeaveReason" TEXT,
-                "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE
+                "teacherId" TEXT NOT NULL
             );
-            -- One attendance record per teacher per day
             CREATE UNIQUE INDEX IF NOT EXISTS "TeacherAttendance_teacher_date_unique" ON "TeacherAttendance"("teacherId", "date");
 
             -- Homework Table
@@ -166,6 +151,7 @@ export const initDb = async () => {
                 "dueDate" TIMESTAMP(3) NOT NULL,
                 "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE,
                 "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+                "allowFileUpload" BOOLEAN DEFAULT TRUE,
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -174,12 +160,12 @@ export const initDb = async () => {
                 "id" TEXT PRIMARY KEY,
                 "content" TEXT,
                 "fileUrl" TEXT,
+                "feedback" TEXT,
                 "status" "SubmissionStatus" NOT NULL DEFAULT 'PENDING',
                 "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE,
                 "homeworkId" TEXT NOT NULL REFERENCES "Homework"("id") ON DELETE CASCADE ON UPDATE CASCADE,
                 "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
-
 
             -- Result Table
             CREATE TABLE IF NOT EXISTS "Result" (
@@ -191,10 +177,9 @@ export const initDb = async () => {
                 "academicYear" INTEGER NOT NULL DEFAULT 2025,
                 "grade" TEXT,
                 "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-                "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+                "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT "result_unique_entry" UNIQUE ("studentId", "subject", "semester", "academicYear")
             );
-
-            -- Gallery Table
 
             -- Gallery Table
             CREATE TABLE IF NOT EXISTS "Gallery" (
@@ -218,202 +203,68 @@ export const initDb = async () => {
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            -- SystemConfig Table (for persistent settings)
+            -- SystemConfig Table
             CREATE TABLE IF NOT EXISTS "SystemConfig" (
                 "key" TEXT PRIMARY KEY,
                 "value" TEXT NOT NULL,
                 "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            -- Default configs
-            INSERT INTO "SystemConfig" ("key", "value") VALUES ('attendance_override', 'AUTO')
-            ON CONFLICT ("key") DO NOTHING;
-        `);
+            -- Default System Data
+            INSERT INTO "SystemConfig" ("key", "value") VALUES ('attendance_override', 'AUTO') ON CONFLICT ("key") DO NOTHING;
 
-        console.log('Database tables verified/initialized successfully.');
+            INSERT INTO "Class" ("id", "name", "grade") VALUES
+            ('class-nursery', 'Nursery', 0),
+            ('class-kg-i', 'KG-I', 1),
+            ('class-kg-ii-a', 'KG-II A', 2),
+            ('class-kg-ii-b', 'KG-II B', 2),
+            ('class-std-i', 'STD-I', 3),
+            ('class-std-ii', 'STD-II', 4),
+            ('class-std-iii', 'STD-III', 5),
+            ('class-std-iv', 'STD-IV', 6)
+            ON CONFLICT ("name") DO NOTHING;
 
-        // --- Migrations: run idempotently on every start ---
-        // 1. Alter date columns from TIMESTAMP to DATE if not already DATE
-        await db.query(`
+            -- Default Admin (Initial setup)
+            INSERT INTO "Admin" ("id", "adminId", "username", "password", "name", "email", "designation") 
+            VALUES (
+                'admin-aritra-uuid', 
+                'A-8100474669', 
+                'aritrada420', 
+                '$2b$10$TZtbcOHow1SbhWx5azR2eOiMUpvUwylmmipL9wYmApi5d4IL/KuAi', 
+                'Aritra Dutta', 
+                'aritrada420@gmail.com',
+                'DEVELOPER'
+            ) ON CONFLICT ("adminId") DO NOTHING;
+
+            -- 3. Essential Migrations (Alterations)
+            
+            -- Attendance Table: Relax teacherId dependency (Allow Admins)
             DO $$ BEGIN
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'Attendance' AND column_name = 'date' AND data_type = 'timestamp without time zone'
-                ) THEN
-                    -- Remove duplicates first (keep the one with lowest id for each student+day)
-                    DELETE FROM "Attendance"
-                    WHERE id NOT IN (
-                        SELECT DISTINCT ON ("studentId", date::DATE) id
-                        FROM "Attendance"
-                        ORDER BY "studentId", date::DATE, id ASC
-                    );
-                    -- Alter column type
-                    ALTER TABLE "Attendance" ALTER COLUMN date TYPE DATE USING date::DATE;
+                IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Attendance_teacherId_fkey') THEN
+                    ALTER TABLE "Attendance" DROP CONSTRAINT "Attendance_teacherId_fkey";
+                END IF;
+                IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'TeacherAttendance_teacherId_fkey') THEN
+                    ALTER TABLE "TeacherAttendance" DROP CONSTRAINT "TeacherAttendance_teacherId_fkey";
                 END IF;
             END $$;
-        `);
 
-        await db.query(`
+            -- Column Sync (Idempotent alterations)
             DO $$ BEGIN
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'TeacherAttendance' AND column_name = 'date' AND data_type = 'timestamp without time zone'
-                ) THEN
-                    -- Remove duplicates first
-                    DELETE FROM "TeacherAttendance"
-                    WHERE id NOT IN (
-                        SELECT DISTINCT ON ("teacherId", date::DATE) id
-                        FROM "TeacherAttendance"
-                        ORDER BY "teacherId", date::DATE, id ASC
-                    );
-                    -- Alter column type
-                    ALTER TABLE "TeacherAttendance" ALTER COLUMN date TYPE DATE USING date::DATE;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Homework' AND column_name='allowFileUpload') THEN
+                    ALTER TABLE "Homework" ADD COLUMN "allowFileUpload" BOOLEAN DEFAULT TRUE;
                 END IF;
-            END $$;
-        `);        await db.query(`
-            DO $$ BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'Notice' AND column_name = 'expiresAt'
-                ) THEN
-                    ALTER TABLE "Notice" ADD COLUMN "expiresAt" TIMESTAMP(3);
-                END IF;
-            END $$;
-        `);
-
-        // 2. Add 'reason' and time columns to TeacherAttendance if they don't exist
-        await db.query(`
-            DO $$ BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'TeacherAttendance' AND column_name = 'reason') THEN
-                    ALTER TABLE "TeacherAttendance" ADD COLUMN "reason" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'TeacherAttendance' AND column_name = 'arrivalTime') THEN
-                    ALTER TABLE "TeacherAttendance" ADD COLUMN "arrivalTime" TIME;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'TeacherAttendance' AND column_name = 'departureTime') THEN
-                    ALTER TABLE "TeacherAttendance" ADD COLUMN "departureTime" TIME;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'TeacherAttendance' AND column_name = 'earlyLeaveReason') THEN
-                    ALTER TABLE "TeacherAttendance" ADD COLUMN "earlyLeaveReason" TEXT;
-                END IF;
-            END $$;
-        `);
-
-        // 3. Add 'banglarSikkhaId' and 'photo' columns to Student if they don't exist
-        await db.query(`
-            DO $$ BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'Student' AND column_name = 'banglarSikkhaId'
-                ) THEN
-                    ALTER TABLE "Student" ADD COLUMN "banglarSikkhaId" TEXT;
-                END IF;
-
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'Student' AND column_name = 'photo'
-                ) THEN
-                    ALTER TABLE "Student" ADD COLUMN "photo" TEXT;
-                END IF;
-
-                -- Add unique constraint if not exists
-                IF NOT EXISTS (
-                    SELECT 1 FROM pg_indexes 
-                    WHERE tablename = 'Student' AND indexname = 'Student_banglarSikkhaId_unique'
-                ) THEN
-                    CREATE UNIQUE INDEX "Student_banglarSikkhaId_unique" ON "Student"("banglarSikkhaId") WHERE ("banglarSikkhaId" IS NOT NULL);
-                END IF;
-            END $$;
-        `);
-
-        // 4. Update Teacher Table Schema
-        await db.query(`
-            DO $$ BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Teacher' AND column_name = 'phone') THEN
-                    ALTER TABLE "Teacher" ADD COLUMN "phone" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Teacher' AND column_name = 'aadhar') THEN
-                    ALTER TABLE "Teacher" ADD COLUMN "aadhar" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Teacher' AND column_name = 'designation') THEN
-                    ALTER TABLE "Teacher" ADD COLUMN "designation" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Teacher' AND column_name = 'joiningDate') THEN
-                    ALTER TABLE "Teacher" ADD COLUMN "joiningDate" DATE;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Teacher' AND column_name = 'isTeaching') THEN
-                    ALTER TABLE "Teacher" ADD COLUMN "isTeaching" BOOLEAN DEFAULT TRUE;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Teacher' AND column_name = 'plainPassword') THEN
-                    ALTER TABLE "Teacher" ADD COLUMN "plainPassword" TEXT;
-                END IF;
-                
-                -- Make password and teacherId nullable if they aren't already
-                ALTER TABLE "Teacher" ALTER COLUMN "password" DROP NOT NULL;
-                ALTER TABLE "Teacher" ALTER COLUMN "teacherId" DROP NOT NULL;
-            END $$;
-        `);
-
-        // 5. Update Submission Table Schema
-        await db.query(`
-            DO $$ BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Submission' AND column_name = 'feedback') THEN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Submission' AND column_name='feedback') THEN
                     ALTER TABLE "Submission" ADD COLUMN "feedback" TEXT;
                 END IF;
-            END $$;
-        `);
-
-        // 6. Update Result Table Schema (Academic Year & Unique Constraint)
-        await db.query(`
-            DO $$ BEGIN
-                -- Add academicYear if missing
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Result' AND column_name = 'academicYear') THEN
-                    ALTER TABLE "Result" ADD COLUMN "academicYear" INTEGER NOT NULL DEFAULT 2025;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Student' AND column_name='plainPassword') THEN
+                    ALTER TABLE "Student" ADD COLUMN "plainPassword" TEXT;
                 END IF;
-
-                -- Add unique constraint if missing
-                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'result_unique_entry') THEN
-                    ALTER TABLE "Result" ADD CONSTRAINT "result_unique_entry" UNIQUE ("studentId", "subject", "semester", "academicYear");
-                END IF;
-            END $$;
-        `);
-
-        // 7. Update Admin Table Schema and Perform Migration
-        await db.query(`
-            DO $$ BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'designation') THEN
-                    ALTER TABLE "Admin" ADD COLUMN "designation" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'phone') THEN
-                    ALTER TABLE "Admin" ADD COLUMN "phone" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'aadhar') THEN
-                    ALTER TABLE "Admin" ADD COLUMN "aadhar" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'photo') THEN
-                    ALTER TABLE "Admin" ADD COLUMN "photo" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'address') THEN
-                    ALTER TABLE "Admin" ADD COLUMN "address" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'dob') THEN
-                    ALTER TABLE "Admin" ADD COLUMN "dob" DATE;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'qualification') THEN
-                    ALTER TABLE "Admin" ADD COLUMN "qualification" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'extraQualification') THEN
-                    ALTER TABLE "Admin" ADD COLUMN "extraQualification" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'caste') THEN
-                    ALTER TABLE "Admin" ADD COLUMN "caste" TEXT;
-                END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'joiningDate') THEN
-                    ALTER TABLE "Admin" ADD COLUMN "joiningDate" DATE;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Admin' AND column_name='plainPassword') THEN
+                    ALTER TABLE "Admin" ADD COLUMN "plainPassword" TEXT;
                 END IF;
             END $$;
 
-            -- Move Principal and Headmistress to Admin table if they are still in Teacher table
+            -- Leadership Role Migration (Teacher -> Admin)
             INSERT INTO "Admin" (
                 id, "adminId", password, "plainPassword", name, email, 
                 designation, phone, aadhar, photo, address, dob, 
@@ -437,12 +288,27 @@ export const initDb = async () => {
                 caste = EXCLUDED.caste,
                 "joiningDate" = EXCLUDED."joiningDate";
 
-            -- Remove them from Teacher table once moved
             DELETE FROM "Teacher" WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS');
+
+            -- 4. Performance Indexes
+            CREATE INDEX IF NOT EXISTS "idx_student_class" ON "Student"("classId");
+            CREATE INDEX IF NOT EXISTS "idx_student_rollNumber" ON "Student"("rollNumber");
+            CREATE INDEX IF NOT EXISTS "idx_student_name" ON "Student"("name");
+            CREATE INDEX IF NOT EXISTS "idx_student_id" ON "Student"("studentId");
+            CREATE INDEX IF NOT EXISTS "idx_teacher_id" ON "Teacher"("teacherId");
+            CREATE INDEX IF NOT EXISTS "idx_teacher_name" ON "Teacher"("name");
+            CREATE INDEX IF NOT EXISTS "idx_attendance_date" ON "Attendance"("date");
+            CREATE INDEX IF NOT EXISTS "idx_attendance_class" ON "Attendance"("classId");
+            CREATE INDEX IF NOT EXISTS "idx_attendance_date_student" ON "Attendance"("date", "studentId");
+            CREATE INDEX IF NOT EXISTS "idx_result_student" ON "Result"("studentId");
+            CREATE INDEX IF NOT EXISTS "idx_result_student_exam" ON "Result"("studentId", "semester");
+            CREATE INDEX IF NOT EXISTS "idx_homework_class" ON "Homework"("classId");
+            CREATE INDEX IF NOT EXISTS "idx_submission_status" ON "Submission"("status");
+            CREATE INDEX IF NOT EXISTS "idx_notice_createdAt" ON "Notice"("createdAt");
         `);
 
-        console.log('Migrations applied successfully.');
+        console.log('Database finalized and ready.');
     } catch (error) {
-        console.error('Error initializing database:', error);
+        console.error('Critical Database initialization failure:', error);
     }
 };
