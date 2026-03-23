@@ -54,9 +54,13 @@ export const getStudents = async (req: AuthRequest, res: Response) => {
             db.query(countQuery, params.slice(0, paramCount - 3))
         ]);
 
+        const total = parseInt(countRes.rows[0].total, 10);
+        const totalPages = Math.ceil(total / Number(limit));
+
         res.json({
             students: studentsRes.rows,
-            total: parseInt(countRes.rows[0].total, 10),
+            total,
+            totalPages,
             page: Number(page),
             limit: Number(limit)
         });
@@ -107,9 +111,13 @@ export const getTeachers = async (req: Request, res: Response) => {
             LIMIT $2 OFFSET $3
         `, [searchParam, Number(limit), offset]);
 
+        const total = parseInt(countRes.rows[0].total, 10);
+        const totalPages = Math.ceil(total / Number(limit));
+
         res.json({
             teachers: teachersRes.rows,
-            total: parseInt(countRes.rows[0].total, 10),
+            total,
+            totalPages,
             page: Number(page),
             limit: Number(limit)
         });

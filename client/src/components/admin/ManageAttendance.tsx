@@ -942,49 +942,55 @@ const ManageAttendance = () => {
                 {/* Pagination Footer */}
                 {!loading && totalPages > 1 && (
                     <div style={{
-                        padding: '16px 24px',
+                        padding: '24px',
                         display: 'flex',
-                        justifyContent: 'space-between',
+                        justifyContent: 'center',
                         alignItems: 'center',
+                        gap: '20px',
                         borderTop: '1px solid var(--border-soft)',
                         background: 'var(--bg-main)'
                     }}>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>
-                            Page <span style={{ color: 'var(--text-main)' }}>{page}</span> of {totalPages}
-                            <span style={{ marginLeft: '8px', opacity: 0.5 }}>({totalCount} items)</span>
-                        </span>
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ display: 'flex', gap: '12px' }}>
                             <button
-                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }}
                                 disabled={page === 1}
                                 style={{
-                                    padding: '8px 16px', borderRadius: '10px',
+                                    padding: '10px 20px', borderRadius: '30px',
                                     border: '1px solid var(--border-soft)',
                                     background: 'var(--bg-card)',
                                     cursor: page === 1 ? 'not-allowed' : 'pointer',
-                                    opacity: page === 1 ? 0.5 : 1,
+                                    opacity: page === 1 ? 0.3 : 1,
                                     display: 'flex', alignItems: 'center', gap: '8px',
-                                    fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)',
-                                    transition: 'all 0.2s'
+                                    fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-main)',
+                                    transition: 'all 0.2s',
+                                    boxShadow: 'var(--shadow-sm)'
                                 }}
                             >
-                                <ChevronLeft size={16} /> Previous
+                                <ChevronLeft size={18} /> Previous
                             </button>
+                        </div>
+
+                        <span style={{ fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: '800' }}>
+                            Page <span style={{ color: 'var(--primary-bold)' }}>{page}</span> of {totalPages}
+                        </span>
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
                             <button
-                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }}
                                 disabled={page === totalPages}
                                 style={{
-                                    padding: '8px 16px', borderRadius: '10px',
+                                    padding: '10px 20px', borderRadius: '30px',
                                     border: '1px solid var(--border-soft)',
                                     background: 'var(--bg-card)',
                                     cursor: page === totalPages ? 'not-allowed' : 'pointer',
-                                    opacity: page === totalPages ? 0.5 : 1,
+                                    opacity: page === totalPages ? 0.3 : 1,
                                     display: 'flex', alignItems: 'center', gap: '8px',
-                                    fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)',
-                                    transition: 'all 0.2s'
+                                    fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-main)',
+                                    transition: 'all 0.2s',
+                                    boxShadow: 'var(--shadow-sm)'
                                 }}
                             >
-                                Next <ChevronRight size={16} />
+                                Next <ChevronRight size={18} />
                             </button>
                         </div>
                     </div>
