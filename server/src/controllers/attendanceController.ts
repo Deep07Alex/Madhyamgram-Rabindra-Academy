@@ -96,6 +96,12 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
             ORDER BY session_date DESC
         `);
         const sessionDates = allSessionsRes.rows.map(r => new Date(r.session_date).toLocaleDateString('en-CA'));
+        
+        // 2. Add today's date if not already in session dates (Virtual Presence for Today)
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        if (!sessionDates.includes(todayStr)) {
+            sessionDates.unshift(todayStr); // Add today as a potential session date
+        }
         const totalSessions = sessionDates.length;
 
         // 2. Get explicit records for this student
