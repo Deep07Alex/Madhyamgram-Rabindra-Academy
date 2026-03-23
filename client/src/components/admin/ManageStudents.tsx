@@ -99,7 +99,7 @@ const ManageStudents = () => {
                 role: 'STUDENT'
             };
 
-            await api.post('/auth/register', payload);
+            await api.post('/users/students/enroll', payload);
             showToast('Student enrolled successfully', 'success');
             setNewUser({ 
                 password: '', name: '', email: '', rollNumber: '', studentId: '', 
@@ -392,22 +392,20 @@ const ManageStudents = () => {
                         );
                     })()}
                     <div className="form-group">
-                        <label>Guardian Name</label>
+                        <label>Guardian Name (Optional)</label>
                         <input
                             type="text"
                             placeholder="Enter Guardian Name"
                             value={newUser.guardianName}
                             onChange={e => setNewUser({ ...newUser, guardianName: e.target.value })}
-                            required
                         />
                     </div>
                     <div className="form-group">
-                        <label>Date of Birth</label>
+                        <label>Date of Birth (Optional)</label>
                         <input
                             type="date"
                             value={newUser.dob}
                             onChange={e => setNewUser({ ...newUser, dob: e.target.value })}
-                            required
                         />
                     </div>
                     <div className="form-group">
@@ -420,12 +418,11 @@ const ManageStudents = () => {
                         />
                     </div>
                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                        <label>Full Address</label>
+                        <label>Full Address (Optional)</label>
                         <textarea
                             placeholder="Enter Complete Address"
                             value={newUser.address}
                             onChange={e => setNewUser({ ...newUser, address: e.target.value })}
-                            required
                             style={{
                                 width: '100%',
                                 padding: '12px',

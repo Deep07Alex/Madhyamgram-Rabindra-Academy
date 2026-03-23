@@ -276,8 +276,7 @@ export const enrollStudent = async (req: Request, res: Response) => {
 
     try {
         const id = crypto.randomUUID();
-        const hashedPassword = await bcrypt.hash(password, 10);
-        
+
         // Ensure uppercase S- prefix
         let finalId = studentId.trim();
         if (!finalId.toUpperCase().startsWith('S-')) {
@@ -285,6 +284,31 @@ export const enrollStudent = async (req: Request, res: Response) => {
         } else {
             finalId = `S-${finalId.slice(2)}`;
         }
+
+        // Check if studentId already exists
+        const idCheck = await db.query(`SELECT id FROM "Student" WHERE "studentId" = $1 LIMIT 1`, [finalId]);
+        if (idCheck.rows.length > 0) {
+            return res.status(400).json({ message: `Admission Number ${studentId} already exists` });
+        }
+
+        // Check if roll number already exists in the same class
+        const rollCheck = await db.query(
+            `SELECT id FROM "Student" WHERE "rollNumber" = $1 AND "classId" = $2 LIMIT 1`,
+            [rollNumber, classId]
+        );
+        if (rollCheck.rows.length > 0) {
+            return res.status(400).json({ message: `Roll number ${rollNumber} is already taken in this class` });
+        }
+
+        // Auto-generate password if not provided (Name@Last4DigitsOfID)
+        let finalPassword = password;
+        if (!finalPassword || finalPassword.trim() === '') {
+            const cleanName = name.trim().toLowerCase().replace(/\s+/g, '');
+            const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+            const numericId = finalId.replace(/\D/g, '');
+            finalPassword = `${capitalizedName}@${numericId.slice(-4) || '0000'}`;
+        }
+        const hashedPassword = await bcrypt.hash(finalPassword, 10);
 
         const query = `
             INSERT INTO "Student" (
@@ -296,7 +320,7 @@ export const enrollStudent = async (req: Request, res: Response) => {
         `;
         
         const result = await db.query(query, [
-            id, finalId, hashedPassword, password, name, email || null,
+            id, finalId, hashedPassword, finalPassword, name, email || null,
             rollNumber, banglarSikkhaId || null, classId,
             guardianName || null, dob || null, address || null, phone || null
         ]);

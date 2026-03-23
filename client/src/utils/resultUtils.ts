@@ -34,6 +34,27 @@ export const generateResultPDF = async (data: any) => {
 
         const logoData = await getLogoData();
 
+        // Helper to get DataURL for Student Photo
+        const getStudentPhotoData = async () => {
+            if (!student.photo) return null;
+            try {
+                const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+                const url = student.photo.startsWith('http') ? student.photo : `${baseUrl}${student.photo}`;
+                const response = await fetch(url);
+                if (!response.ok) return null;
+                const blob = await response.blob();
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(blob);
+                });
+            } catch (e) {
+                return null;
+            }
+        };
+
+        const studentPhotoData = await getStudentPhotoData();
+
         // 1. Main Border
         doc.setDrawColor(0);
         doc.setLineWidth(0.5);
@@ -45,6 +66,26 @@ export const generateResultPDF = async (data: any) => {
                 doc.addImage(logoData as string, 'JPEG', margin + 5, margin + 5, 25, 25);
             } catch (e) {
                 console.warn('Failed to add logo image to PDF:', e);
+            }
+        }
+
+        if (studentPhotoData) {
+            try {
+                const format = student.photo.toLowerCase().endsWith('.png') ? 'PNG' : 'JPEG';
+                const photoWidth = 20;
+                const photoHeight = 26;
+                // Flush to the right inner border so it never overlaps text
+                const photoX = pageWidth - margin - photoWidth;
+                const photoY = margin + 4;
+                
+                doc.addImage(studentPhotoData as string, format, photoX, photoY, photoWidth, photoHeight);
+                
+                // Draw a slight border around the photo
+                doc.setDrawColor(200);
+                doc.setLineWidth(0.3);
+                doc.rect(photoX, photoY, photoWidth, photoHeight);
+            } catch (e) {
+                console.warn('Failed to add student photo to PDF:', e);
             }
         }
 
