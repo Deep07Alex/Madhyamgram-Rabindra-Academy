@@ -59,7 +59,11 @@ const ManageStudents = () => {
         studentId: '',
         banglarSikkhaId: '',
         classId: '',
-        photo: ''
+        photo: '',
+        guardianName: '',
+        dob: '',
+        address: '',
+        phone: ''
     });
 
     const [editData, setEditData] = useState<any>({
@@ -69,7 +73,11 @@ const ManageStudents = () => {
         banglarSikkhaId: '',
         email: '',
         password: '',
-        photo: ''
+        photo: '',
+        guardianName: '',
+        dob: '',
+        address: '',
+        phone: ''
     });
 
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: '', type: 'single' as 'single' | 'all' });
@@ -93,7 +101,11 @@ const ManageStudents = () => {
 
             await api.post('/auth/register', payload);
             showToast('Student enrolled successfully', 'success');
-            setNewUser({ password: '', name: '', email: '', rollNumber: '', studentId: '', banglarSikkhaId: '', classId: classes[0]?.id || '', photo: '' });
+            setNewUser({ 
+                password: '', name: '', email: '', rollNumber: '', studentId: '', 
+                banglarSikkhaId: '', classId: classes[0]?.id || '', photo: '',
+                guardianName: '', dob: '', address: '', phone: '' 
+            });
             refreshStudents();
         } catch (error: any) {
             console.error('Failed to create student:', error);
@@ -379,6 +391,53 @@ const ManageStudents = () => {
                             </div>
                         );
                     })()}
+                    <div className="form-group">
+                        <label>Guardian Name</label>
+                        <input
+                            type="text"
+                            placeholder="Enter Guardian Name"
+                            value={newUser.guardianName}
+                            onChange={e => setNewUser({ ...newUser, guardianName: e.target.value })}
+                            required
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>Date of Birth</label>
+                        <input
+                            type="date"
+                            value={newUser.dob}
+                            onChange={e => setNewUser({ ...newUser, dob: e.target.value })}
+                            required
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>Phone Number (Optional)</label>
+                        <input
+                            type="tel"
+                            placeholder="Enter Phone Number"
+                            value={newUser.phone}
+                            onChange={e => setNewUser({ ...newUser, phone: e.target.value })}
+                        />
+                    </div>
+                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                        <label>Full Address</label>
+                        <textarea
+                            placeholder="Enter Complete Address"
+                            value={newUser.address}
+                            onChange={e => setNewUser({ ...newUser, address: e.target.value })}
+                            required
+                            style={{
+                                width: '100%',
+                                padding: '12px',
+                                borderRadius: 'var(--radius-md)',
+                                border: '1px solid var(--border-color)',
+                                background: 'var(--bg-main)',
+                                color: 'var(--text-main)',
+                                minHeight: '80px',
+                                outline: 'none'
+                            }}
+                        />
+                    </div>
                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                         <label>Student Photo</label>
                         <PhotoUpload
@@ -498,7 +557,11 @@ const ManageStudents = () => {
                                                         banglarSikkhaId: user.banglarSikkhaId || '',
                                                         email: user.email || '',
                                                         password: '',
-                                                        photo: user.photo || ''
+                                                        photo: user.photo || '',
+                                                        guardianName: user.guardianName || '',
+                                                        dob: user.dob ? new Date(user.dob).toISOString().split('T')[0] : '',
+                                                        address: user.address || '',
+                                                        phone: user.phone || ''
                                                     });
                                                     setIsEditModalOpen(true);
                                                 }}
@@ -677,6 +740,35 @@ const ManageStudents = () => {
                                 <input type="text" value={editData.banglarSikkhaId} onChange={e => setEditData({ ...editData, banglarSikkhaId: e.target.value })} />
                             </div>
                         )}
+                        <div className="form-group">
+                            <label>Guardian Name</label>
+                            <input type="text" value={editData.guardianName} onChange={e => setEditData({ ...editData, guardianName: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                            <label>Date of Birth</label>
+                            <input type="date" value={editData.dob} onChange={e => setEditData({ ...editData, dob: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                            <label>Phone Number (Optional)</label>
+                            <input type="tel" value={editData.phone} onChange={e => setEditData({ ...editData, phone: e.target.value })} />
+                        </div>
+                        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                            <label>Full Address</label>
+                            <textarea
+                                value={editData.address}
+                                onChange={e => setEditData({ ...editData, address: e.target.value })}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: '1px solid var(--border-color)',
+                                    background: 'var(--bg-main)',
+                                    color: 'var(--text-main)',
+                                    minHeight: '80px',
+                                    outline: 'none'
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
             </Modal>

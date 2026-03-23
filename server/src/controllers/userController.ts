@@ -267,6 +267,51 @@ export const deleteClass = async (req: Request, res: Response) => {
     }
 };
 
+// Enroll a single student
+export const enrollStudent = async (req: Request, res: Response) => {
+    const { 
+        name, studentId, rollNumber, banglarSikkhaId, email, password, classId,
+        guardianName, dob, address, phone
+    } = req.body;
+
+    try {
+        const id = crypto.randomUUID();
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        // Ensure uppercase S- prefix
+        let finalId = studentId.trim();
+        if (!finalId.toUpperCase().startsWith('S-')) {
+            finalId = `S-${finalId}`;
+        } else {
+            finalId = `S-${finalId.slice(2)}`;
+        }
+
+        const query = `
+            INSERT INTO "Student" (
+                id, "studentId", password, "plainPassword", name, email, 
+                "rollNumber", "banglarSikkhaId", "classId",
+                "guardianName", "dob", "address", "phone"
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            RETURNING *
+        `;
+        
+        const result = await db.query(query, [
+            id, finalId, hashedPassword, password, name, email || null,
+            rollNumber, banglarSikkhaId || null, classId,
+            guardianName || null, dob || null, address || null, phone || null
+        ]);
+
+        broadcast('user:created', { id, role: 'STUDENT' });
+        res.status(201).json(result.rows[0]);
+    } catch (error: any) {
+        console.error('Enroll student error:', error);
+        if (error.code === '23505') {
+            return res.status(400).json({ message: 'Admission Number or Email already exists' });
+        }
+        res.status(500).json({ message: 'Error enrolling student' });
+    }
+};
+
 // Update a student (general update)
 /**
  * Dynamically updates student fields. 
@@ -274,7 +319,10 @@ export const deleteClass = async (req: Request, res: Response) => {
  */
 export const updateStudent = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { name, studentId, rollNumber, banglarSikkhaId, email, password, photo } = req.body;
+    const { 
+        name, studentId, rollNumber, banglarSikkhaId, email, password, photo,
+        guardianName, dob, address, phone
+    } = req.body;
 
     try {
         let updateQuery = 'UPDATE "Student" SET ';
@@ -327,6 +375,22 @@ export const updateStudent = async (req: Request, res: Response) => {
         if (photo !== undefined) {
             updateQuery += `"photo" = $${paramCount++}, `;
             params.push(photo);
+        }
+        if (guardianName !== undefined) {
+            updateQuery += `"guardianName" = $${paramCount++}, `;
+            params.push(guardianName || null);
+        }
+        if (dob !== undefined) {
+            updateQuery += `"dob" = $${paramCount++}, `;
+            params.push(dob || null);
+        }
+        if (address !== undefined) {
+            updateQuery += `"address" = $${paramCount++}, `;
+            params.push(address || null);
+        }
+        if (phone !== undefined) {
+            updateQuery += `"phone" = $${paramCount++}, `;
+            params.push(phone || null);
         }
 
         // Remove trailing comma and space
@@ -693,16 +757,17 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
         if (validStudents.length > 0) {
             await client.query('BEGIN');
             try {
-                const columns = '(id, "studentId", password, "plainPassword", name, "rollNumber", "classId", "banglarSikkhaId")';
+                const columns = '(id, "studentId", password, "plainPassword", name, "rollNumber", "classId", "banglarSikkhaId", "guardianName", "dob", "address", "phone")';
                 const values: any[] = [];
                 const placeholders: string[] = [];
 
                 validStudents.forEach((st, idx) => {
-                    const base = idx * 8;
-                    placeholders.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8})`);
+                    const base = idx * 12;
+                    placeholders.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12})`);
                     values.push(
                         st.id, st.studentId, st.hashedPassword, st.password, 
-                        st.name, st.rollNumber, st.classId, st.banglarSikkhaId
+                        st.name, st.rollNumber, st.classId, st.banglarSikkhaId,
+                        null, null, null, null
                     );
                 });
 

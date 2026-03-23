@@ -262,6 +262,20 @@ export const initDb = async () => {
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Admin' AND column_name='plainPassword') THEN
                     ALTER TABLE "Admin" ADD COLUMN "plainPassword" TEXT;
                 END IF;
+                
+                -- Student Enhancements
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Student' AND column_name='guardianName') THEN
+                    ALTER TABLE "Student" ADD COLUMN "guardianName" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Student' AND column_name='dob') THEN
+                    ALTER TABLE "Student" ADD COLUMN "dob" DATE;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Student' AND column_name='address') THEN
+                    ALTER TABLE "Student" ADD COLUMN "address" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Student' AND column_name='phone') THEN
+                    ALTER TABLE "Student" ADD COLUMN "phone" TEXT;
+                END IF;
             END $$;
 
             -- Leadership Role Migration (Teacher -> Admin)

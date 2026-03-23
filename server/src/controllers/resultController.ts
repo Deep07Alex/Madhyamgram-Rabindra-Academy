@@ -103,19 +103,29 @@ export const bulkUploadResults = async (req: Request, res: Response) => {
             return res.status(400).json({ message: 'No valid results found. Ensure "Admission No" matches student records.' });
         }
 
-        // Process in a single transaction for efficiency
+        // Process in a single transaction for efficiency using Bulk INSERT
         const client = await db.connect();
         try {
             await client.query('BEGIN');
-            for (const r of resultsToInsert) {
-                await client.query(
-                    `INSERT INTO "Result" (id, "studentId", subject, semester, "academicYear", marks, "totalMarks", grade)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                     ON CONFLICT ON CONSTRAINT "result_unique_entry"
-                     DO UPDATE SET marks = EXCLUDED.marks, "totalMarks" = EXCLUDED."totalMarks", grade = EXCLUDED.grade`,
-                    [r.id, r.studentId, r.subject, r.semester, r.academicYear, r.marks, r.totalMarks, r.grade]
-                );
-            }
+            
+            const columns = '(id, "studentId", subject, semester, "academicYear", marks, "totalMarks", grade)';
+            const values: any[] = [];
+            const placeholders: string[] = [];
+
+            resultsToInsert.forEach((r, idx) => {
+                const base = idx * 8;
+                placeholders.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8})`);
+                values.push(r.id, r.studentId, r.subject, r.semester, r.academicYear, r.marks, r.totalMarks, r.grade);
+            });
+
+            const query = `
+                INSERT INTO "Result" ${columns} 
+                VALUES ${placeholders.join(', ')}
+                ON CONFLICT ON CONSTRAINT "result_unique_entry"
+                DO UPDATE SET marks = EXCLUDED.marks, "totalMarks" = EXCLUDED."totalMarks", grade = EXCLUDED.grade
+            `;
+
+            await client.query(query, values);
             await client.query('COMMIT');
         } catch (e) {
             await client.query('ROLLBACK');

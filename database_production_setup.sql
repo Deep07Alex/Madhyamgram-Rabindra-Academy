@@ -99,6 +99,10 @@ CREATE TABLE IF NOT EXISTS "Student" (
     "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     "photo" TEXT,
     "plainPassword" TEXT,
+    "guardianName" TEXT,
+    "dob" DATE,
+    "address" TEXT,
+    "phone" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
