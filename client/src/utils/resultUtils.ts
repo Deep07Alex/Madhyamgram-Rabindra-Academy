@@ -66,27 +66,6 @@ export const generateResultPDF = async (data: any) => {
         doc.text(`YEARLY PROGRESS REPORT - 2025`, pageWidth / 2, addressY + 18, { align: 'center' });
         doc.line(margin, addressY + 22, pageWidth - margin, addressY + 22);
 
-        // 3. Grades Legend (Top Right Box - Moved down to avoid header overlap)
-        const legendWidth = 50;
-        const legendX = pageWidth - margin - legendWidth;
-        const legendY = margin + 2; 
-        autoTable(doc, {
-            startY: legendY,
-            margin: { left: legendX },
-            tableWidth: legendWidth,
-            head: [['Grades']],
-            body: [
-                ['90-100', 'AA', 'Excellent'],
-                ['80-89', 'A+', 'Very Good'],
-                ['60-79', 'A', 'Good'],
-                ['50-59', 'B+', 'Satisfactory'],
-                ['30-49', 'B', 'Fair'],
-                ['Below 29', 'C', 'Not Satisfactory']
-            ],
-            theme: 'grid',
-            styles: { fontSize: 6, cellPadding: 0.8, halign: 'center' },
-            headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] }
-        });
 
         // 4. Student Info Section
         const infoY = addressY + 30;
@@ -96,7 +75,7 @@ export const generateResultPDF = async (data: any) => {
         doc.line(margin, infoY - 6, pageWidth - margin, infoY - 6);
         doc.text(`Student Registration No. :`, margin + 5, infoY);
         doc.setFont('helvetica', 'normal');
-        doc.text(student.studentId || '-', margin + 55, infoY);
+        doc.text((student.studentId || '').replace('S-', ''), margin + 55, infoY);
         
         doc.setFont('helvetica', 'bold');
         doc.text(`Student ID :`, pageWidth / 2 + 10, infoY);
@@ -180,11 +159,14 @@ export const generateResultPDF = async (data: any) => {
 
         const tableFinalY = (doc as any).lastAutoTable?.finalY || infoY + 100;
 
-        // 6. Attendance Sidebar (Positioned carefully to avoid border cross)
+        // 6. Sidebar (Right Side)
+        const sidebarX = pageWidth - margin - 40; // Unified sidebar starting X
         const attWidth = 38;
+        
+        // 6a. Attendance Sidebar
         autoTable(doc, {
             startY: infoY + 20,
-            margin: { left: pageWidth - margin - attWidth - 2 },
+            margin: { left: sidebarX },
             tableWidth: attWidth,
             head: [[{ content: 'Attendance Record', styles: { fontSize: 7 } }]],
             body: [
@@ -198,6 +180,27 @@ export const generateResultPDF = async (data: any) => {
             ],
             theme: 'grid',
             styles: { fontSize: 7, halign: 'center' },
+            headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] }
+        });
+
+        const attFinalY = (doc as any).lastAutoTable?.finalY || infoY + 40;
+
+        // 6b. Grades Legend Sidebar (Moved here from header)
+        autoTable(doc, {
+            startY: attFinalY + 5,
+            margin: { left: sidebarX },
+            tableWidth: attWidth,
+            head: [['Grades']],
+            body: [
+                ['90-100', 'AA'],
+                ['80-89', 'A+'],
+                ['60-79', 'A'],
+                ['50-59', 'B+'],
+                ['30-49', 'B'],
+                ['Below 29', 'C']
+            ],
+            theme: 'grid',
+            styles: { fontSize: 6, cellPadding: 1, halign: 'center' },
             headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] }
         });
 
