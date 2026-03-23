@@ -219,7 +219,6 @@ export const generateResultPDF = async (data: any) => {
         });
 
         // Remarks & N.B.
-        const summaryTableHeight = 4 * 7; // Approx height of 4 rows
         const remarksX = margin + 85;
         const remarksHeight = 35;
         doc.setDrawColor(0);
