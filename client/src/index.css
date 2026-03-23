@@ -193,16 +193,33 @@ textarea:focus {
   outline: none;
 }
 
-/* Animations */
-@keyframes fadeIn {
+@keyframes slideDown {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(-10px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+.custom-select-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -228,6 +245,19 @@ textarea:focus {
     opacity: 1;
     transform: translateX(0) scale(1);
   }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
 
 /* Layout */
@@ -369,9 +399,7 @@ textarea:focus {
 }
 
 .card:hover {
-  transform: translateY(-5px);
   box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.12);
-  border-color: var(--primary-bold);
 }
 
 .card h3 {
@@ -517,6 +545,56 @@ textarea:focus {
   background: #ef4444;
   color: white;
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-main);
+  border: 1.5px solid var(--border-soft);
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-main);
+  border-color: var(--primary-bold);
+  color: var(--primary-bold);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-sm {
+  padding: 6px 14px !important;
+  font-size: 0.8125rem !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.btn-view-details {
+  background: var(--primary-soft);
+  color: var(--primary-bold);
+  border: 1px solid rgba(var(--primary-bold-rgb), 0.15);
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 0.75rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.btn-view-details:hover {
+  background: var(--primary-bold);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(var(--primary-bold-rgb), 0.2);
+  border-color: var(--primary-bold);
 }
 
 /* Premium Tables */

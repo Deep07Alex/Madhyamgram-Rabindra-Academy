@@ -13,6 +13,7 @@ import api from '../../services/api';
 import useServerEvents from '../../hooks/useServerEvents';
 import { generateResultPDF } from '../../utils/resultUtils';
 import { ACADEMIC_YEARS } from '../../utils/constants';
+import CustomSelect from '../common/CustomSelect';
 import {
     Award,
     TrendingUp,
@@ -65,9 +66,12 @@ const StudentResults = () => {
                     <p style={{ color: 'var(--text-muted)', maxWidth: '400px', margin: '0 auto 24px' }}>
                         No results have been published for the {selectedYear} academic session yet.
                     </p>
-                    <select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="btn-secondary" style={{ width: 'auto' }}>
-                        {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y} Session</option>)}
-                    </select>
+                    <CustomSelect 
+                        value={selectedYear.toString()}
+                        onChange={val => setSelectedYear(parseInt(val))}
+                        options={ACADEMIC_YEARS.map(y => ({ value: y.toString(), label: `${y} Session` }))}
+                        className="btn-secondary"
+                    />
                 </div>
             </div>
         );
@@ -91,9 +95,12 @@ const StudentResults = () => {
                     </p>
                 </div>
                 <div style={{ display: 'flex', gap: '12px' }}>
-                    <select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="btn-secondary" style={{ width: 'auto', padding: '10px 20px' }}>
-                        {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
+                    <CustomSelect 
+                        value={selectedYear.toString()}
+                        onChange={val => setSelectedYear(parseInt(val))}
+                        options={ACADEMIC_YEARS.map(y => ({ value: y.toString(), label: y.toString() }))}
+                        icon={<Calendar size={16} />}
+                    />
                     <button onClick={() => generateResultPDF(reportData)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 24px' }}>
                         <Download size={18} /> Download official PDF
                     </button>
@@ -144,10 +151,10 @@ const StudentResults = () => {
                         <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-muted)' }}>Attendance</span>
                     </div>
                     <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)' }}>
-                        {attendance.total_days ? ((attendance.present_days / attendance.total_days) * 100).toFixed(0) : 0}%
+                        {parseInt(attendance?.total_days) > 0 ? ((parseInt(attendance.present_days) / parseInt(attendance.total_days)) * 100).toFixed(0) : 0}%
                     </div>
                     <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginTop: '4px' }}>
-                        {attendance.present_days} of {attendance.total_days} days
+                        {attendance?.present_days || 0} of {attendance?.total_days || 0} days
                     </div>
                 </div>
             </div>

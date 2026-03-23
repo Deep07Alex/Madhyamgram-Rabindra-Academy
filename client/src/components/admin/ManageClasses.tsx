@@ -10,10 +10,12 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import api from '../../services/api';
+import ConfirmModal from '../common/ConfirmModal';
 import { GraduationCap, Trash2 } from 'lucide-react';
 
 const ManageClasses = () => {
-    const [classes, setClasses] = useState([]);
+    const [classes, setClasses] = useState<any[]>([]);
+    const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: '' });
 
     const fetchData = async (signal?: AbortSignal) => {
         try {
@@ -36,11 +38,12 @@ const ManageClasses = () => {
         return () => controller.abort();
     }, []);
 
-    const handleDeleteClass = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this class?')) return;
+    const handleDeleteClass = async () => {
+        if (!deleteModal.id) return;
         try {
-            await api.delete(`/users/classes/${id}`);
-            fetchData();
+            await api.delete(`/users/classes/${deleteModal.id}`);
+            setClasses(classes.filter(c => c.id !== deleteModal.id));
+            setDeleteModal({ isOpen: false, id: '' });
         } catch (error) {
             console.error('Failed to delete class:', error);
         }
@@ -73,7 +76,7 @@ const ManageClasses = () => {
                                     <span style={{ fontWeight: '700' }}>{c._count?.students || 0}</span>
                                 </td>
                                 <td style={{ textAlign: 'right' }}>
-                                    <button onClick={() => handleDeleteClass(c.id)} className="btn-danger btn-sm" style={{ padding: '6px 12px' }}>
+                                    <button onClick={() => setDeleteModal({ isOpen: true, id: c.id })} className="btn-danger btn-sm" style={{ padding: '6px 12px' }} title="Delete Class">
                                         <Trash2 size={14} /> Delete
                                     </button>
                                 </td>
@@ -82,6 +85,14 @@ const ManageClasses = () => {
                     </tbody>
                 </table>
             </div>
+
+            <ConfirmModal 
+                isOpen={deleteModal.isOpen}
+                onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
+                onConfirm={handleDeleteClass}
+                title="Delete Class"
+                message="Are you sure you want to permanently remove this class? This will dissociate all students currently enrolled in it."
+            />
         </div>
         </div>
     );

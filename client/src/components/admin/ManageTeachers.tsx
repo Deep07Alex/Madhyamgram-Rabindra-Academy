@@ -16,6 +16,15 @@ import PhotoUpload from '../common/PhotoUpload';
 import Modal from '../common/Modal';
 import { useFetch } from '../../hooks/useFetch';
 import useServerEvents from '../../hooks/useServerEvents';
+import CustomSelect from '../common/CustomSelect';
+import ConfirmModal from '../common/ConfirmModal';
+
+const DESIGNATIONS = [
+    'PRINCIPAL', 'HEAD MISTRESS', 'A. TEACHER', 
+    'KARATE TEACHER', 'DANCE TEACHER', 'NON-TEACHING STAFF'
+];
+
+const CASTES = ['GENERAL', 'SC', 'ST', 'OBC-A', 'OBC-B'];
 
 const ManageTeachers = () => {
     const { showToast } = useToast();
@@ -27,6 +36,7 @@ const ManageTeachers = () => {
     const [editData, setEditData] = useState<any>({});
     const [selectedTeacher, setSelectedTeacher] = useState<any | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: '' });
 
     useServerEvents({ 'profile_updated': refreshTeachers });
 
@@ -59,14 +69,16 @@ const ManageTeachers = () => {
         }
     };
 
-    const handleDeleteTeacher = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this faculty member?')) return;
+    const handleDeleteTeacher = async () => {
+        if (!deleteModal.id) return;
         try {
-            await api.delete(`/users/teachers/${id}`);
+            await api.delete(`/users/teachers/${deleteModal.id}`);
             showToast('Faculty member deleted successfully', 'success');
+            setDeleteModal({ isOpen: false, id: '' });
             refreshTeachers();
         } catch (error) {
             console.error('Failed to delete faculty:', error);
+            showToast('Failed to delete faculty', 'error');
         }
     };
 
@@ -134,10 +146,10 @@ const ManageTeachers = () => {
                         <label>Full Name</label>
                         <input type="text" placeholder="Enter Full Name" value={newUser.name} onChange={e => setNewUser({ ...newUser, name: e.target.value })} required />
                     </div>
-                    <div className="form-group">
-                        <label>Designation</label>
-                        <select value={newUser.designation} onChange={e => {
-                            const val = e.target.value;
+                    <CustomSelect 
+                        label="Designation"
+                        value={newUser.designation}
+                        onChange={val => {
                             const isAdminRole = ['PRINCIPAL', 'HEAD MISTRESS'].includes(val);
                             const isCoreTeacher = val === 'A. TEACHER';
                             const isNonTeaching = val === 'NON-TEACHING STAFF';
@@ -159,15 +171,10 @@ const ManageTeachers = () => {
                                 isTeaching: shouldHaveLogin,
                                 teacherId: newTeacherId
                             });
-                        }} required>
-                            <option value="PRINCIPAL">PRINCIPAL</option>
-                            <option value="HEAD MISTRESS">HEAD MISTRESS</option>
-                            <option value="A. TEACHER">A. TEACHER</option>
-                            <option value="KARATE TEACHER">KARATE TEACHER</option>
-                            <option value="DANCE TEACHER">DANCE TEACHER</option>
-                            <option value="NON-TEACHING STAFF">NON-TEACHING STAFF</option>
-                        </select>
-                    </div>
+                        }}
+                        options={DESIGNATIONS.map(d => ({ value: d, label: d }))}
+                        icon={<GraduationCap size={16} />}
+                    />
                     <div className="form-group">
                         <label>Phone Number</label>
                         <input 
@@ -214,16 +221,13 @@ const ManageTeachers = () => {
                         <label>Date of Joining</label>
                         <input type="date" value={newUser.joiningDate} onChange={e => setNewUser({ ...newUser, joiningDate: e.target.value })} />
                     </div>
-                    <div className="form-group">
-                        <label>Caste</label>
-                        <select value={newUser.caste} onChange={e => setNewUser({ ...newUser, caste: e.target.value })}>
-                            <option value="GENERAL">GENERAL</option>
-                            <option value="SC">SC</option>
-                            <option value="ST">ST</option>
-                            <option value="OBC-A">OBC-A</option>
-                            <option value="OBC-B">OBC-B</option>
-                        </select>
-                    </div>
+                    <CustomSelect 
+                        label="Caste"
+                        value={newUser.caste}
+                        onChange={val => setNewUser({ ...newUser, caste: val })}
+                        options={CASTES.map(c => ({ value: c, label: c }))}
+                        icon={<Fingerprint size={16} />}
+                    />
                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                         <label>Address</label>
                         <textarea 
@@ -403,7 +407,7 @@ const ManageTeachers = () => {
                                                 View Profile
                                             </button>
                                             <button 
-                                                onClick={() => handleDeleteTeacher(user.id)} 
+                                                onClick={() => setDeleteModal({ isOpen: true, id: user.id })} 
                                                 style={{
                                                     background: 'none',
                                                     color: '#ef4444',
@@ -506,27 +510,20 @@ const ManageTeachers = () => {
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Fingerprint size={14} /> Aadhar Number</label>
                                 <input type="text" value={editData.aadhar || ''} onChange={e => setEditData({ ...editData, aadhar: e.target.value })} />
                             </div>
-                            <div className="form-group">
-                                <label>Designation</label>
-                                <select value={editData.designation || ''} onChange={e => setEditData({ ...editData, designation: e.target.value })}>
-                                    <option value="PRINCIPAL">PRINCIPAL</option>
-                                    <option value="HEAD MISTRESS">HEAD MISTRESS</option>
-                                    <option value="A. TEACHER">A. TEACHER</option>
-                                    <option value="KARATE TEACHER">KARATE TEACHER</option>
-                                    <option value="DANCE TEACHER">DANCE TEACHER</option>
-                                    <option value="NON-TEACHING STAFF">NON-TEACHING STAFF</option>
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label>Caste Category</label>
-                                <select value={editData.caste || 'GENERAL'} onChange={e => setEditData({ ...editData, caste: e.target.value })}>
-                                    <option value="GENERAL">GENERAL</option>
-                                    <option value="SC">SC</option>
-                                    <option value="ST">ST</option>
-                                    <option value="OBC-A">OBC-A</option>
-                                    <option value="OBC-B">OBC-B</option>
-                                </select>
-                            </div>
+                            <CustomSelect 
+                                label="Designation"
+                                value={editData.designation || ''}
+                                onChange={val => setEditData({ ...editData, designation: val })}
+                                options={DESIGNATIONS.map(d => ({ value: d, label: d }))}
+                                icon={<GraduationCap size={16} />}
+                            />
+                            <CustomSelect 
+                                label="Caste Category"
+                                value={editData.caste || 'GENERAL'}
+                                onChange={val => setEditData({ ...editData, caste: val })}
+                                options={CASTES.map(c => ({ value: c, label: c }))}
+                                icon={<Fingerprint size={16} />}
+                            />
                             <div className="form-group">
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} /> Date of Joining</label>
                                 <input type="date" value={editData.joiningDate ? new Date(editData.joiningDate).toLocaleDateString('en-CA') : ''} onChange={e => setEditData({ ...editData, joiningDate: e.target.value })} />
@@ -551,6 +548,14 @@ const ManageTeachers = () => {
                     </div>
                 </div>
             </Modal>
+
+            <ConfirmModal 
+                isOpen={deleteModal.isOpen}
+                onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
+                onConfirm={handleDeleteTeacher}
+                title="Delete Faculty Profile"
+                message="Are you sure you want to permanently remove this teacher from the database? All associated records will be lost."
+            />
         </div>
     );
 };

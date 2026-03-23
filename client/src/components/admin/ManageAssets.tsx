@@ -9,8 +9,8 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import ConfirmModal from '../common/ConfirmModal';
 import { 
-    Upload, 
     Image as ImageIcon, 
     Plus, 
     Trash2, 
@@ -28,7 +28,8 @@ const ManageAssets = () => {
     const [heroBanner, setHeroBanner] = useState('');
     const [festivalBanner, setFestivalBanner] = useState('');
     const [bannerFile, setBannerFile] = useState<File | null>(null);
-    const [uploading, setUploading] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: '' });
     const [previewUrl, setPreviewUrl] = useState('');
 
     // Gallery states
@@ -67,7 +68,7 @@ const ManageAssets = () => {
 
     const handleBannerUpload = async (type: 'hero' | 'festival') => {
         if (!bannerFile) return;
-        setUploading(true);
+        setIsUploading(true);
         const formData = new FormData();
         formData.append('banner', bannerFile);
 
@@ -86,7 +87,7 @@ const ManageAssets = () => {
         } catch (error) {
             showToast('Upload failed.', 'error');
         } finally {
-            setUploading(false);
+            setIsUploading(false);
         }
     };
 
@@ -115,13 +116,15 @@ const ManageAssets = () => {
         }
     };
 
-    const handleGalleryDelete = async (id: string) => {
-        if (!confirm('Delete this photo?')) return;
+    const handleDelete = async () => {
+        if (!deleteModal.id) return;
         try {
-            await api.delete(`/gallery/${id}`);
-            fetchData();
+            await api.delete(`/gallery/${deleteModal.id}`); // Changed from /assets to /gallery based on existing code
+            setGalleryImages(galleryImages.filter((img: any) => img.id !== deleteModal.id));
             showToast('Image removed.', 'success');
+            setDeleteModal({ isOpen: false, id: '' });
         } catch (error) {
+            console.error('Failed to delete asset:', error);
             showToast('Delete failed.', 'error');
         }
     };
@@ -196,11 +199,11 @@ const ManageAssets = () => {
                             <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', marginBottom: '16px' }}>
                                 <input type="file" accept="image/*" onChange={handleBannerFileChange} style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer', zIndex: 10 }} />
                                 <div style={{ width: '100%', height: '100%', border: '2px dashed var(--primary-bold)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--primary-soft)', overflow: 'hidden' }}>
-                                    {previewUrl ? <img src={previewUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Upload size={32} color="var(--primary-bold)" />}
+                                    {previewUrl ? <img src={previewUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <ImageIcon size={32} color="var(--primary-bold)" />}
                                 </div>
                             </div>
-                            <button className="btn-primary" disabled={!bannerFile || uploading} onClick={() => handleBannerUpload(activeTab)} style={{ width: '100%', height: '48px' }}>
-                                {uploading ? 'Processing...' : 'Deploy to Website'}
+                            <button className="btn-primary" disabled={!bannerFile || isUploading} onClick={() => handleBannerUpload(activeTab)} style={{ width: '100%', height: '48px' }}>
+                                {isUploading ? 'Processing...' : 'Deploy to Website'}
                             </button>
                         </div>
                     </div>
@@ -254,7 +257,7 @@ const ManageAssets = () => {
                                             <img src={previewUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         ) : (
                                             <>
-                                                <Upload size={40} color="var(--primary-bold)" style={{ marginBottom: '12px', opacity: 0.7 }} />
+                                                <ImageIcon size={40} color="var(--primary-bold)" style={{ marginBottom: '12px', opacity: 0.7 }} />
                                                 <span style={{ fontSize: '0.9rem', color: 'var(--primary-bold)', fontWeight: 700 }}>Click or Drag Photo</span>
                                                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>PNG, JPG, WebP up to 5MB</span>
                                             </>
@@ -287,7 +290,7 @@ const ManageAssets = () => {
                                             </td>
                                             <td>{img.title}</td>
                                             <td style={{ textAlign: 'right' }}>
-                                                <button onClick={() => handleGalleryDelete(img.id)} className="btn-danger btn-sm"><Trash2 size={14} /></button>
+                                                <button onClick={() => setDeleteModal({ isOpen: true, id: img.id })} className="btn-danger btn-sm"><Trash2 size={14} /></button>
                                             </td>
                                         </tr>
                                     ))}
@@ -297,7 +300,14 @@ const ManageAssets = () => {
                     </div>
                 </div>
             )}
-        </div>
+        <ConfirmModal 
+            isOpen={deleteModal.isOpen}
+            onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
+            onConfirm={handleDelete}
+            title="Remove Asset"
+            message="Are you sure you want to delete this photo from the gallery? This action is permanent."
+        />
+    </div>
     );
 };
 

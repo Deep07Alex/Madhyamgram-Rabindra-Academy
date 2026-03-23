@@ -6,7 +6,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- 2. Enums
 DO $$ BEGIN
-    CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE', 'EXCUSED');
+    CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS "Admin" (
     "adminId" TEXT UNIQUE NOT NULL,
     "username" TEXT UNIQUE,
     "password" TEXT NOT NULL,
+    "plainPassword" TEXT,
     "name" TEXT NOT NULL,
     "email" TEXT UNIQUE,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -80,6 +81,7 @@ CREATE TABLE IF NOT EXISTS "Student" (
     "banglarSikkhaId" TEXT,
     "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     "photo" TEXT,
+    "plainPassword" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

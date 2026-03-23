@@ -8,11 +8,12 @@
  * - System Override: Global control to Force Open/Close the attendance window.
  * - Unified View: Shows everyone in the database, matching records where they exist.
  */
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import useServerEvents from '../../hooks/useServerEvents';
+import CustomSelect from '../common/CustomSelect';
 import {
     ClipboardCheck,
     Search,
@@ -21,11 +22,11 @@ import {
     X,
     Users,
     UserCheck,
-    ChevronDown,
     CalendarDays,
     Clock,
     ShieldAlert,
-    ShieldCheck
+    ShieldCheck,
+    School
 } from 'lucide-react';
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT';
@@ -63,7 +64,7 @@ const STATUS_COLORS: Record<AttendanceStatus, string> = {
     ABSENT: '#ef4444',
 };
 
-const StatusBadge = ({ status }: { status: AttendanceStatus | null }) => {
+const StatusBadge = React.memo(({ status }: { status: AttendanceStatus | null }) => {
     const displayStatus = status || 'PRESENT';
     return (
         <span style={{
@@ -76,9 +77,9 @@ const StatusBadge = ({ status }: { status: AttendanceStatus | null }) => {
             {displayStatus}
         </span>
     );
-};
+});
 
-const InlineStatusEdit = ({
+const InlineStatusEdit = React.memo(({
     attendanceId, currentStatus, type, personId, date, classId, initialReason,
     onUpdated
 }: {
@@ -159,19 +160,17 @@ const InlineStatusEdit = ({
 
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <select
+            <CustomSelect 
                 value={status}
-                onChange={e => setStatus(e.target.value as AttendanceStatus)}
-                style={{
-                    border: '1px solid var(--border-soft)', borderRadius: '6px',
-                    padding: '4px 8px', fontSize: '0.82rem', fontWeight: '600',
-                    background: 'var(--bg-card)', color: status ? STATUS_COLORS[status as AttendanceStatus] : 'var(--text-muted)', cursor: 'pointer'
-                }}
-            >
-                <option value="" disabled>Select Status</option>
-                <option value="PRESENT">PRESENT</option>
-                <option value="ABSENT">ABSENT</option>
-            </select>
+                onChange={val => setStatus(val as AttendanceStatus)}
+                options={[
+                    { value: 'PRESENT', label: 'PRESENT', color: '#22c55e' },
+                    { value: 'ABSENT', label: 'ABSENT', color: '#ef4444' }
+                ]}
+                placeholder="Status"
+                size="sm"
+                className="compact-status-select"
+            />
             {type === 'teacher' && status === 'ABSENT' && (
                 <input
                     type="text"
@@ -192,9 +191,9 @@ const InlineStatusEdit = ({
             </button>
         </div>
     );
-};
+});
 
-const MonthlySummaryDisplay = ({ personId, dataMap }: { personId: string; dataMap: Record<string, Record<string, any>> }) => {
+const MonthlySummaryDisplay = React.memo(({ personId, dataMap }: { personId: string; dataMap: Record<string, Record<string, any>> }) => {
     const records = dataMap[personId] || {};
     const days = Object.values(records);
     const absent = days.filter((r: any) => r.status === 'ABSENT').length;
@@ -219,7 +218,135 @@ const MonthlySummaryDisplay = ({ personId, dataMap }: { personId: string; dataMa
             </span>
         </div>
     );
-};
+});
+
+const StudentAttendanceRow = React.memo(({ 
+    row, 
+    viewMode, 
+    dateFilter, 
+    monthlyDataMap, 
+    fetchStudentData 
+}: { 
+    row: StudentRow, 
+    viewMode: 'daily' | 'monthly', 
+    dateFilter: string, 
+    monthlyDataMap: any, 
+    fetchStudentData: any 
+}) => {
+    return (
+        <tr style={{ borderBottom: '1px solid var(--border-soft)', transition: 'background 0.15s' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-main)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-card)')}>
+            <td style={{ padding: '14px 20px' }}>
+                <p style={{ margin: 0, fontWeight: '700', fontSize: '0.9rem', color: 'var(--text-main)' }}>{row.name}</p>
+                <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{row.studentId}</p>
+            </td>
+            <td style={{ padding: '14px 20px', fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: '600' }}>#{row.rollNumber}</td>
+            <td style={{ padding: '14px 20px' }}>
+                <span style={{ padding: '3px 10px', background: 'var(--primary-soft)', color: 'var(--primary-bold)', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '700' }}>
+                    {row.className}
+                </span>
+            </td>
+            <td style={{ padding: '14px 20px' }}>
+                {viewMode === 'daily' ? (
+                    dateFilter ? (
+                        <InlineStatusEdit
+                            attendanceId={row.attendanceId}
+                            currentStatus={row.status}
+                            type="student"
+                            personId={row.id}
+                            date={dateFilter}
+                            classId={row.classId}
+                            onUpdated={fetchStudentData}
+                        />
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                            <StatusBadge status={row.status} />
+                            {row.subject && row.subject !== 'Full Day Record' && (
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', background: 'var(--bg-main)', padding: '2px 6px', borderRadius: '4px' }}>
+                                    {row.subject}
+                                </span>
+                            )}
+                        </div>
+                    )
+                ) : (
+                    <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} />
+                )}
+            </td>
+        </tr>
+    );
+});
+
+const TeacherAttendanceRow = React.memo(({ 
+    row, 
+    viewMode, 
+    dateFilter, 
+    monthlyDataMap, 
+    fetchTeacherData,
+    tab 
+}: { 
+    row: TeacherRow, 
+    viewMode: 'daily' | 'monthly', 
+    dateFilter: string, 
+    monthlyDataMap: any, 
+    fetchTeacherData: any,
+    tab: string
+}) => {
+    return (
+        <tr style={{ borderBottom: '1px solid var(--border-soft)', transition: 'background 0.15s' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-main)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-card)')}>
+            <td style={{ padding: '14px 20px' }}>
+                <p style={{ margin: 0, fontWeight: '700', fontSize: '0.9rem', color: 'var(--text-main)' }}>
+                    {row.name} <span style={{ fontSize: '0.75rem', color: 'var(--primary-bold)', opacity: 0.8 }}>({row.designation})</span>
+                </p>
+                {tab === 'teachers' && (
+                    <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{row.teacherId}</p>
+                )}
+            </td>
+            <td style={{ padding: '14px 20px', fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: '600' }}>
+                {row.arrivalTime || '—'}
+            </td>
+            <td style={{ padding: '14px 20px', fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: '600' }}>
+                {row.departureTime || '—'}
+            </td>
+            <td style={{ padding: '14px 20px' }}>
+                {viewMode === 'daily' ? (
+                    dateFilter ? (
+                        <InlineStatusEdit
+                            attendanceId={row.attendanceId}
+                            currentStatus={row.status}
+                            type="teacher"
+                            personId={row.id}
+                            date={dateFilter}
+                            initialReason={row.reason}
+                            onUpdated={fetchTeacherData}
+                        />
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+                            <StatusBadge status={row.status} />
+                        </div>
+                    )
+                ) : (
+                    <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} />
+                )}
+            </td>
+            <td style={{ padding: '14px 20px' }}>
+                {row.status === 'ABSENT' && row.reason && (
+                    <div style={{ fontSize: '0.75rem', color: '#ef4444', background: '#fee2e2', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                        <strong>Absent:</strong> {row.reason}
+                    </div>
+                )}
+                {row.earlyLeaveReason && (
+                    <div style={{ marginTop: '4px', fontSize: '0.75rem', color: 'var(--warning-bold)', background: 'rgba(var(--warning-rgb), 0.1)', padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--warning-soft)' }}>
+                        <strong>Early Leave:</strong> {row.earlyLeaveReason}
+                    </div>
+                )}
+                {!row.reason && !row.earlyLeaveReason && <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>—</span>}
+            </td>
+        </tr>
+    );
+});
 
 const thStyle: React.CSSProperties = {
     padding: '13px 20px', textAlign: 'left', fontSize: '0.72rem',
@@ -657,14 +784,16 @@ const ManageAttendance = () => {
 
                 {/* Class filter (students only) */}
                 {tab === 'students' && (
-                    <div style={{ position: 'relative' }}>
-                        <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)}
-                            style={{ ...inputStyle, paddingRight: '32px', appearance: 'none', fontWeight: '600', color: 'var(--text-main)' }}>
-                            {viewMode === 'daily' && <option value="">All Classes</option>}
-                            {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                        <ChevronDown size={14} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)' }} />
-                    </div>
+                    <CustomSelect 
+                        value={selectedClass}
+                        onChange={val => setSelectedClass(val)}
+                        options={[
+                            ...(viewMode === 'daily' ? [{ value: '', label: 'All Classes' }] : []),
+                            ...classes.map((c: any) => ({ value: c.id, label: c.name }))
+                        ]}
+                        icon={<School size={16} />}
+                        placeholder="Select Class"
+                    />
                 )}
 
                 {viewMode === 'daily' && dateFilter && (
@@ -707,48 +836,15 @@ const ManageAttendance = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredStudents.map((row, idx) => (
-                                    <tr key={row.id}
-                                        style={{ borderBottom: idx < filteredStudents.length - 1 ? '1px solid var(--border-soft)' : 'none', transition: 'background 0.15s' }}
-                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-main)')}
-                                        onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-card)')}>
-                                        <td style={{ padding: '14px 20px' }}>
-                                            <p style={{ margin: 0, fontWeight: '700', fontSize: '0.9rem', color: 'var(--text-main)' }}>{row.name}</p>
-                                            <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{row.studentId}</p>
-                                        </td>
-                                        <td style={{ padding: '14px 20px', fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: '600' }}>#{row.rollNumber}</td>
-                                        <td style={{ padding: '14px 20px' }}>
-                                            <span style={{ padding: '3px 10px', background: 'var(--primary-soft)', color: 'var(--primary-bold)', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '700' }}>
-                                                {row.className}
-                                            </span>
-                                        </td>
-                                        <td style={{ padding: '14px 20px' }}>
-                                            {viewMode === 'daily' ? (
-                                                dateFilter ? (
-                                                    <InlineStatusEdit
-                                                        attendanceId={row.attendanceId}
-                                                        currentStatus={row.status}
-                                                        type="student"
-                                                        personId={row.id}
-                                                        date={dateFilter}
-                                                        classId={row.classId}
-                                                        onUpdated={fetchStudentData}
-                                                    />
-                                                ) : (
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
-                                                        <StatusBadge status={row.status} />
-                                                        {row.subject && row.subject !== 'Full Day Record' && (
-                                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', background: 'var(--bg-main)', padding: '2px 6px', borderRadius: '4px' }}>
-                                                                {row.subject}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                )
-                                            ) : (
-                                                <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} />
-                                            )}
-                                        </td>
-                                    </tr>
+                                {filteredStudents.map((row) => (
+                                    <StudentAttendanceRow 
+                                        key={row.id} 
+                                        row={row} 
+                                        viewMode={viewMode} 
+                                        dateFilter={dateFilter} 
+                                        monthlyDataMap={monthlyDataMap} 
+                                        fetchStudentData={fetchStudentData} 
+                                    />
                                 ))}
                             </tbody>
                         </table>
@@ -776,60 +872,16 @@ const ManageAttendance = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredTeachers.map((row, idx) => (
-                                    <tr key={row.id}
-                                        style={{ borderBottom: idx < filteredTeachers.length - 1 ? '1px solid var(--border-soft)' : 'none', transition: 'background 0.15s' }}
-                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-main)')}
-                                        onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-card)')}>
-                                        <td style={{ padding: '14px 20px' }}>
-                                            <p style={{ margin: 0, fontWeight: '700', fontSize: '0.9rem', color: 'var(--text-main)' }}>
-                                                {row.name} <span style={{ fontSize: '0.75rem', color: 'var(--primary-bold)', opacity: 0.8 }}>({row.designation})</span>
-                                            </p>
-                                            {tab === 'teachers' && (
-                                                <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{row.teacherId}</p>
-                                            )}
-                                        </td>
-                                        <td style={{ padding: '14px 20px', fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: '600' }}>
-                                            {row.arrivalTime || '—'}
-                                        </td>
-                                        <td style={{ padding: '14px 20px', fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: '600' }}>
-                                            {row.departureTime || '—'}
-                                        </td>
-                                        <td style={{ padding: '14px 20px' }}>
-                                            {viewMode === 'daily' ? (
-                                                dateFilter ? (
-                                                    <InlineStatusEdit
-                                                        attendanceId={row.attendanceId}
-                                                        currentStatus={row.status}
-                                                        type="teacher"
-                                                        personId={row.id}
-                                                        date={dateFilter}
-                                                        initialReason={row.reason}
-                                                        onUpdated={fetchTeacherData}
-                                                    />
-                                                ) : (
-                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
-                                                        <StatusBadge status={row.status} />
-                                                    </div>
-                                                )
-                                            ) : (
-                                                <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} />
-                                            )}
-                                        </td>
-                                        <td style={{ padding: '14px 20px' }}>
-                                            {row.status === 'ABSENT' && row.reason && (
-                                                <div style={{ fontSize: '0.75rem', color: '#ef4444', background: '#fee2e2', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                                                    <strong>Absent:</strong> {row.reason}
-                                                </div>
-                                            )}
-                                            {row.earlyLeaveReason && (
-                                                <div style={{ marginTop: '4px', fontSize: '0.75rem', color: 'var(--warning-bold)', background: 'rgba(var(--warning-rgb), 0.1)', padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--warning-soft)' }}>
-                                                    <strong>Early Leave:</strong> {row.earlyLeaveReason}
-                                                </div>
-                                            )}
-                                            {!row.reason && !row.earlyLeaveReason && <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>—</span>}
-                                        </td>
-                                    </tr>
+                                {filteredTeachers.map((row) => (
+                                    <TeacherAttendanceRow 
+                                        key={row.id} 
+                                        row={row} 
+                                        viewMode={viewMode} 
+                                        dateFilter={dateFilter} 
+                                        monthlyDataMap={monthlyDataMap} 
+                                        fetchTeacherData={fetchTeacherData} 
+                                        tab={tab}
+                                    />
                                 ))}
                             </tbody>
                         </table>

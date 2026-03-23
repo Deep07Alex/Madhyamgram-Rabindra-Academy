@@ -429,17 +429,13 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
         const classes = (classesRes.rows as any[]).map(c => ({ ...c, norm: normalize(c.name) })).sort((a,b) => b.name.length - a.name.length);
         const existingStudentIds = new Set(existingIdsRes.rows.map(r => r.studentId.toUpperCase()));
         
-        const findValue = (row: any, aliases: string[]) => {
-            const keys = Object.keys(row);
-            const normalizedAliases = aliases.map(a => normalize(a));
-            const foundKey = keys.find(key => normalizedAliases.includes(normalize(key)));
-            return foundKey ? row[foundKey] : undefined;
-        }
-        const nameAliases = ['NAME', 'STUDENT NAME', 'FULL NAME', 'CANDIDATE NAME'];
-        const idAliases = ['ADMISSION NO', 'ADMISSIONID', 'REGISTER NO', 'REGISTRATION NO', 'REG NO', 'ID', 'ADMISSION REGISTRATION NO.', 'RID', 'STUDENTID', 'SLNO'];
-        const rollAliases = ['ROLL', 'ROLL NO', 'SL', 'SR NO', 'SL NO', 'SL_NO'];
-        const classAliases = ['CLASS', 'GRADE', 'STANDARD', 'STD', 'SECTION'];
-        const banglarAliases = ['BANGLAR SIKKHA ID', 'BANGLAR SHIKSHA ID', 'BANGLAR SHIKSHA', 'BS ID', 'PORTAL ID', 'STUDENT ID IN BANGLAR SHIKSHA PORTAL'];
+        const MANDATORY_HEADERS = [
+            'CLASS',
+            'Roll',
+            'NAME',
+            'STUDENT ID IN BANGLAR SHIKSHA PORTAL',
+            'Admission Registration No.'
+        ];
 
         /**
          * Maps raw Excel grade names (e.g., "Class 1", "STDI") to 
@@ -471,13 +467,36 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
 
         const usedRollsInClass = new Set<string>();
 
+        let processedValidSheet = false;
         for (const sheetName of workbook.SheetNames) {
             const worksheet = workbook.Sheets[sheetName];
             if (!worksheet) continue;
+            
+            const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            if (rawData.length === 0) continue;
+            
+            const headersRaw = (rawData[0] as any[]).map(h => (h || "").toString().replace(/\s+/g, ' ').trim()).filter(h => h !== "");
+            const headersNorm = headersRaw.map(h => h.toUpperCase());
+            const mandatoryNorm = MANDATORY_HEADERS.map(h => h.toUpperCase());
+            
+            const missing = mandatoryNorm.filter(h => !headersNorm.includes(h));
+            const extra = headersNorm.filter(h => !mandatoryNorm.includes(h));
+            
+            // If this sheet doesn't even have the core headers, skip it (could be Sheet2/3)
+            // But if it HAS headers but they are wrong (extra/missing), we should decide: skip or error?
+            // Safer to skip sheets that don't look like our data at all.
+            if (missing.length === mandatoryNorm.length) continue; 
+
+            // If it LOOKS like a student sheet but format is wrong, error out.
+            if (missing.length > 0 || extra.length > 0) {
+                return res.status(400).json({ message: "excel format is not supported" });
+            }
+
+            processedValidSheet = true;
             const data = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
             if (!data || data.length === 0) continue;
 
-            const usedRollsInSheet = new Set<string>(); // ISOLATE SEEN ROLLS PER SHEET
+            const usedRollsInSheet = new Set<string>();
             let lastValidClassId = ""; 
             let lastValidClassName = "";
 
@@ -507,12 +526,12 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
                     const classId = lastValidClassId;
                     const finalClassName = lastValidClassName;
 
-                    // 2. EXTRACT STUDENT DATA
-                    studentName = (findValue(row, nameAliases) || "").toString().trim();
-                    let admissionNoRaw = (findValue(row, idAliases) || "").toString().trim();
+                    // 2. EXTRACT STUDENT DATA (STRICT MAPPING)
+                    studentName = (row['NAME'] || "").toString().trim();
+                    let admissionNoRaw = (row['Admission Registration No.'] || "").toString().trim();
 
                     // SKIP HEADING/STRUCTURAL ROWS
-                    if (!studentName || studentName.toUpperCase() === 'NAME' || normalize(studentName) === 'STUDENTNAME' || !admissionNoRaw || admissionNoRaw === 'ID') {
+                    if (!studentName || studentName.toUpperCase() === 'NAME' || !admissionNoRaw) {
                         continue; 
                     }
 
@@ -520,8 +539,8 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
                         throw new Error(`Grade not detected. System expects: Nursery, KG-I A, KG-I B, KG-II A, KG-II B, STD-I to IV.`);
                     }
 
-                    let rollNumber = (findValue(row, rollAliases) || "").toString().trim() || '0';
-                    const banglarSikkhaId = (findValue(row, banglarAliases) || "").toString().trim();
+                    let rollNumber = (row['Roll'] || "").toString().trim() || '0';
+                    const banglarSikkhaId = (row['STUDENT ID IN BANGLAR SHIKSHA PORTAL'] || "").toString().trim();
 
                     let admissionNo = admissionNoRaw.toString().replace(/[^0-9]/g, ''); 
                     if (!admissionNo) throw new Error(`Admission No "${admissionNoRaw}" must contain digits.`);
@@ -569,6 +588,10 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
                     });
                 }
             }
+        }
+
+        if (!processedValidSheet) {
+            return res.status(400).json({ message: "excel format is not supported" });
         }
 
         const HASH_BATCH_SIZE = 30; // Smaller batch for stability

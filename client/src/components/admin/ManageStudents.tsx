@@ -11,11 +11,14 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
-import { UserCircle, UserPlus, List, Eye, EyeOff, Edit, Trash2, Users, Search, Save } from 'lucide-react';
+import { UserPlus, List, Eye, EyeOff, Edit, Trash2, Users, Search, Save, School, Download, Upload, FileSpreadsheet, Loader2 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import PhotoUpload from '../common/PhotoUpload';
 import Modal from '../common/Modal';
 import { useFetch } from '../../hooks/useFetch';
 import useServerEvents from '../../hooks/useServerEvents';
+import CustomSelect from '../common/CustomSelect';
+import ConfirmModal from '../common/ConfirmModal';
 
 const ManageStudents = () => {
     const { showToast } = useToast();
@@ -23,7 +26,7 @@ const ManageStudents = () => {
     const { data: classesData } = useFetch<any[]>('/users/classes');
     const students = studentsData || [];
     const classes = classesData || [];
-    
+
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -51,6 +54,9 @@ const ManageStudents = () => {
         password: '',
         photo: ''
     });
+
+    const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: '', type: 'single' as 'single' | 'all' });
+    const [isFinalWarning, setIsFinalWarning] = useState(false);
 
     useEffect(() => {
         if (classes.length > 0 && !newUser.classId) {
@@ -101,33 +107,50 @@ const ManageStudents = () => {
         }
     };
 
-    const handleDeleteAllStudents = async () => {
-        const confirm1 = confirm("CAUTION: This will entirely delete ALL students from the database. This action is irreversible. Are you sure?");
-        if (!confirm1) return;
+    const downloadTemplate = () => {
+        const headers = [
+            'CLASS',
+            'Roll',
+            'NAME',
+            'STUDENT ID IN BANGLAR SHIKSHA PORTAL',
+            'Admission Registration No.'
+        ];
+        // Sample data
+        const data = [
+            ['KG-I A', '2', 'SAMPLE STUDENT', '10000000000002', '901']
+        ];
 
-        const confirm2 = confirm("FINAL WARNING: Are you absolutely sure you want to delete EVERY student record?");
-        if (!confirm2) return;
+        const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
 
+        XLSX.writeFile(workbook, `Student_Import_Template.xlsx`);
+        showToast('Template downloaded. Please fill and upload.', 'info');
+    };
+
+    const handleDeleteAll = async () => {
         try {
             await api.delete('/users/students/all');
-            showToast('All students deleted successfully', 'success');
+            showToast('All student records wiped successfully', 'success');
+            setDeleteModal({ ...deleteModal, isOpen: false });
+            setIsFinalWarning(false);
             refreshStudents();
         } catch (error: any) {
-            console.error('Failed to delete all students:', error);
-            showToast(error.response?.data?.message || 'Failed to delete all students', 'error');
+            console.error('Failed to wipe database:', error);
+            showToast(error.response?.data?.message || 'Failed to wipe database', 'error');
         }
     };
 
-
-
-    const handleDeleteStudent = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this student?')) return;
+    const handleDeleteStudent = async () => {
+        if (!deleteModal.id) return;
         try {
-            await api.delete(`/users/students/${id}`);
+            await api.delete(`/users/students/${deleteModal.id}`);
             showToast('Student deleted successfully', 'success');
+            setDeleteModal({ ...deleteModal, isOpen: false });
             refreshStudents();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to delete student:', error);
+            showToast(error.response?.data?.message || 'Failed to delete student', 'error');
         }
     };
 
@@ -178,55 +201,104 @@ const ManageStudents = () => {
     return (
         <div className="manage-section">
 
-            <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px', flexWrap: 'wrap' }}>
-                <input
-                    type="file"
-                    accept=".xlsx, .xls"
-                    ref={fileInputRef}
-                    onChange={handleBulkImport}
-                    style={{ display: 'none' }}
-                />
-                <button
-                    className="btn-primary"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isImporting}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        background: 'linear-gradient(135deg, var(--primary-bold) 0%, var(--primary-rich) 100%)',
-                        color: 'white',
-                        padding: '10px 24px',
-                        border: 'none',
-                        transition: 'var(--transition-base)',
-                        minWidth: '200px',
-                        flex: '1 1 200px'
-                    }}
-                >
-                    <UserCircle size={18} />
-                    {isImporting ? 'Importing...' : 'Bulk Import Students (Excel)'}
-                </button>
-                <button
-                    className="btn-danger"
-                    onClick={handleDeleteAllStudents}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
-                        color: 'white',
-                        padding: '10px 24px',
-                        border: 'none',
-                        transition: 'var(--transition-base)',
-                        minWidth: '200px',
-                        flex: '1 1 200px'
-                    }}
-                >
-                    <Trash2 size={18} />
-                    Delete All Students
-                </button>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', marginBottom: '32px', alignItems: 'stretch' }}>
+                {/* Bulk Import Column */}
+                <div className="card" style={{ margin: 0, padding: '24px', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}>
+                                <Upload size={18} />
+                            </div>
+                            <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Bulk Enrollment</h3>
+                        </div>
+                        <button onClick={downloadTemplate} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '0.75rem', fontWeight: 700 }}>
+                            <Download size={14} /> Get Template
+                        </button>
+                    </div>
+
+                    <div style={{ marginBottom: '20px', padding: '12px 16px', background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '12px', borderLeft: '4px solid var(--primary-bold)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ color: 'var(--primary-bold)' }}>
+                            <FileSpreadsheet size={18} />
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: 600 }}>
+                            Uploading the excel must follow the rules given in templates.
+                        </p>
+                    </div>
+
+                    <div
+                        onClick={() => fileInputRef.current?.click()}
+                        style={{
+                            border: '2px dashed var(--border-soft)',
+                            padding: '32px 24px',
+                            textAlign: 'center',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            background: isImporting ? 'var(--bg-main)' : 'rgba(var(--primary-rgb), 0.02)',
+                            transition: 'all 0.3s ease',
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                        }}
+                    >
+                        {isImporting ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                                <Loader2 className="animate-spin" color="var(--primary-bold)" size={32} />
+                                <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9rem' }}>Processing Database...</p>
+                            </div>
+                        ) : (
+                            <>
+                                <FileSpreadsheet size={32} style={{ marginBottom: '16px', color: 'var(--primary-bold)' }} />
+                                <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800 }}>Click to Upload Student Excel</h4>
+                                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Only the strict template format is supported.</p>
+                            </>
+                        )}
+                        <input type="file" ref={fileInputRef} onChange={handleBulkImport} accept=".xlsx, .xls" style={{ display: 'none' }} />
+                    </div>
+                </div>
+
+                {/* Database Actions Column */}
+                <div className="card" style={{ margin: 0, padding: '24px', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444' }}>
+                            <Trash2 size={18} />
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Danger Zone</h3>
+                    </div>
+
+                    <p style={{ margin: '0 0 24px 0', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                        Use these tools for emergency cleanup or academic year resets. These actions are destructive and permanent.
+                    </p>
+
+                    <button
+                        className="btn-danger"
+                        onClick={() => setDeleteModal({ isOpen: true, id: '', type: 'all' })}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '12px',
+                            background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                            color: 'white',
+                            padding: '16px 24px',
+                            border: 'none',
+                            borderRadius: '12px',
+                            fontWeight: 800,
+                            fontSize: '0.95rem',
+                            width: '100%',
+                            boxShadow: '0 10px 15px -3px rgba(239, 68, 68, 0.2)'
+                        }}
+                    >
+                        <Trash2 size={20} />
+                        Wipe Student Database
+                    </button>
+
+                    <div style={{ marginTop: '32px', padding: '16px', background: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-soft)', fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }}></div>
+                        <span><strong>Note:</strong> Wiping students will also clear their attendance records and examination results permanently.</span>
+                    </div>
+                </div>
             </div>
 
 
@@ -268,15 +340,14 @@ const ManageStudents = () => {
                             required
                         />
                     </div>
-                    <div className="form-group">
-                        <label>Select Class</label>
-                        <select value={newUser.classId} onChange={e => setNewUser({ ...newUser, classId: e.target.value })} required>
-                            {classes.length === 0 && <option value="">Loading Classes...</option>}
-                            {classes.map((c: any) => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
-                        </select>
-                    </div>
+                    <CustomSelect
+                        label="Select Class"
+                        value={newUser.classId}
+                        onChange={val => setNewUser({ ...newUser, classId: val })}
+                        options={classes.map((c: any) => ({ value: c.id, label: c.name }))}
+                        icon={<School size={16} />}
+                        placeholder={classes.length === 0 ? "Loading Classes..." : "Choose Class..."}
+                    />
                     {(() => {
                         const selectedClass = classes.find((c: any) => c.id === newUser.classId);
                         const showBanglarSikkha = selectedClass && selectedClass.grade >= 2;
@@ -316,24 +387,16 @@ const ManageStudents = () => {
                         View Registered Students
                     </h3>
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                        <select
+                        <CustomSelect
                             value={selectedClassId}
-                            onChange={(e) => setSelectedClassId(e.target.value)}
-                            style={{
-                                padding: '10px 16px',
-                                borderRadius: 'var(--radius-md)',
-                                border: '1px solid var(--border-color)',
-                                background: 'var(--bg-main)',
-                                color: 'var(--text-main)',
-                                fontSize: '0.9rem',
-                                outline: 'none'
-                             }}
-                        >
-                            <option value="">All Classes</option>
-                            {classes.map((c: any) => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
-                        </select>
+                            onChange={(val) => setSelectedClassId(val)}
+                            options={[
+                                { value: '', label: 'All Classes' },
+                                ...classes.map((c: any) => ({ value: c.id, label: c.name }))
+                            ]}
+                            icon={<School size={16} />}
+                            placeholder="All Classes"
+                        />
                         <div style={{ position: 'relative', width: '250px' }}>
                             <input
                                 type="text"
@@ -375,7 +438,7 @@ const ManageStudents = () => {
                                 <tr key={user.id}>
                                     <td style={{ padding: '24px 20px', verticalAlign: 'middle' }}>
                                         <div style={{ width: '45px', height: '45px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-soft)', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                             {user.photo ? (
+                                            {user.photo ? (
                                                 <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${user.photo}?t=${Date.now()}`} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                             ) : (
                                                 <Users size={24} color="var(--text-muted)" />
@@ -411,7 +474,7 @@ const ManageStudents = () => {
                                     <td style={{ color: 'var(--text-main)', fontWeight: '600', padding: '24px 20px' }}>{user.class?.name}</td>
                                     <td style={{ padding: '24px 20px' }}>
                                         <div style={{ display: 'flex', gap: '10px' }}>
-                                            <button 
+                                            <button
                                                 onClick={() => {
                                                     setSelectedStudent(user);
                                                     setEditData({
@@ -424,7 +487,7 @@ const ManageStudents = () => {
                                                         photo: user.photo || ''
                                                     });
                                                     setIsEditModalOpen(true);
-                                                }} 
+                                                }}
                                                 style={{
                                                     display: 'flex',
                                                     alignItems: 'center',
@@ -444,8 +507,8 @@ const ManageStudents = () => {
                                             >
                                                 <Edit size={14} /> Edit
                                             </button>
-                                            <button 
-                                                onClick={() => handleDeleteStudent(user.id)} 
+                                            <button
+                                                onClick={() => setDeleteModal({ isOpen: true, id: user.id, type: 'single' })}
                                                 style={{
                                                     background: 'none',
                                                     color: '#ef4444',
@@ -482,16 +545,16 @@ const ManageStudents = () => {
                 maxWidth="800px"
                 footer={
                     <>
-                        <button 
-                            onClick={() => setIsEditModalOpen(false)} 
-                            className="btn-secondary" 
+                        <button
+                            onClick={() => setIsEditModalOpen(false)}
+                            className="btn-secondary"
                             style={{ padding: '10px 24px', background: 'var(--bg-hover)', color: 'var(--text-main)', border: '1px solid var(--border-soft)' }}
                         >
                             Cancel
                         </button>
-                        <button 
-                            onClick={handleUpdateStudent} 
-                            className="btn-primary" 
+                        <button
+                            onClick={handleUpdateStudent}
+                            className="btn-primary"
                             style={{ padding: '10px 24px', display: 'flex', alignItems: 'center', gap: '8px' }}
                         >
                             <Save size={18} /> Update Student
@@ -502,12 +565,12 @@ const ManageStudents = () => {
                 <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '32px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', gridColumn: '1 / -1' }}>
                         <div style={{ maxWidth: '200px', margin: '0 auto' }}>
-                           <PhotoUpload 
-                               value={editData.photo || ''} 
-                               onChange={(url: string) => setEditData({ ...editData, photo: url })} 
-                               label="Update Profile Photo" 
-                               uploadPath="/uploads/student-photo"
-                           />
+                            <PhotoUpload
+                                value={editData.photo || ''}
+                                onChange={(url: string) => setEditData({ ...editData, photo: url })}
+                                label="Update Profile Photo"
+                                uploadPath="/uploads/student-photo"
+                            />
                         </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', gridColumn: '1 / -1' }}>
@@ -540,6 +603,31 @@ const ManageStudents = () => {
                     </div>
                 </div>
             </Modal>
+
+            <ConfirmModal
+                isOpen={deleteModal.isOpen && deleteModal.type === 'single'}
+                onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
+                onConfirm={handleDeleteStudent}
+                title="Delete Student Record"
+                message="Are you sure you want to permanently remove this student from the database? This will also delete their results and attendance history."
+            />
+
+            <ConfirmModal
+                isOpen={deleteModal.isOpen && deleteModal.type === 'all'}
+                onClose={() => {
+                    setDeleteModal({ ...deleteModal, isOpen: false });
+                    setIsFinalWarning(false);
+                }}
+                onConfirm={!isFinalWarning ? () => setIsFinalWarning(true) : handleDeleteAll}
+                title={!isFinalWarning ? "Wipe Student Database" : "FINAL WARNING"}
+                message={!isFinalWarning
+                    ? "CAUTION: This will entirely delete ALL students from the database. This action is irreversible. Are you absolutely sure?"
+                    : "THIS IS YOUR LAST CHANCE. Are you 100% sure you want to delete EVERY single student record from this academy?"
+                }
+                confirmText={!isFinalWarning ? "Continue" : "PURGE ALL RECORDS"}
+                variant={!isFinalWarning ? "warning" : "danger"}
+                shouldCloseOnConfirm={isFinalWarning}
+            />
         </div>
     );
 };

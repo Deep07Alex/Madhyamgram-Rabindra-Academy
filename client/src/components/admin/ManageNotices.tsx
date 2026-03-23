@@ -14,6 +14,8 @@
  * - Real-time sync: Notifies users instantly via dashboard alerts.
  */
 import { useState, useEffect } from 'react';
+import { useToast } from '../../context/ToastContext';
+
 import { 
     Plus, 
     Trash2, 
@@ -28,6 +30,8 @@ import {
     User
 } from 'lucide-react';
 import api from '../../services/api';
+import CustomSelect from '../common/CustomSelect';
+import ConfirmModal from '../common/ConfirmModal';
 
 interface Notice {
     id: string;
@@ -58,6 +62,9 @@ const ManageNotices = () => {
     const [students, setStudents] = useState<Student[]>([]);
     const [loading, setLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: '' });
+    const { showToast } = useToast();
+
     
     const [formData, setFormData] = useState({
         title: '',
@@ -91,13 +98,26 @@ const ManageNotices = () => {
         loadInitialData();
     }, []);
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this notice?')) return;
+    const refreshNotices = async () => {
         try {
-            await api.delete(`/notices/${id}`);
-            setNotices(notices.filter(n => n.id !== id));
+            const res = await api.get('/notices');
+            setNotices(res.data);
+        } catch (error) {
+            console.error('Failed to refresh:', error);
+        }
+    };
+
+
+    const handleDeleteNotice = async () => {
+        if (!deleteModal.id) return;
+        try {
+            await api.delete(`/notices/${deleteModal.id}`);
+            showToast('Notice successfully removed.', 'success');
+            setDeleteModal({ isOpen: false, id: '' });
+            refreshNotices();
         } catch (error) {
             console.error('Failed to delete notice:', error);
+            showToast('Failed to remove notice. Critical error.', 'error');
         }
     };
 
@@ -128,8 +148,10 @@ const ManageNotices = () => {
                 targetStudentId: '',
                 expiresAt: ''
             });
+            showToast('Notice broadcasted successfully!', 'success');
         } catch (error) {
             console.error('Failed to create notice:', error);
+            showToast('Failed to broadcast notice. Please try again.', 'error');
         }
     };
 
@@ -237,54 +259,48 @@ const ManageNotices = () => {
 
                         {/* Visibility Type Removed - All notices are INTERNAL */}
 
-                        <div className="form-group">
-                            <label>Target Audience</label>
-                            <div style={{ position: 'relative' }}>
-                                <select 
-                                    value={formData.targetAudience}
-                                    onChange={e => setFormData({
-                                        ...formData, 
-                                        targetAudience: e.target.value as 'ALL' | 'TEACHER' | 'STUDENT',
-                                        targetClassId: '',
-                                        targetStudentId: ''
-                                    })}
-                                    style={{ paddingLeft: '40px' }}
-                                >
-                                    <option value="ALL">Everyone</option>
-                                    <option value="TEACHER">Teaching Staff</option>
-                                    <option value="STUDENT">Students</option>
-                                </select>
-                                <Target size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-bold)' }} />
-                            </div>
-                        </div>
+                        <CustomSelect 
+                            label="Target Audience"
+                            value={formData.targetAudience}
+                            onChange={val => setFormData({
+                                ...formData, 
+                                targetAudience: val as 'ALL' | 'TEACHER' | 'STUDENT',
+                                targetClassId: '',
+                                targetStudentId: ''
+                            })}
+                            options={[
+                                { value: 'ALL', label: 'Everyone' },
+                                { value: 'TEACHER', label: 'Teaching Staff' },
+                                { value: 'STUDENT', label: 'Students' }
+                            ]}
+                            icon={<Target size={16} />}
+                        />
 
                         {formData.targetAudience === 'STUDENT' && (
                             <>
-                                <div className="form-group">
-                                    <label>Filter by Class (Optional)</label>
-                                    <select 
-                                        value={formData.targetClassId}
-                                        onChange={e => setFormData({...formData, targetClassId: e.target.value, targetStudentId: ''})}
-                                    >
-                                        <option value="">All Classes</option>
-                                        {classes.map(c => (
-                                            <option key={c.id} value={c.id}>{c.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>Individual Student (Optional)</label>
-                                    <select 
-                                        value={formData.targetStudentId}
-                                        onChange={e => setFormData({...formData, targetStudentId: e.target.value})}
-                                        disabled={!formData.targetClassId}
-                                    >
-                                        <option value="">All Students in Class</option>
-                                        {filteredStudents.map(s => (
-                                            <option key={s.id} value={s.id}>{s.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                <CustomSelect 
+                                    label="Filter by Class (Optional)"
+                                    value={formData.targetClassId}
+                                    onChange={val => setFormData({...formData, targetClassId: val, targetStudentId: ''})}
+                                    options={[
+                                        { value: '', label: 'All Classes' },
+                                        ...classes.map(c => ({ value: c.id, label: c.name }))
+                                    ]}
+                                    icon={<UsersIcon size={16} />}
+                                    placeholder="All Classes"
+                                />
+                                <CustomSelect 
+                                    label="Individual Student (Optional)"
+                                    value={formData.targetStudentId}
+                                    onChange={val => setFormData({...formData, targetStudentId: val})}
+                                    options={[
+                                        { value: '', label: 'All Students in Class' },
+                                        ...filteredStudents.map(s => ({ value: s.id, label: s.name }))
+                                    ]}
+                                    icon={<User size={16} />}
+                                    disabled={!formData.targetClassId}
+                                    placeholder="All Students in Class"
+                                />
                             </>
                         )}
 
@@ -426,7 +442,7 @@ const ManageNotices = () => {
                                         <td style={{ textAlign: 'right', paddingRight: '32px' }}>
                                             <button 
                                                 className="btn-danger btn-sm" 
-                                                onClick={() => handleDelete(notice.id)}
+                                                onClick={() => setDeleteModal({ isOpen: true, id: notice.id })}
                                                 style={{ padding: '8px', borderRadius: '8px' }}
                                                 title="Remove Announcement"
                                             >
@@ -440,6 +456,14 @@ const ManageNotices = () => {
                     </table>
                 </div>
             </div>
+
+            <ConfirmModal 
+                isOpen={deleteModal.isOpen}
+                onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
+                onConfirm={handleDeleteNotice}
+                title="Delete Notice"
+                message="Are you sure you want to permanently withdraw this notice? It will be removed from all student and teacher dashboards immediately."
+            />
         </div>
     );
 };

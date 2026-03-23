@@ -14,6 +14,8 @@ import { useToast } from '../../context/ToastContext';
 import useServerEvents from '../../hooks/useServerEvents';
 import { MAIN_SUBJECTS } from '../../utils/constants';
 import FileUploadPicker from '../shared/FileUploadPicker';
+import CustomSelect from '../common/CustomSelect';
+import ConfirmModal from '../common/ConfirmModal';
 import {
     BookPlus,
     Calendar,
@@ -31,6 +33,7 @@ import {
 
 const TeacherHomework = () => {
     const { showToast } = useToast();
+    const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: '' });
     const [classes, setClasses] = useState([]);
     const [homeworkList, setHomeworkList] = useState([]);
     const [submissions, setSubmissions] = useState([]);
@@ -42,7 +45,7 @@ const TeacherHomework = () => {
     });
     const [attachedFile, setAttachedFile] = useState<File | null>(null);
 
-    const fetchData = useCallback(async () => {
+    const refreshHomework = useCallback(async () => {
         try {
             const [clsRes, hwRes] = await Promise.all([
                 api.get('/users/classes'),
@@ -55,7 +58,7 @@ const TeacherHomework = () => {
         }
     }, []);
 
-    useEffect(() => { fetchData(); }, [fetchData]);
+    useEffect(() => { refreshHomework(); }, [refreshHomework]);
 
 
     const fetchSubmissions = useCallback(async () => {
@@ -76,9 +79,9 @@ const TeacherHomework = () => {
     // Live: refresh on remote changes
     useServerEvents({
         'homework_submitted': fetchSubmissions,
-        'homework_created': fetchData,
+        'homework_created': refreshHomework,
         'homework_deleted': (data: any) => {
-            fetchData();
+            refreshHomework();
             if (data && data.id === selectedHomework) {
                 setSelectedHomework('');
             }
@@ -103,19 +106,22 @@ const TeacherHomework = () => {
             showToast('Assignment deployed successfully!', 'success');
             setNewHomework({ classId: '', title: '', description: '', subject: '', dueDate: '', allowFileUpload: false });
             setAttachedFile(null);
-            fetchData();
+            refreshHomework();
         } catch (error) {
             console.error('Failed to create homework:', error);
         }
     };
 
-    const handleDeleteHomework = async (id: string) => {
-        if (!window.confirm('Are you sure you want to delete this assignment?')) return;
+    const handleDeleteAssignment = async () => {
+        if (!deleteModal.id) return;
         try {
-            await api.delete(`/homework/${id}`);
-            fetchData();
+            await api.delete(`/homework/${deleteModal.id}`);
+            showToast('Assignment successfully removed.', 'success');
+            setDeleteModal({ isOpen: false, id: '' });
+            refreshHomework();
         } catch (error) {
             console.error('Failed to delete homework:', error);
+            showToast('Failed to remove assignment.', 'error');
         }
     };
 
@@ -141,23 +147,21 @@ const TeacherHomework = () => {
                     Establish New Academic Assignment
                 </h3>
                 <form onSubmit={handleCreateHomework} className="form-grid">
-                    <div className="form-group">
-                        <label>Target Grade</label>
-                        <div style={{ position: 'relative' }}>
-                            <School size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                            <select value={newHomework.classId} onChange={e => setNewHomework({ ...newHomework, classId: e.target.value })} required style={{ paddingLeft: '40px' }}>
-                                <option value="">Choose Class...</option>
-                                {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    <div className="form-group">
-                        <label>Subject Domain</label>
-                        <select value={newHomework.subject} onChange={e => setNewHomework({ ...newHomework, subject: e.target.value })} required>
-                            <option value="">Choose Subject...</option>
-                            {MAIN_SUBJECTS.map(sub => <option key={sub} value={sub}>{sub}</option>)}
-                        </select>
-                    </div>
+                    <CustomSelect 
+                        label="Target Grade"
+                        value={newHomework.classId}
+                        onChange={val => setNewHomework({ ...newHomework, classId: val })}
+                        options={classes.map((c: any) => ({ value: c.id, label: c.name }))}
+                        icon={<School size={16} />}
+                        placeholder={classes.length === 0 ? "Loading Classes..." : "Choose Class..."}
+                    />
+                    <CustomSelect 
+                        label="Subject Domain"
+                        value={newHomework.subject}
+                        onChange={val => setNewHomework({ ...newHomework, subject: val })}
+                        options={MAIN_SUBJECTS.map(sub => ({ value: sub, label: sub }))}
+                        icon={<GraduationCap size={16} />}
+                    />
                     <div className="form-group" style={{ gridColumn: 'span 2' }}>
                         <label>Assignment Objective</label>
                         <div style={{ position: 'relative' }}>
@@ -288,7 +292,7 @@ const TeacherHomework = () => {
                                         </div>
                                     </td>
                                     <td style={{ textAlign: 'right' }}>
-                                        <button onClick={() => handleDeleteHomework(hw.id)} className="btn-danger btn-sm" style={{ padding: '6px 12px' }}>
+                                        <button onClick={() => setDeleteModal({ isOpen: true, id: hw.id })} className="btn-danger btn-sm" style={{ padding: '6px 12px' }}>
                                             <Trash2 size={14} /> Remove
                                         </button>
                                     </td>
@@ -305,13 +309,14 @@ const TeacherHomework = () => {
                     <GraduationCap size={20} color="var(--primary-bold)" />
                     Student Submission Review
                 </h3>
-                <div className="form-group" style={{ marginBottom: '24px', maxWidth: '400px' }}>
-                    <label>Select Workspace to Audit</label>
-                    <select value={selectedHomework} onChange={e => setSelectedHomework(e.target.value)}>
-                        <option value="">Choose Assignment...</option>
-                        {homeworkList.map((hw: any) => <option key={hw.id} value={hw.id}>{hw.title} ({hw.class?.name})</option>)}
-                    </select>
-                </div>
+                <CustomSelect 
+                    label="Select Workspace to Audit"
+                    value={selectedHomework}
+                    onChange={val => setSelectedHomework(val)}
+                    options={homeworkList.map((hw: any) => ({ value: hw.id, label: `${hw.title} (${hw.class?.name})` }))}
+                    icon={<FileText size={16} />}
+                    placeholder="Choose Assignment..."
+                />
 
                 {selectedHomework && (
                     submissions.length === 0 ? (
@@ -540,6 +545,14 @@ const TeacherHomework = () => {
                     </div>
                 );
             })()}
+
+            <ConfirmModal 
+                isOpen={deleteModal.isOpen}
+                onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
+                onConfirm={handleDeleteAssignment}
+                title="Delete Assignment"
+                message="Are you sure you want to permanently remove this homework? Students will no longer be able to view or submit it."
+            />
         </div>
     );
 };

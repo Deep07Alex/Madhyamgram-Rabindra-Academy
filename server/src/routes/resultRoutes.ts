@@ -5,7 +5,7 @@
  */
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
-import { createResult, getResults, bulkUploadResults, getConsolidatedReport, deleteResult } from '../controllers/resultController.js';
+import { createResult, getResults, bulkUploadResults, getConsolidatedReport, deleteResult, deleteStudentResults, deleteClassResults } from '../controllers/resultController.js';
 import multer from 'multer';
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -18,6 +18,8 @@ router.post('/bulk', authorize(['ADMIN', 'TEACHER']), upload.single('file'), bul
 router.get('/', authorize(['ADMIN', 'TEACHER', 'STUDENT']), getResults);
 router.get('/report', authorize(['ADMIN', 'TEACHER', 'STUDENT']), getConsolidatedReport);
 router.get('/report/:studentId', authorize(['ADMIN', 'TEACHER', 'STUDENT']), getConsolidatedReport);
+router.delete('/student/:studentId', authorize(['ADMIN']), deleteStudentResults);
+router.delete('/bulk/class/:classId', authorize(['ADMIN']), deleteClassResults);
 router.delete('/:id', authorize(['ADMIN']), deleteResult);
 
 export default router;

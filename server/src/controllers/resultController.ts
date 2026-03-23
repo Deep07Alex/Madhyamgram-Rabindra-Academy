@@ -153,19 +153,42 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
             [studentId, academicYear]
         );
 
-        // Fetch Attendance Summary
-        const attendanceRes = await db.query(
-            `SELECT 
-                COUNT(*) as total_days,
-                COUNT(CASE WHEN status = 'PRESENT' THEN 1 END) as present_days,
-                COUNT(CASE WHEN status = 'ABSENT' THEN 1 END) as absent_days
-             FROM "Attendance" 
-             WHERE "studentId" = $1 AND (
+        // Fetch Attendance Summary using Virtual Presence Logic
+        // We count all unique school session dates in the system as expected presence
+        const sessionsRes = await db.query(
+            `SELECT date::date as session_date 
+             FROM (
+                SELECT date::date FROM "Attendance"
+                UNION
+                SELECT date::date FROM "TeacherAttendance"
+             ) as session_union 
+             WHERE (
+                (EXTRACT(YEAR FROM date) = $1 AND EXTRACT(MONTH FROM date) >= 1) OR 
+                (EXTRACT(YEAR FROM date) = $1 + 1 AND EXTRACT(MONTH FROM date) <= 12)
+             )`,
+            [academicYear]
+        );
+        const sessionDates = new Set(sessionsRes.rows.map(r => new Date(r.session_date).toLocaleDateString('en-CA')));
+        const totalSessions = sessionDates.size;
+
+        // Count explicit ABSENT records for this student within these sessions
+        const explicitAbsentRes = await db.query(
+            `SELECT COUNT(DISTINCT date::date) as absent_count
+             FROM "Attendance"
+             WHERE "studentId" = $1 AND status = 'ABSENT' AND (
                 (EXTRACT(YEAR FROM date) = $2 AND EXTRACT(MONTH FROM date) >= 1) OR 
                 (EXTRACT(YEAR FROM date) = $2 + 1 AND EXTRACT(MONTH FROM date) <= 12)
              )`,
             [studentId, academicYear]
         );
+        const absentCount = parseInt(explicitAbsentRes.rows[0].absent_count || '0');
+        const presentCount = Math.max(0, totalSessions - absentCount);
+
+        const attendanceData = {
+            total_days: totalSessions,
+            present_days: presentCount,
+            absent_days: absentCount
+        };
 
         // Calculate Rank in Class
         const rankRes = await db.query(
@@ -186,7 +209,7 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
         res.json({
             student,
             results: resultsRes.rows,
-            attendance: attendanceRes.rows[0] || { total_days: 0, present_days: 0, absent_days: 0 },
+            attendance: attendanceData,
             rank: myRank
         });
     } catch (error) {
@@ -239,9 +262,6 @@ export const getResults = async (req: AuthRequest, res: Response) => {
     }
 };
 
-/**
- * Deletes a result record.
- */
 export const deleteResult = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
@@ -249,6 +269,58 @@ export const deleteResult = async (req: Request, res: Response) => {
         res.json({ message: 'Result deleted' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting result' });
+    }
+};
+
+/**
+ * Deletes all result records for a specific student, semester, and academic year.
+ */
+export const deleteStudentResults = async (req: Request, res: Response) => {
+    try {
+        const { studentId } = req.params;
+        const { semester, academicYear } = req.query;
+
+        if (!studentId || !semester || !academicYear) {
+            return res.status(400).json({ message: 'Missing studentId, semester, or academicYear' });
+        }
+
+        await db.query(
+            'DELETE FROM "Result" WHERE "studentId" = $1 AND semester = $2 AND "academicYear" = $3',
+            [studentId, semester, parseInt(academicYear as string)]
+        );
+
+        res.json({ message: 'All results for this student in the selected term have been deleted' });
+    } catch (error) {
+        console.error('Error deleting student results:', error);
+        res.status(500).json({ message: 'Error deleting student results' });
+    }
+};
+
+/**
+ * Deletes all results for a specific class, semester, and academic year.
+ */
+export const deleteClassResults = async (req: Request, res: Response) => {
+    try {
+        const { classId } = req.params;
+        const { semester, academicYear } = req.query;
+
+        if (!classId || !semester || !academicYear) {
+            return res.status(400).json({ message: 'Missing classId, semester, or academicYear' });
+        }
+
+        // Delete results for all students in the specific class
+        await db.query(
+            `DELETE FROM "Result" 
+             WHERE semester = $1 
+             AND "academicYear" = $2 
+             AND "studentId" IN (SELECT id FROM "Student" WHERE "classId" = $3)`,
+            [semester, parseInt(academicYear as string), classId]
+        );
+
+        res.json({ message: `All records for the selected class in ${semester} (${academicYear}) have been cleared.` });
+    } catch (error) {
+        console.error('Error in bulk class result deletion:', error);
+        res.status(500).json({ message: 'Error in bulk class result deletion' });
     }
 };
 

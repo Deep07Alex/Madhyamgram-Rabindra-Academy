@@ -18,17 +18,19 @@ import { isAttendanceOpen } from '../../utils/attendance';
 import { useToast } from '../../context/ToastContext';
 import { MAIN_SUBJECTS } from '../../utils/constants';
 import useServerEvents from '../../hooks/useServerEvents';
+import CustomSelect from '../common/CustomSelect';
 import {
     Users,
     UserCheck,
     Calendar,
-    BookOpen,
     ClipboardCheck,
     AlertCircle,
     CheckCircle2,
     XCircle,
     Search,
-    BarChart3
+    BarChart3,
+    GraduationCap,
+    School
 } from 'lucide-react';
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT';
@@ -317,31 +319,27 @@ const TeacherAttendance = () => {
             {tab === 'mark' && (
                 <div className="card">
                     <h3><ClipboardCheck size={20} color="var(--primary-bold)" /> Mark Class Attendance</h3>
-                    <div className="form-grid">
+                    <div className="form-grid" style={{ marginBottom: '32px' }}>
+                        <CustomSelect 
+                            label="Target Class"
+                            value={markClass}
+                            onChange={val => setMarkClass(val)}
+                            options={classes.map((c: any) => ({ value: c.id, label: c.name }))}
+                            icon={<School size={16} />}
+                            placeholder="Select Class"
+                        />
                         <div className="form-group">
-                            <label>Date</label>
-                            <div style={{ position: 'relative' }}>
-                                <Calendar size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                                <input type="date" value={markDate} onChange={e => setMarkDate(e.target.value)} style={{ paddingLeft: '40px' }} />
-                            </div>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>Session Date</label>
+                            <input type="date" value={markDate} onChange={e => setMarkDate(e.target.value)} />
                         </div>
-                        <div className="form-group">
-                            <label>Subject</label>
-                            <div style={{ position: 'relative' }}>
-                                <BookOpen size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                                <select value={markSubject} onChange={e => setMarkSubject(e.target.value)} style={{ paddingLeft: '40px' }}>
-                                    <option value="">Full Day Record</option>
-                                    {MAIN_SUBJECTS.map(sub => <option key={sub} value={sub}>{sub}</option>)}
-                                </select>
-                            </div>
-                        </div>
-                        <div className="form-group">
-                            <label>Class</label>
-                            <select value={markClass} onChange={e => setMarkClass(e.target.value)}>
-                                <option value="">Select Class...</option>
-                                {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
-                        </div>
+                        <CustomSelect 
+                            label="Academic Subject"
+                            value={markSubject}
+                            onChange={val => setMarkSubject(val)}
+                            options={MAIN_SUBJECTS.map(s => ({ value: s, label: s }))}
+                            icon={<GraduationCap size={16} />}
+                            placeholder="Select Subject"
+                        />
                     </div>
 
                     {markClass && students.length > 0 && (
@@ -404,11 +402,13 @@ const TeacherAttendance = () => {
 
                     {/* Filters */}
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '24px' }}>
-                        <select value={histClass} onChange={e => { setHistClass(e.target.value); setHistSearch(''); }}
-                            style={{ padding: '10px 14px', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', background: 'var(--bg-card)', color: 'var(--text-main)', fontWeight: '600', cursor: 'pointer', flex: 1, minWidth: '160px' }}>
-                            <option value="">Select Class...</option>
-                            {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
+                        <CustomSelect 
+                            value={histClass}
+                            onChange={val => { setHistClass(val); setHistSearch(''); }}
+                            options={classes.map((c: any) => ({ value: c.id, label: c.name }))}
+                            icon={<School size={16} />}
+                            placeholder="Select Class"
+                        />
 
                         <div style={{ position: 'relative' }}>
                             <Calendar size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
