@@ -43,7 +43,7 @@ import {
 } from 'lucide-react';
 
 const AdminDashboard = () => {
-    const { user, logout: authLogout } = useAuth();
+    const { user, logout: authLogout, updateUser } = useAuth();
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -76,6 +76,17 @@ const AdminDashboard = () => {
         fetchStats();
     }, [fetchStats]);
 
+    const fetchUser = useCallback(async () => {
+        try {
+            const res = await api.get('/auth/me');
+            if (res.data) {
+                updateUser({ ...res.data, role: res.data.role || 'ADMIN' });
+            }
+        } catch (error) {
+            console.error('Failed to refresh user profile:', error);
+        }
+    }, [updateUser]);
+
     // Real-time Event Handling:
     // Automatically refreshes dashboard statistics when relevant backend events occur.
     useServerEvents({
@@ -84,7 +95,12 @@ const AdminDashboard = () => {
         'user:created': () => fetchStats(true),
         'user:deleted': () => fetchStats(true),
         'class:updated': () => fetchStats(true),
-        'profile_updated': () => fetchStats(true),
+        'profile_updated': (data: any) => {
+            fetchStats(true);
+            if (data?.teacherId === user?.id || data?.adminId === user?.id || (!data?.teacherId && !data?.adminId)) {
+                fetchUser();
+            }
+        },
         'new_notice': () => fetchStats(true),
         'notice_deleted': () => fetchStats(true)
     });

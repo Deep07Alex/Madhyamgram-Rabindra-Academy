@@ -34,7 +34,15 @@ const AdminOverview = ({ user, stats }: AdminOverviewProps) => {
                     <div style={{ position: 'relative', zIndex: 1, display: 'flex', gap: '32px', flexWrap: 'wrap' }}>
                         <div style={{ flex: '0 0 160px' }}>
                             <div style={{ width: '160px', height: '160px', borderRadius: '20px', overflow: 'hidden', border: '4px solid var(--bg-main)', boxShadow: 'var(--shadow-lg)', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <UserCircle size={100} color="var(--primary-bold)" />
+                                {user.photo ? (
+                                    <img 
+                                        src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${user.photo}?t=${Date.now()}`} 
+                                        alt={user.name} 
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                    />
+                                ) : (
+                                    <UserCircle size={100} color="var(--primary-bold)" />
+                                )}
                             </div>
                         </div>
 
