@@ -221,7 +221,7 @@ if (process.env.NODE_ENV === 'production') {
             }
         }
     }));
-    app.get('/*', (req, res) => {
+    app.get(/.*/, (req, res) => {
         // Only serve index.html if it's not an /api route (already handled above)
         if (!req.path.startsWith('/api')) {
             res.sendFile(path.join(clientDistPath, 'index.html'));
