@@ -203,9 +203,17 @@ const StudentAttendance = () => {
                                     </span>
                                 )}
                                 {!record && (
-                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                        {isFuture ? 'Upcoming' : '—'}
-                                    </span>
+                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                        {isToday ? (
+                                            <span className="badge present" style={{ minWidth: '100px', justifyContent: 'center', gap: '6px', opacity: 0.8 }}>
+                                                <CheckCircle2 size={12} /> PRESENT
+                                            </span>
+                                        ) : (
+                                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                                {isFuture ? 'Upcoming' : '—'}
+                                            </span>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         )}
