@@ -12,6 +12,7 @@ import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import homeworkRoutes from './routes/homeworkRoutes.js';
+import feesRoutes from './routes/feesRoutes.js';
 
 import resultRoutes from './routes/resultRoutes.js';
 import galleryRoutes from './routes/galleryRoutes.js';
@@ -136,6 +137,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/homework', homeworkRoutes);
+app.use('/api/fees', feesRoutes);
 
 app.use('/api/results', resultRoutes);
 app.use('/api/gallery', galleryRoutes);

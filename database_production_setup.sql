@@ -284,4 +284,29 @@ ON CONFLICT ("adminId") DO UPDATE SET
 
 DELETE FROM "Teacher" WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS');
 
+-- Monthly Fee Table
+CREATE TABLE IF NOT EXISTS "MonthlyFee" (
+    "id" TEXT PRIMARY KEY,
+    "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE,
+    "date" DATE NOT NULL,
+    "month" TEXT NOT NULL,
+    "academicYear" INTEGER NOT NULL DEFAULT 2025,
+    "fee" NUMERIC(10,2) NOT NULL DEFAULT 0,
+    "fine" NUMERIC(10,2) NOT NULL DEFAULT 0,
+    "others" NUMERIC(10,2) NOT NULL DEFAULT 0,
+    "total" NUMERIC(10,2) NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Admission Fee Table
+CREATE TABLE IF NOT EXISTS "AdmissionFee" (
+    "id" TEXT PRIMARY KEY,
+    "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE,
+    "date" DATE NOT NULL,
+    "totalAdmissionFee" NUMERIC(10,2) NOT NULL DEFAULT 0,
+    "amountPaid" NUMERIC(10,2) NOT NULL DEFAULT 0,
+    "due" NUMERIC(10,2) NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- End of Setup Script

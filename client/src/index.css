@@ -77,6 +77,7 @@
   /* Adjusted primary for better dark contrast if needed, but keeping original for now */
   --primary: #f4d394;
   --primary-glow: rgba(244, 211, 148, 0.15);
+  --primary-soft: rgba(244, 211, 148, 0.1);
 
   --accent-soft: #2d2d2d;
 
