@@ -163,7 +163,7 @@ const InlineStatusEdit = React.memo(({
 
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <CustomSelect 
+            <CustomSelect
                 value={status}
                 onChange={val => setStatus(val as AttendanceStatus)}
                 options={[
@@ -173,6 +173,7 @@ const InlineStatusEdit = React.memo(({
                 placeholder="Status"
                 size="sm"
                 className="compact-status-select"
+                containerStyle={{ width: '140px' }}
             />
             {type === 'teacher' && status === 'ABSENT' && (
                 <input
@@ -223,18 +224,18 @@ const MonthlySummaryDisplay = React.memo(({ personId, dataMap }: { personId: str
     );
 });
 
-const StudentAttendanceRow = React.memo(({ 
-    row, 
-    viewMode, 
-    dateFilter, 
-    monthlyDataMap, 
-    fetchStudentData 
-}: { 
-    row: StudentRow, 
-    viewMode: 'daily' | 'monthly', 
-    dateFilter: string, 
-    monthlyDataMap: any, 
-    fetchStudentData: any 
+const StudentAttendanceRow = React.memo(({
+    row,
+    viewMode,
+    dateFilter,
+    monthlyDataMap,
+    fetchStudentData
+}: {
+    row: StudentRow,
+    viewMode: 'daily' | 'monthly',
+    dateFilter: string,
+    monthlyDataMap: any,
+    fetchStudentData: any
 }) => {
     return (
         <tr style={{ borderBottom: '1px solid var(--border-soft)', transition: 'background 0.15s' }}
@@ -280,18 +281,18 @@ const StudentAttendanceRow = React.memo(({
     );
 });
 
-const TeacherAttendanceRow = React.memo(({ 
-    row, 
-    viewMode, 
-    dateFilter, 
-    monthlyDataMap, 
+const TeacherAttendanceRow = React.memo(({
+    row,
+    viewMode,
+    dateFilter,
+    monthlyDataMap,
     fetchTeacherData,
-    tab 
-}: { 
-    row: TeacherRow, 
-    viewMode: 'daily' | 'monthly', 
-    dateFilter: string, 
-    monthlyDataMap: any, 
+    tab
+}: {
+    row: TeacherRow,
+    viewMode: 'daily' | 'monthly',
+    dateFilter: string,
+    monthlyDataMap: any,
     fetchTeacherData: any,
     tab: string
 }) => {
@@ -398,7 +399,7 @@ const ManageAttendance = () => {
             const states: Array<'AUTO' | 'OPEN' | 'CLOSED'> = ['AUTO', 'OPEN', 'CLOSED'];
             const currentIndex = states.indexOf(attendanceStatus);
             const nextValue = states[(currentIndex + 1) % states.length];
-            
+
             await api.patch('/attendance/config', { attendance_override: nextValue });
             setAttendanceStatus(nextValue);
             showToast(`System set to ${nextValue}.`, 'success');
@@ -436,9 +437,9 @@ const ManageAttendance = () => {
         try {
             const [stuRes, attRes, clsRes] = await Promise.all([
                 api.get('/users/students', {
-                    params: { 
-                        page, 
-                        limit, 
+                    params: {
+                        page,
+                        limit,
                         classId: selectedClass,
                         search: search
                     }
@@ -576,9 +577,9 @@ const ManageAttendance = () => {
             if (tab === 'students') {
                 const [stuRes, attRes] = await Promise.all([
                     api.get('/users/students', {
-                        params: { 
-                            classId: selectedClass, 
-                            page, 
+                        params: {
+                            classId: selectedClass,
+                            page,
                             limit,
                             search: search
                         }
@@ -696,27 +697,26 @@ const ManageAttendance = () => {
                     <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-main)' }}>Attendance Registry</h2>
                     <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>View and edit attendance for all students and teachers — everyone is shown even with no record</p>
                 </div>
-                
-                <button 
+
+                <button
                     onClick={handleToggleOverride}
                     disabled={togglingOverride}
                     style={{
                         marginLeft: 'auto',
                         padding: '10px 20px',
                         borderRadius: '12px',
-                        border: `1px solid ${
-                            attendanceStatus === 'OPEN' ? '#22c55e' : 
-                            attendanceStatus === 'CLOSED' ? '#ef4444' : 
-                            'var(--border-soft)'
-                        }`,
-                        background: 
-                            attendanceStatus === 'OPEN' ? '#22c55e10' : 
-                            attendanceStatus === 'CLOSED' ? '#ef444410' : 
-                            'var(--bg-card)',
-                        color: 
-                            attendanceStatus === 'OPEN' ? '#22c55e' : 
-                            attendanceStatus === 'CLOSED' ? '#ef4444' : 
-                            'var(--text-muted)',
+                        border: `1px solid ${attendanceStatus === 'OPEN' ? '#22c55e' :
+                                attendanceStatus === 'CLOSED' ? '#ef4444' :
+                                    'var(--border-soft)'
+                            }`,
+                        background:
+                            attendanceStatus === 'OPEN' ? '#22c55e10' :
+                                attendanceStatus === 'CLOSED' ? '#ef444410' :
+                                    'var(--bg-card)',
+                        color:
+                            attendanceStatus === 'OPEN' ? '#22c55e' :
+                                attendanceStatus === 'CLOSED' ? '#ef4444' :
+                                    'var(--text-muted)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '10px',
@@ -815,28 +815,30 @@ const ManageAttendance = () => {
                     <div style={{ position: 'relative' }}>
                         <CalendarDays size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                         <input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)}
-                            style={{ ...inputStyle, paddingLeft: '36px' }} />
+                            style={{ ...inputStyle, paddingLeft: '36px', width: '160px' }} />
                     </div>
                 ) : (
                     <div style={{ position: 'relative' }}>
                         <CalendarDays size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                         <input type="month" value={monthFilter} onChange={e => setMonthFilter(e.target.value)}
-                            style={{ ...inputStyle, paddingLeft: '36px' }} />
+                            style={{ ...inputStyle, paddingLeft: '36px', width: '160px' }} />
                     </div>
                 )}
 
                 {/* Class filter (students only) */}
                 {tab === 'students' && (
-                    <CustomSelect 
-                        value={selectedClass}
-                        onChange={val => setSelectedClass(val)}
-                        options={[
-                            ...(viewMode === 'daily' ? [{ value: '', label: 'All Classes' }] : []),
-                            ...classes.map((c: any) => ({ value: c.id, label: c.name }))
-                        ]}
-                        icon={<School size={16} />}
-                        placeholder="Select Class"
-                    />
+                    <div style={{ width: '220px' }}>
+                        <CustomSelect
+                            value={selectedClass}
+                            onChange={val => setSelectedClass(val)}
+                            options={[
+                                ...(viewMode === 'daily' ? [{ value: '', label: 'All Classes' }] : []),
+                                ...classes.map((c: any) => ({ value: c.id, label: c.name }))
+                            ]}
+                            icon={<School size={16} />}
+                            placeholder="Select Class"
+                        />
+                    </div>
                 )}
 
                 {viewMode === 'daily' && dateFilter && (
@@ -851,11 +853,11 @@ const ManageAttendance = () => {
             </div>
 
             {/* Table Container */}
-            <div style={{ 
-                background: 'var(--bg-card)', 
-                borderRadius: 'var(--radius-lg)', 
-                border: '1px solid var(--border-soft)', 
-                boxShadow: 'var(--shadow-sm)', 
+            <div style={{
+                background: 'var(--bg-card)',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--border-soft)',
+                boxShadow: 'var(--shadow-sm)',
                 overflow: 'hidden',
                 position: 'relative',
                 minHeight: '400px'
@@ -890,22 +892,22 @@ const ManageAttendance = () => {
                         <tbody>
                             {!loading && (tab === 'students' ? filteredStudents : filteredTeachers).map((row: any) => (
                                 tab === 'students' ? (
-                                    <StudentAttendanceRow 
-                                        key={row.id} 
-                                        row={row} 
-                                        viewMode={viewMode} 
-                                        dateFilter={dateFilter} 
-                                        monthlyDataMap={monthlyDataMap} 
-                                        fetchStudentData={fetchStudentData} 
+                                    <StudentAttendanceRow
+                                        key={row.id}
+                                        row={row}
+                                        viewMode={viewMode}
+                                        dateFilter={dateFilter}
+                                        monthlyDataMap={monthlyDataMap}
+                                        fetchStudentData={fetchStudentData}
                                     />
                                 ) : (
-                                    <TeacherAttendanceRow 
-                                        key={row.id} 
-                                        row={row} 
-                                        viewMode={viewMode} 
-                                        dateFilter={dateFilter} 
-                                        monthlyDataMap={monthlyDataMap} 
-                                        fetchTeacherData={fetchTeacherData} 
+                                    <TeacherAttendanceRow
+                                        key={row.id}
+                                        row={row}
+                                        viewMode={viewMode}
+                                        dateFilter={dateFilter}
+                                        monthlyDataMap={monthlyDataMap}
+                                        fetchTeacherData={fetchTeacherData}
                                         tab={tab}
                                     />
                                 )
@@ -925,10 +927,10 @@ const ManageAttendance = () => {
 
                 {/* Loading Overlay */}
                 {loading && (
-                    <div style={{ 
-                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
+                    <div style={{
+                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
                         background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(2px)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10
                     }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                             <Loader2 className="animate-spin" size={32} color="var(--primary-bold)" />
@@ -939,20 +941,20 @@ const ManageAttendance = () => {
 
                 {/* Pagination Footer */}
                 {!loading && totalPages > 1 && (
-                    <div style={{ 
-                        padding: '16px 24px', 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
+                    <div style={{
+                        padding: '16px 24px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         alignItems: 'center',
                         borderTop: '1px solid var(--border-soft)',
                         background: 'var(--bg-main)'
                     }}>
                         <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>
-                            Page <span style={{ color: 'var(--text-main)' }}>{page}</span> of {totalPages} 
+                            Page <span style={{ color: 'var(--text-main)' }}>{page}</span> of {totalPages}
                             <span style={{ marginLeft: '8px', opacity: 0.5 }}>({totalCount} items)</span>
                         </span>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                            <button 
+                            <button
                                 onClick={() => setPage(p => Math.max(1, p - 1))}
                                 disabled={page === 1}
                                 style={{
@@ -968,7 +970,7 @@ const ManageAttendance = () => {
                             >
                                 <ChevronLeft size={16} /> Previous
                             </button>
-                            <button 
+                            <button
                                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                                 disabled={page === totalPages}
                                 style={{

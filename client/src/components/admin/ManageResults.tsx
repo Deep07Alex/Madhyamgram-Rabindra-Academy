@@ -71,11 +71,11 @@ const ManageResults = () => {
         try {
             const [resRes, stuRes, classRes] = await Promise.all([
                 api.get(`/results?academicYear=${selectedYear}&semester=${selectedTerm}`),
-                api.get('/users/students'),
+                api.get('/users/students?limit=1000'),
                 api.get('/users/classes')
             ]);
             setResults(resRes.data);
-            setStudents(stuRes.data);
+            setStudents(stuRes.data.students || []);
             setClasses(classRes.data);
             if (classRes.data.length > 0 && !selectedClassId) setSelectedClassId(classRes.data[0].id);
         } catch (error) {

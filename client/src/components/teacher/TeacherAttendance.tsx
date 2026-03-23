@@ -167,13 +167,13 @@ const TeacherAttendance = () => {
 
         try {
             const [stuRes, attRes] = await Promise.all([
-                api.get(`/users/students?classId=${markClass}`),
+                api.get(`/users/students?classId=${markClass}&limit=200`),
                 api.get('/attendance/student', {
                     params: { classId: markClass, startDate: markDate, endDate: markDate }
                 })
             ]);
 
-            setStudents(stuRes.data);
+            setStudents(stuRes.data.students || []);
 
             // Prefill existing attendance status, default to PRESENT if none
             const init: Record<string, string> = {};
@@ -184,7 +184,7 @@ const TeacherAttendance = () => {
                 if (!attMap[a.studentId]) attMap[a.studentId] = a.status;
             });
 
-            stuRes.data.forEach((s: any) => {
+            (stuRes.data.students || []).forEach((s: any) => {
                 init[s.id] = attMap[s.id] || 'PRESENT';
             });
 
@@ -205,7 +205,7 @@ const TeacherAttendance = () => {
         if (!silent) setHistLoading(true);
         try {
             const [stuRes, attRes] = await Promise.all([
-                api.get(`/users/students?classId=${histClass}`),
+                api.get(`/users/students?classId=${histClass}&limit=200`),
                 api.get('/attendance/student', {
                     params: { classId: histClass, startDate: histDate, endDate: histDate }
                 }),
@@ -215,7 +215,7 @@ const TeacherAttendance = () => {
             const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
             attRecords.forEach((a: any) => { if (!attMap[a.studentId]) attMap[a.studentId] = a; });
 
-            setHistRows(stuRes.data.map((s: any) => {
+            setHistRows((stuRes.data.students || []).map((s: any) => {
                 const att = attMap[s.id] || null;
                 return {
                     id: s.id,

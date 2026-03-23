@@ -18,6 +18,7 @@ interface CustomSelectProps {
     searchable?: boolean;
     size?: 'sm' | 'md' | 'lg';
     disabled?: boolean;
+    containerStyle?: React.CSSProperties;
 }
 
 const CustomSelect: React.FC<CustomSelectProps> = ({
@@ -30,7 +31,8 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
     className = '',
     searchable = false,
     size = 'md',
-    disabled = false
+    disabled = false,
+    containerStyle = {}
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -59,7 +61,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
     };
 
     return (
-        <div className={`custom-select-container ${className}`} ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+        <div className={`custom-select-container ${className}`} ref={containerRef} style={{ position: 'relative', width: '100%', ...containerStyle }}>
             {label && <label className="custom-select-label">{label}</label>}
             
             <div 

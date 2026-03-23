@@ -82,13 +82,13 @@ const ManageNotices = () => {
                 const [noticesRes, classesRes, studentsRes] = await Promise.all([
                     api.get('/notices'),
                     api.get('/users/classes'),
-                    api.get('/users/students')
+                    api.get('/users/students?limit=1000')
                 ]);
                 setNotices(noticesRes.data);
                 setClasses(classesRes.data);
                 // The students API returns full student objects, so we need to map the ID if necessary
                 // or just ensure we're using the 'id' field for filtering.
-                setStudents(studentsRes.data);
+                setStudents(studentsRes.data.students || []);
             } catch (error) {
                 console.error('Failed to fetch initial data:', error);
             } finally {
