@@ -1,115 +1,155 @@
-# Madhyamgram Rabindra Academy - Deployment Guide
+# Madhyamgram Rabindra Academy - Complete Production Deployment Guide
 
-This guide outlines the steps to deploy the application to a production Linux VPS (e.g., Hostinger VPS).
+This guide provides a comprehensive, step-by-step plan to deploy the Academy Portal to a Linux VPS (e.g., Ubuntu 22.04+).
 
-## 1. Prerequisites
-- A Linux VPS (Ubuntu 22.04+ recommended)
-- Node.js 20+ installed
-- PostgreSQL 14+ installed and running
-- A domain name pointing to your VPS IP
+---
 
-## 2. Database Setup
-1. Log into PostgreSQL: `sudo -u postgres psql`
-2. Create the database: `CREATE DATABASE "Madhyamgram-Rabindra-Academy";`
-3. Create a dedicated user: `CREATE USER aritrada420 WITH PASSWORD 'Aritradutta@2005';`
-4. Grant privileges: `GRANT ALL PRIVILEGES ON DATABASE "Madhyamgram-Rabindra-Academy" TO aritrada420;`
+## 1. Initial VPS Preparation
 
-## 3. Server Setup
-1. Clone the repository: `git clone <your-repo-url>`
-2. Install dependencies:
+Secure your server and install core dependencies.
+
+```bash
+# Update System
+sudo apt update && sudo apt upgrade -y
+
+# Install Node.js 20 (LTS)
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Install PostgreSQL
+sudo apt install postgresql postgresql-contrib -y
+
+# Install Build Essentials & PM2
+sudo npm install -g pm2
+```
+
+---
+
+## 2. Database Infrastructure Setup
+
+The application requires a PostgreSQL database.
+
+1. Access PostgreSQL: `sudo -u postgres psql`
+2. Create User & Database:
+
+   ```sql
+   CREATE USER aritrada420 WITH PASSWORD 'Aritradutta@2005';
+   -- Database creation and schema is handled by the setup script below
+   \q
+   ```
+
+3. Run Production Setup Script:
+   From the project root on your VPS, execute the provided SQL script to initialize the schema, classes, and admin user:
+
+   ```bash
+   psql -U postgres -f database_production_setup.sql
+   ```
+
+   *Note: This script creates the "Madhyamgram-Rabindra-Academy" database and all required tables/indexes.*
+
+---
+
+## 3. Project Configuration
+
+1. Clone Repository: `git clone <your-repo-url>`
+2. Install All Dependencies:
+
    ```bash
    npm run install-all
    ```
-3. Configure Environment Variables:
-   - Create `server/.env`:
-     ```env
-     PORT=5000
-     NODE_ENV=production
-     DATABASE_URL=postgresql://aritrada420:Aritradutta%402005@localhost:5432/Madhyamgram-Rabindra-Academy
-     JWT_SECRET=your_secure_random_jwt_secret
-     ALLOWED_ORIGINS=https://your-academy-domain.com
-     ```
-   - Create `client/.env.production`:
-     ```env
-     VITE_API_BASE_URL=https://your-academy-domain.com/api
-     VITE_API_URL=https://your-academy-domain.com
-     ```
 
-## 4. Build the Application
-1. Build the Backend:
-   ```bash
-   cd server && npm run build
-   ```
-2. Build the Frontend:
-   ```bash
-   cd ../client && npm run build
-   ```
+### Environment Variables
+
+Configure the backend and frontend for the live environment.
+
+**Backend (`server/.env`):**
+
+```env
+PORT=5000
+NODE_ENV=production
+DATABASE_URL=postgresql://aritrada420:Aritradutta%402005@localhost:5432/Madhyamgram-Rabindra-Academy
+JWT_SECRET=generate_a_long_random_string_here
+ALLOWED_ORIGINS=https://your-academy-domain.com
+```
+
+**Frontend (`client/.env.production`):**
+
+```env
+VITE_API_BASE_URL=https://your-academy-domain.com/api
+VITE_API_URL=https://your-academy-domain.com
+```
+
+---
+
+## 4. Build Phase
+
+Build the optimized production bundles.
+
+```bash
+# Build everything at once
+npm run build-all
+
+# Or manually:
+# cd client && npm run build
+# cd ../server && npm run build
+```
+
+---
 
 ## 5. Process Management (PM2)
-Install PM2 globally to keep the server running: `sudo npm install -g pm2`
-1. Start the backend:
-   ```bash
-   cd ../server
-   pm2 start dist/index.js --name "mra-backend"
-   ```
-2. Save pm2 list: `pm2 save && pm2 startup`
 
-## 6. Reverse Proxy (Nginx)
-Configure Nginx to serve the frontend, proxy API requests, and handle Socket.io.
+We use PM2 to manage the backend process in cluster mode for high availability.
 
-1. Create a config file: `sudo nano /etc/nginx/sites-available/mra`
-2. Recommended Nginx Config:
+```bash
+# From the project root
+pm2 start ecosystem.config.js
+
+# Ensure PM2 starts on boot
+pm2 save
+pm2 startup
+```
+
+---
+
+## 6. Reverse Proxy & Networking (Nginx)
+
+Nginx handles SSL termination, static file serving, and reverse proxying to the Node.js API with Socket.io/SSE support.
+
+1. Configure Site: `sudo nano /etc/nginx/sites-available/academy`
+2. Use the provided `nginx.conf` content:
+
    ```nginx
-   server {
-       listen 80;
-       server_name your-academy-domain.com;
-
-       # Gzip Compression for Speed
-       gzip on;
-       gzip_types text/plain text/css application/json application/javascript text/xml;
-
-       # Frontend
-       location / {
-           root /path/to/Madhyamgram-Rabindra-Academy/client/dist;
-           try_files $uri /index.html;
-       }
-
-       # Backend API
-       location /api {
-           proxy_pass http://localhost:5000;
-           proxy_http_version 1.1;
-           proxy_set_header Upgrade $http_upgrade;
-           proxy_set_header Connection 'upgrade';
-           proxy_set_header Host $host;
-           proxy_cache_bypass $http_upgrade;
-       }
-
-       # Socket.io Support
-       location /socket.io/ {
-           proxy_pass http://localhost:5000;
-           proxy_http_version 1.1;
-           proxy_set_header Upgrade $http_upgrade;
-           proxy_set_header Connection "upgrade";
-           proxy_set_header Host $host;
-           proxy_cache_bypass $http_upgrade;
-       }
-
-       # Uploaded Media (Optimized Direct Serving)
-       location /uploads {
-           alias /path/to/Madhyamgram-Rabindra-Academy/server/uploads;
-           expires 1d;
-           add_header Cache-Control "public, no-transform";
-       }
-   }
+   # Copy content from 'nginx.conf' in the project root here.
+   # Ensure you update 'server_name' and paths to match your VPS structure.
    ```
-3. Enable the site: `sudo ln -s /etc/nginx/sites-available/mra /etc/nginx/sites-enabled/`
-4. Test and restart Nginx: `sudo nginx -t && sudo systemctl restart nginx`
 
-## 7. SSL (Certbot)
-Secure your site with HTTPS:
+3. Enable Configuration:
+
+   ```bash
+   sudo ln -s /etc/nginx/sites-available/academy /etc/nginx/sites-enabled/
+   sudo nginx -t
+   sudo systemctl restart nginx
+   ```
+
+---
+
+## 7. Security & SSL
+
+Secure all traffic using Let's Encrypt.
+
 ```bash
 sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d your-academy-domain.com
 ```
 
-Your Madhyamgram Rabindra Academy application is now live, optimized, and secure!
+---
+
+## 8. Final Verification Checklist
+
+- [ ] Admin Login works at `your-domain.com/login`
+- [ ] Student results can be published and viewed.
+- [ ] Live Attendance sync (SSE) is functional.
+- [ ] Profile photos and homework uploads are stored in `/server/uploads`.
+- [ ] DB backups are configured (recommended: daily `pg_dump`).
+
+**Academy Portal is now Production Ready.**
