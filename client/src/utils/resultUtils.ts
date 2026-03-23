@@ -66,24 +66,25 @@ export const generateResultPDF = async (data: any) => {
         doc.text(`YEARLY PROGRESS REPORT - 2025`, pageWidth / 2, addressY + 18, { align: 'center' });
         doc.line(margin, addressY + 22, pageWidth - margin, addressY + 22);
 
-        // 3. Grades Legend (Top Right Box)
-        const legendX = pageWidth - 65;
-        const legendY = margin;
+        // 3. Grades Legend (Top Right Box - Moved down to avoid header overlap)
+        const legendWidth = 50;
+        const legendX = pageWidth - margin - legendWidth;
+        const legendY = margin + 2; 
         autoTable(doc, {
             startY: legendY,
             margin: { left: legendX },
-            tableWidth: 53,
+            tableWidth: legendWidth,
             head: [['Grades']],
             body: [
-                ['90 - 100', 'AA', 'Excellent'],
-                ['80 - 89', 'A+', 'Very Good'],
-                ['60 - 79', 'A', 'Good'],
-                ['50 - 59', 'B+', 'Satisfactory'],
-                ['30 - 49', 'B', 'Fair'],
+                ['90-100', 'AA', 'Excellent'],
+                ['80-89', 'A+', 'Very Good'],
+                ['60-79', 'A', 'Good'],
+                ['50-59', 'B+', 'Satisfactory'],
+                ['30-49', 'B', 'Fair'],
                 ['Below 29', 'C', 'Not Satisfactory']
             ],
             theme: 'grid',
-            styles: { fontSize: 7, cellPadding: 1, halign: 'center' },
+            styles: { fontSize: 6, cellPadding: 0.8, halign: 'center' },
             headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] }
         });
 
@@ -164,29 +165,30 @@ export const generateResultPDF = async (data: any) => {
 
         autoTable(doc, {
             startY: infoY + 20,
-            margin: { left: margin, right: 60 },
+            margin: { left: margin, right: 55 }, // Increased right margin
             head: [
-                [{ content: 'Subject', rowSpan: 2 }, { content: 'UNIT - I', colSpan: 2 }, { content: 'UNIT - II', colSpan: 2 }, { content: 'UNIT - III', colSpan: 2 }, { content: 'Full Marks Unit I+II+III', rowSpan: 2 }, { content: 'Total Marks Obtained Unit I+II+III', rowSpan: 2 }, { content: 'Grade', rowSpan: 2 }, { content: 'Highest Marks', rowSpan: 2 }],
-                ['Full Marks', 'Marks Obtained', 'Full Marks', 'Marks Obtained', 'Full Marks', 'Marks Obtained']
+                [{ content: 'Subject', rowSpan: 2 }, { content: 'UNIT - I', colSpan: 2 }, { content: 'UNIT - II', colSpan: 2 }, { content: 'UNIT - III', colSpan: 2 }, { content: 'Full Marks', rowSpan: 2 }, { content: 'Obtained Marks', rowSpan: 2 }, { content: 'Grade', rowSpan: 2 }, { content: 'Highest Marks', rowSpan: 2 }],
+                ['FM', 'MO', 'FM', 'MO', 'FM', 'MO'] // Shortened headers to save space
             ],
             body: tableData,
             theme: 'grid',
             headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontSize: 7, halign: 'center', lineWidth: 0.1 },
             bodyStyles: { fontSize: 8, halign: 'center', lineWidth: 0.1, textColor: [0, 0, 0] },
-            columnStyles: { 0: { halign: 'left', fontStyle: 'bold', cellWidth: 35 } },
+            columnStyles: { 0: { halign: 'left', fontStyle: 'bold', cellWidth: 32 } },
             styles: { overflow: 'linebreak' }
         });
 
         const tableFinalY = (doc as any).lastAutoTable?.finalY || infoY + 100;
 
-        // 6. Attendance Sidebar
+        // 6. Attendance Sidebar (Positioned carefully to avoid border cross)
+        const attWidth = 38;
         autoTable(doc, {
             startY: infoY + 20,
-            margin: { left: pageWidth - 55 },
-            tableWidth: 43,
+            margin: { left: pageWidth - margin - attWidth - 2 },
+            tableWidth: attWidth,
             head: [[{ content: 'Attendance Record', styles: { fontSize: 7 } }]],
             body: [
-                ['Working Days', 'Days Present', 'Days Absent', '%'],
+                ['Days', 'Pres.', 'Abs.', '%'],
                 [
                     (attendance?.total_days || 0).toString(), 
                     (attendance?.present_days || 0).toString(), 
@@ -200,16 +202,16 @@ export const generateResultPDF = async (data: any) => {
         });
 
         // 7. Academic Summary
-        const summaryY = tableFinalY + 10;
+        const summaryY = tableFinalY + 8;
         autoTable(doc, {
             startY: summaryY,
             margin: { left: margin },
             tableWidth: 80,
             body: [
-                ['Total Marks', grandTotalFull.toString()],
-                ['Obtained Marks', grandTotalObtained.toString()],
+                ['Total Full Marks', grandTotalFull.toString()],
+                ['Total Obtained Marks', grandTotalObtained.toString()],
                 ['Percentage of Marks', `${grandTotalFull ? ((grandTotalObtained / grandTotalFull) * 100).toFixed(2) : 0}%`],
-                ['Rank', `${rank === '1' ? 'FIRST (1st)' : rank === '2' ? 'SECOND (2nd)' : rank === '3' ? 'THIRD (3rd)' : (rank || '-').toString()}`]
+                ['Class Rank', `${rank === '1' ? 'FIRST (1st)' : rank === '2' ? 'SECOND (2nd)' : rank === '3' ? 'THIRD (3rd)' : (rank || '-').toString()}`]
             ],
             theme: 'grid',
             styles: { fontSize: 9, fontStyle: 'bold' },
@@ -217,32 +219,35 @@ export const generateResultPDF = async (data: any) => {
         });
 
         // Remarks & N.B.
+        const summaryTableHeight = 4 * 7; // Approx height of 4 rows
         const remarksX = margin + 85;
+        const remarksHeight = 35;
         doc.setDrawColor(0);
-        doc.rect(remarksX, summaryY, pageWidth - remarksX - margin, 40);
+        doc.rect(remarksX, summaryY, pageWidth - remarksX - margin - 2, remarksHeight);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
-        doc.text('Remarks', remarksX + 5, summaryY + 10);
+        doc.text('Remarks', remarksX + 5, summaryY + 8);
         
         const per = grandTotalFull ? (grandTotalObtained / grandTotalFull) * 100 : 0;
         const remarkText = per >= 90 ? 'Excellent' : per >= 80 ? 'Very Good' : per >= 60 ? 'Good' : per >= 50 ? 'Satisfactory' : 'Needs Improvement';
         
         doc.setFont('helvetica', 'bolditalic');
-        doc.setFontSize(14);
-        doc.text(remarkText, remarksX + (pageWidth - remarksX - margin) / 2, summaryY + 22, { align: 'center' });
+        doc.setFontSize(16);
+        doc.text(remarkText, remarksX + (pageWidth - remarksX - margin) / 2, summaryY + 18, { align: 'center' });
         
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
-        doc.text('N.B.:', remarksX + 5, summaryY + 32);
+        doc.text('N.B.:', remarksX + 5, summaryY + 28);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
-        doc.text('Physical Education: PT+Yoga+Health, Work Ed: Project+Drawing', remarksX + 5, summaryY + 36);
+        doc.text('Physical Education: PT+Yoga+Health, Work Ed: Project+Drawing', remarksX + 5, summaryY + 32);
 
-        // 8. Signatures
-        const footerY = pageHeight - 30;
+        // 8. Signatures (Moved lower to avoid overlap)
+        const footerY = pageHeight - 35;
         doc.setLineWidth(0.2);
         doc.line(margin + 10, footerY, margin + 70, footerY);
         doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
         doc.text('Signature of the Class Teacher', margin + 40, footerY + 5, { align: 'center' });
 
         doc.line(pageWidth - margin - 70, footerY, pageWidth - margin - 10, footerY);
