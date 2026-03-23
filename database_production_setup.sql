@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS "Attendance" (
     "date" DATE NOT NULL DEFAULT CURRENT_DATE,
     "status" "AttendanceStatus" NOT NULL,
     "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    "teacherId" TEXT NOT NULL, -- Flexible for Teacher or Admin (Principal/HM)
     "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     "subject" TEXT
 );
@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS "TeacherAttendance" (
     "departureTime" TIME,
     "reason" TEXT,
     "earlyLeaveReason" TEXT,
-    "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "teacherId" TEXT NOT NULL -- Flexible for Teacher or Admin (Principal/HM)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "TeacherAttendance_teacher_date_unique" ON "TeacherAttendance"("teacherId", "date");
 

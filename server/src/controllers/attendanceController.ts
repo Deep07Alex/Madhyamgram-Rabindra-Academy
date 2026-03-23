@@ -25,11 +25,8 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
     }
 
     let markerId = req.user.id;
-    // If admin is marking students, we need a valid teacherId for the foreign key
-    if (userRole === 'ADMIN') {
-        const sysMarker = await db.query('SELECT id FROM "Teacher" LIMIT 1');
-        if (sysMarker.rows.length > 0) markerId = sysMarker.rows[0].id;
-    }
+    // Admins (Principal/HM) can now mark attendance directly using their Admin ID
+    // The foreign key constraint has been relaxed in the database setup
 
     try {
         const attendanceDateStr = new Date(date).toLocaleDateString('en-CA');
@@ -356,9 +353,11 @@ export const getTeacherAttendance = async (req: Request, res: Response) => {
 
     try {
         let query = `
-            SELECT ta.*, row_to_json(t.*) as teacher
+            SELECT ta.*, 
+                   COALESCE(row_to_json(t.*), row_to_json(a.*)) as teacher
             FROM "TeacherAttendance" ta
             LEFT JOIN "Teacher" t ON ta."teacherId" = t.id
+            LEFT JOIN "Admin" a ON ta."teacherId" = a.id
             WHERE 1=1
         `;
         const params: any[] = [];

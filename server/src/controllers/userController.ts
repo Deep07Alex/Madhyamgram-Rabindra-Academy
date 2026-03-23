@@ -73,9 +73,20 @@ export const getStudents = async (req: AuthRequest, res: Response) => {
  */
 export const getTeachers = async (req: Request, res: Response) => {
     try {
-        const { page = 1, limit = 20, search = '' } = req.query;
+        const { page = 1, limit = 20, search = '', filter = '' } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
         
+        // Staff filter logic: these designations are considered Non-Teaching/Special Staff
+        const staffDesignations = ['NON-TEACHING STAFF', 'KARATE TEACHER', 'DANCE TEACHER'];
+        const staffListStr = staffDesignations.map(d => `'${d}'`).join(',');
+
+        let filterClause = '';
+        if (filter === 'staff') {
+            filterClause = `AND designation IN (${staffListStr})`;
+        } else if (filter === 'teachers') {
+            filterClause = `AND designation NOT IN (${staffListStr})`;
+        }
+
         const baseQuery = `
             FROM (
                 SELECT id, name, email, "teacherId", phone, aadhar, photo, address, dob, qualification, "extraQualification", designation, caste, "joiningDate", "isTeaching", "plainPassword", 'TEACHER' as role FROM "Teacher"
@@ -84,6 +95,7 @@ export const getTeachers = async (req: Request, res: Response) => {
                 WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS')
             ) staff
             WHERE (name ILIKE $1 OR "teacherId" ILIKE $1 OR designation ILIKE $1)
+            ${filterClause}
         `;
 
         const searchParam = `%${search}%`;
@@ -347,7 +359,24 @@ export const updateTeacher = async (req: Request, res: Response) => {
     } = req.body;
 
     try {
-        let updateQuery = 'UPDATE "Teacher" SET ';
+        // 1. Determine target table (Teacher or Admin)
+        const checkRes = await db.query(`
+            SELECT 'TEACHER' as role FROM "Teacher" WHERE id = $1
+            UNION ALL
+            SELECT 'ADMIN' as role FROM "Admin" WHERE id = $1
+            LIMIT 1
+        `, [id]);
+
+        if (checkRes.rowCount === 0) {
+            return res.status(404).json({ message: 'Faculty member not found' });
+        }
+
+        const role = checkRes.rows[0].role;
+        const tableName = role === 'ADMIN' ? 'Admin' : 'Teacher';
+        const idField = role === 'ADMIN' ? 'adminId' : 'teacherId';
+
+        // 2. Build dynamic update query
+        let updateQuery = `UPDATE "${tableName}" SET `;
         const params: any[] = [];
         let paramCount = 1;
 
@@ -362,7 +391,7 @@ export const updateTeacher = async (req: Request, res: Response) => {
         }
         if (teacherId !== undefined) {
              const safeTeacherId = (teacherId && teacherId.trim()) ? teacherId.trim() : null;
-             updateQuery += `"teacherId" = $${paramCount++}, `;
+             updateQuery += `"${idField}" = $${paramCount++}, `;
              params.push(safeTeacherId);
         }
         if (phone !== undefined) {
@@ -383,10 +412,13 @@ export const updateTeacher = async (req: Request, res: Response) => {
             updateQuery += `"joiningDate" = $${paramCount++}, `;
             params.push(joiningDate);
         }
-        if (isTeaching !== undefined) {
+        
+        // Only Teacher table has isTeaching
+        if (isTeaching !== undefined && role === 'TEACHER') {
             updateQuery += `"isTeaching" = $${paramCount++}, `;
             params.push(isTeaching);
         }
+
         if (photo !== undefined) {
             updateQuery += `"photo" = $${paramCount++}, `;
             params.push(photo);
@@ -417,38 +449,20 @@ export const updateTeacher = async (req: Request, res: Response) => {
             params.push(hashedPassword, password);
         }
 
-        // Remove trailing comma and space
-        updateQuery = updateQuery.slice(0, -2);
+        // Add updatedAt and cleanup
+        updateQuery += `"updatedAt" = CURRENT_TIMESTAMP `;
         updateQuery += ` WHERE id = $${paramCount} RETURNING *`;
         params.push(id);
 
-        let result = await db.query(updateQuery.replace('"Teacher"', '"Teacher"'), params);
-
+        const result = await db.query(updateQuery, params);
+        
         if (result.rowCount === 0) {
-            // Try updating Admin table for Principal/Headmistress
-            let adminUpdateQuery = updateQuery.replace('"Teacher"', '"Admin"');
-            // Remove 'teacherId' set if it exists because Admin uses 'adminId'
-            if (adminUpdateQuery.includes('"teacherId"')) {
-                adminUpdateQuery = adminUpdateQuery.replace('"teacherId"', '"adminId"');
-            }
-            // Filter out 'isTeaching' if it's there as Admin doesn't have it (we assume Admin is always teaching if Princial/HM)
-            if (adminUpdateQuery.includes('"isTeaching"')) {
-                 // Complex regex to remove "isTeaching" = $X, from update query
-                 adminUpdateQuery = adminUpdateQuery.replace(/"isTeaching"\s*=\s*\$\d+,\s*/i, '');
-                 // Note: this simple replace might fail if its the last param. 
-                 // But in our build loop, it's usually followed by other params or where.
-                 // Let's just be careful.
-            }
-
-            result = await db.query(adminUpdateQuery, params);
-            if (result.rowCount === 0) {
-                return res.status(404).json({ message: 'Faculty not found' });
-            }
+            return res.status(404).json({ message: 'Update failed' });
         }
 
-        const updatedTeacher = result.rows[0];
-        broadcast('profile_updated', { teacherId: id });
-        res.json({ message: 'Faculty updated successfully', teacher: updatedTeacher });
+        const updatedUser = result.rows[0];
+        broadcast('profile_updated', { teacherId: id, role });
+        res.json({ message: 'Faculty updated successfully', teacher: updatedUser });
     } catch (error: any) {
         console.error('Update teacher error:', error);
         if (error.code === '23505') {

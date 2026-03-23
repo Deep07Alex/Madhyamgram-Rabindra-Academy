@@ -67,6 +67,21 @@ export const login = async (req: Request, res: Response) => {
                 if (userData.isTeaching === false) {
                     return res.status(403).json({ message: 'Login access is disabled for this account type' });
                 }
+            } else {
+                // FALLBACK: Check Admin table if they are Principal/HM but selected Teacher role
+                let adminLoginId = loginId;
+                if (adminLoginId && typeof adminLoginId === 'string' && !adminLoginId.toUpperCase().startsWith('A-')) {
+                    adminLoginId = `A-${adminLoginId}`;
+                }
+                const adminRes = await db.query(
+                    `SELECT * FROM "Admin" WHERE ("adminId" = $1 OR "adminId" = $2 OR "username" = $2) 
+                     AND designation IN ('PRINCIPAL', 'HEAD MISTRESS') LIMIT 1`,
+                    [adminLoginId, loginId]
+                );
+                if (adminRes.rows.length > 0) {
+                    userData = adminRes.rows[0];
+                    role = 'ADMIN'; // Force correct role for JWT
+                }
             }
         } else if (role === 'STUDENT') {
             let studentLoginId = loginId;

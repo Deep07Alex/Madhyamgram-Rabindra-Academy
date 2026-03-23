@@ -26,7 +26,10 @@ import {
     Clock,
     ShieldAlert,
     ShieldCheck,
-    School
+    School,
+    ChevronLeft,
+    ChevronRight,
+    Loader2
 } from 'lucide-react';
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT';
@@ -361,6 +364,12 @@ const ManageAttendance = () => {
     const [attendanceStatus, setAttendanceStatus] = useState<'AUTO' | 'OPEN' | 'CLOSED'>('AUTO');
     const [togglingOverride, setTogglingOverride] = useState(false);
 
+    // Pagination state
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
+    const limit = 20;
+
     // Student state
     const [studentRows, setStudentRows] = useState<StudentRow[]>([]);
     const fetchConfig = useCallback(async () => {
@@ -426,7 +435,14 @@ const ManageAttendance = () => {
         if (!silent) setLoading(true);
         try {
             const [stuRes, attRes, clsRes] = await Promise.all([
-                api.get('/users/students'),
+                api.get('/users/students', {
+                    params: { 
+                        page, 
+                        limit, 
+                        classId: selectedClass,
+                        search: search
+                    }
+                }),
                 api.get('/attendance/student', {
                     params: dateFilter ? { startDate: dateFilter, endDate: dateFilter } : {}
                 }),
@@ -447,7 +463,11 @@ const ManageAttendance = () => {
             const classMap: Record<string, string> = {};
             clsRes.data.forEach((c: any) => { classMap[c.id] = c.name; });
 
-            const rows: StudentRow[] = stuRes.data.map((s: any) => {
+            const studentData = stuRes.data.students || [];
+            setTotalCount(stuRes.data.total || 0);
+            setTotalPages(stuRes.data.totalPages || 1);
+
+            const rows: StudentRow[] = studentData.map((s: any) => {
                 const att = attMap[s.id] || null;
                 return {
                     id: s.id,
@@ -466,11 +486,12 @@ const ManageAttendance = () => {
             setStudentRows(rows);
         } catch (err: any) {
             if (axios.isCancel(err)) return;
+            console.error('Error loading student data:', err);
             showToast('Failed to load student data.', 'error');
         } finally {
             setLoading(false);
         }
-    }, [dateFilter, viewMode, showToast]);
+    }, [dateFilter, viewMode, showToast, page, limit, selectedClass, search]);
 
     // ── Fetch teachers + attendance for date ──────────────────────────────
     const fetchTeacherData = useCallback(async (silent = false) => {
@@ -478,7 +499,14 @@ const ManageAttendance = () => {
         if (!silent) setLoading(true);
         try {
             const [teachRes, attRes] = await Promise.all([
-                api.get('/users/teachers'),
+                api.get('/users/teachers', {
+                    params: {
+                        page,
+                        limit,
+                        search: search,
+                        filter: tab === 'teachers' ? 'teachers' : (tab === 'staff' ? 'staff' : '')
+                    }
+                }),
                 api.get('/attendance/teacher', {
                     params: dateFilter ? { startDate: dateFilter, endDate: dateFilter } : {}
                 }),
@@ -489,7 +517,11 @@ const ManageAttendance = () => {
                 attMap[a.teacherId] = a;
             });
 
-            const rows: TeacherRow[] = teachRes.data.map((t: any) => {
+            const teacherData = teachRes.data.teachers || [];
+            setTotalCount(teachRes.data.total || 0);
+            setTotalPages(teachRes.data.totalPages || 1);
+
+            const rows: TeacherRow[] = teacherData.map((t: any) => {
                 const att = attMap[t.id] || null;
                 return {
                     id: t.id,
@@ -513,7 +545,7 @@ const ManageAttendance = () => {
         } finally {
             setLoading(false);
         }
-    }, [dateFilter, viewMode, showToast]);
+    }, [dateFilter, viewMode, showToast, page, limit, search]);
 
     // ── Fetch Monthly Data ────────────────────────────────────────────────────
     const [monthlyDataMap, setMonthlyDataMap] = useState<Record<string, Record<string, any>>>({}); // personId -> { dateStr -> record }
@@ -543,7 +575,14 @@ const ManageAttendance = () => {
 
             if (tab === 'students') {
                 const [stuRes, attRes] = await Promise.all([
-                    api.get(`/users/students?classId=${selectedClass}`),
+                    api.get('/users/students', {
+                        params: { 
+                            classId: selectedClass, 
+                            page, 
+                            limit,
+                            search: search
+                        }
+                    }),
                     api.get('/attendance/student', { params: { classId: selectedClass, startDate, endDate } })
                 ]);
 
@@ -556,35 +595,55 @@ const ManageAttendance = () => {
                     matrix[a.studentId][d] = a;
                 });
 
+                const studentData = stuRes.data.students || [];
+                setTotalCount(stuRes.data.total || 0);
+                setTotalPages(stuRes.data.totalPages || 1);
+
                 setMonthlyDataMap(matrix);
-                setStudentRows(stuRes.data.map((s: any) => ({
+                setStudentRows(studentData.map((s: any) => ({
                     id: s.id, name: s.name, studentId: s.studentId, rollNumber: s.rollNumber,
                     classId: s.classId, className: '', attendanceId: null, status: null, date: null, subject: null
                 })));
             } else {
                 const [teachRes, attRes] = await Promise.all([
-                    api.get('/users/teachers'),
+                    api.get('/users/teachers', {
+                        params: {
+                            page,
+                            limit,
+                            search: search
+                        }
+                    }),
                     api.get('/attendance/teacher', { params: { startDate, endDate } })
                 ]);
 
                 const matrix: Record<string, Record<string, any>> = {};
-                attRes.data.forEach((a: any) => {
+                const teacherAttData = Array.isArray(attRes.data) ? attRes.data : [];
+                teacherAttData.forEach((a: any) => {
                     const d = a.date.split('T')[0];
                     if (!matrix[a.teacherId]) matrix[a.teacherId] = {};
                     matrix[a.teacherId][d] = a;
                 });
 
+                const teacherData = teachRes.data.teachers || [];
+                setTotalCount(teachRes.data.total || 0);
+                setTotalPages(teachRes.data.totalPages || 1);
+
                 setMonthlyDataMap(matrix);
-                setTeacherRows(teachRes.data.map((t: any) => ({
+                setTeacherRows(teacherData.map((t: any) => ({
                     id: t.id, name: t.name, teacherId: t.teacherId, attendanceId: null, status: null, date: null, reason: null, designation: t.designation
                 })));
             }
         } catch (err: any) {
+            console.error('Monthly fetch error:', err);
             showToast('Failed to load monthly data.', 'error');
         } finally {
             if (!silent) setLoading(false);
         }
-    }, [viewMode, tab, monthFilter, selectedClass, classes.length, showToast]);
+    }, [viewMode, tab, monthFilter, selectedClass, classes.length, showToast, page, limit, search]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [tab, viewMode, selectedClass, search]);
 
     useEffect(() => {
         if (viewMode === 'daily') {
@@ -598,37 +657,21 @@ const ManageAttendance = () => {
     // Live real-time updates
     useServerEvents({
         'attendance:updated': () => {
-            fetchMonthlyData();
+            fetchMonthlyData(true);
             if (viewMode === 'daily') {
-                if (tab === 'students') fetchStudentData();
-                else fetchTeacherData();
+                if (tab === 'students') fetchStudentData(true);
+                else fetchTeacherData(true);
             }
         }
     });
 
 
     // Filtered rows
-    const filteredStudents = studentRows.filter(r => {
-        const matchClass = !selectedClass || r.classId === selectedClass;
-        const matchSearch = !search ||
-            r.name.toLowerCase().includes(search.toLowerCase()) ||
-            r.studentId.toLowerCase().includes(search.toLowerCase()) ||
-            r.rollNumber.toLowerCase().includes(search.toLowerCase());
-        return matchClass && matchSearch;
-    });
+    const filteredStudents = studentRows;
 
-    const filteredTeachers = teacherRows.filter(r => {
-        const isStaffCategory = ['NON-TEACHING STAFF', 'KARATE TEACHER', 'DANCE TEACHER'].includes(r.designation || '');
+    const filteredTeachers = teacherRows;
 
-        if (tab === 'teachers' && isStaffCategory) return false;
-        if (tab === 'staff' && !isStaffCategory) return false;
-
-        return !search ||
-            r.name.toLowerCase().includes(search.toLowerCase()) ||
-            r.teacherId.toLowerCase().includes(search.toLowerCase());
-    });
-
-    const totalRows = tab === 'students' ? filteredStudents.length : filteredTeachers.length;
+    const totalRows = totalCount;
     const presentCount = tab === 'students'
         ? filteredStudents.filter(r => r.status === 'PRESENT').length
         : filteredTeachers.filter(r => r.status === 'PRESENT').length;
@@ -807,36 +850,46 @@ const ManageAttendance = () => {
                 )}
             </div>
 
-            {/* Table */}
-            <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-soft)', boxShadow: 'var(--shadow-sm)', overflowX: 'auto' }}>
-                {loading ? (
-                    <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                        <ClipboardCheck size={32} style={{ marginBottom: '12px', opacity: 0.4 }} />
-                        <p>Loading...</p>
-                    </div>
-                ) : tab === 'students' ? (
-                    filteredStudents.length === 0 ? (
-                        <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                            <Users size={32} style={{ marginBottom: '12px', opacity: 0.3 }} />
-                            <p style={{ fontWeight: '600' }}>No students found</p>
-                        </div>
-                    ) : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
-                            <thead>
-                                <tr style={{ background: 'var(--bg-main)', borderBottom: '2px solid var(--border-soft)' }}>
-                                    <th style={thStyle}>Student</th>
-                                    <th style={thStyle}>Roll #</th>
-                                    <th style={thStyle}>Class</th>
-                                    <th style={thStyle}>
-                                        {viewMode === 'daily'
-                                            ? (dateFilter ? `Status on ${new Date(dateFilter).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Attendance Status')
-                                            : 'Monthly Summary'
-                                        }
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredStudents.map((row) => (
+            {/* Table Container */}
+            <div style={{ 
+                background: 'var(--bg-card)', 
+                borderRadius: 'var(--radius-lg)', 
+                border: '1px solid var(--border-soft)', 
+                boxShadow: 'var(--shadow-sm)', 
+                overflow: 'hidden',
+                position: 'relative',
+                minHeight: '400px'
+            }}>
+                {/* Table Header/Body */}
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
+                        <thead>
+                            <tr style={{ background: 'var(--bg-main)', borderBottom: '2px solid var(--border-soft)' }}>
+                                {tab === 'students' ? (
+                                    <>
+                                        <th style={thStyle}>Student</th>
+                                        <th style={thStyle}>Roll #</th>
+                                        <th style={thStyle}>Class</th>
+                                    </>
+                                ) : (
+                                    <>
+                                        <th style={thStyle}>Teacher/Staff</th>
+                                        <th style={thStyle}>Arrival</th>
+                                        <th style={thStyle}>Departure</th>
+                                    </>
+                                )}
+                                <th style={thStyle}>
+                                    {viewMode === 'daily'
+                                        ? (dateFilter ? `Status on ${new Date(dateFilter).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Attendance Status')
+                                        : 'Monthly Summary'
+                                    }
+                                </th>
+                                {tab !== 'students' && <th style={thStyle}>Leave Info</th>}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {!loading && (tab === 'students' ? filteredStudents : filteredTeachers).map((row: any) => (
+                                tab === 'students' ? (
                                     <StudentAttendanceRow 
                                         key={row.id} 
                                         row={row} 
@@ -845,34 +898,7 @@ const ManageAttendance = () => {
                                         monthlyDataMap={monthlyDataMap} 
                                         fetchStudentData={fetchStudentData} 
                                     />
-                                ))}
-                            </tbody>
-                        </table>
-                    )
-                ) : (
-                    filteredTeachers.length === 0 ? (
-                        <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                            <UserCheck size={32} style={{ marginBottom: '12px', opacity: 0.3 }} />
-                            <p style={{ fontWeight: '600' }}>No teachers found</p>
-                        </div>
-                    ) : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
-                            <thead>
-                                <tr style={{ background: 'var(--bg-main)', borderBottom: '2px solid var(--border-soft)' }}>
-                                    <th style={thStyle}>Teacher</th>
-                                    <th style={thStyle}>Arrival</th>
-                                    <th style={thStyle}>Departure</th>
-                                    <th style={thStyle}>
-                                        {viewMode === 'daily'
-                                            ? (dateFilter ? `Status on ${new Date(dateFilter).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Attendance Status')
-                                            : 'Monthly Summary'
-                                        }
-                                    </th>
-                                    <th style={thStyle}>Leave Info</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredTeachers.map((row) => (
+                                ) : (
                                     <TeacherAttendanceRow 
                                         key={row.id} 
                                         row={row} 
@@ -882,15 +908,89 @@ const ManageAttendance = () => {
                                         fetchTeacherData={fetchTeacherData} 
                                         tab={tab}
                                     />
-                                ))}
-                            </tbody>
-                        </table>
-                    )
+                                )
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Empty State */}
+                {!loading && (tab === 'students' ? filteredStudents.length === 0 : filteredTeachers.length === 0) && (
+                    <div style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <Users size={48} style={{ opacity: 0.1, marginBottom: '16px' }} />
+                        <p style={{ fontWeight: '600', fontSize: '1.1rem' }}>No records matches your criteria</p>
+                        <p style={{ fontSize: '0.85rem' }}>Try adjusting your filters or search query</p>
+                    </div>
+                )}
+
+                {/* Loading Overlay */}
+                {loading && (
+                    <div style={{ 
+                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
+                        background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(2px)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 
+                    }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                            <Loader2 className="animate-spin" size={32} color="var(--primary-bold)" />
+                            <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--primary-bold)' }}>Syncing Records...</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* Pagination Footer */}
+                {!loading && totalPages > 1 && (
+                    <div style={{ 
+                        padding: '16px 24px', 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        borderTop: '1px solid var(--border-soft)',
+                        background: 'var(--bg-main)'
+                    }}>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+                            Page <span style={{ color: 'var(--text-main)' }}>{page}</span> of {totalPages} 
+                            <span style={{ marginLeft: '8px', opacity: 0.5 }}>({totalCount} items)</span>
+                        </span>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button 
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                disabled={page === 1}
+                                style={{
+                                    padding: '8px 16px', borderRadius: '10px',
+                                    border: '1px solid var(--border-soft)',
+                                    background: 'var(--bg-card)',
+                                    cursor: page === 1 ? 'not-allowed' : 'pointer',
+                                    opacity: page === 1 ? 0.5 : 1,
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                <ChevronLeft size={16} /> Previous
+                            </button>
+                            <button 
+                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                disabled={page === totalPages}
+                                style={{
+                                    padding: '8px 16px', borderRadius: '10px',
+                                    border: '1px solid var(--border-soft)',
+                                    background: 'var(--bg-card)',
+                                    cursor: page === totalPages ? 'not-allowed' : 'pointer',
+                                    opacity: page === totalPages ? 0.5 : 1,
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                Next <ChevronRight size={16} />
+                            </button>
+                        </div>
+                    </div>
                 )}
             </div>
 
-            <p style={{ margin: '12px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'right' }}>
-                Showing {totalRows} {tab === 'students' ? 'student' : 'teacher'}{totalRows !== 1 ? 's' : ''}
+            <p style={{ margin: '16px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+                Showing {totalCount} {tab === 'students' ? 'student' : 'teacher'}{totalCount !== 1 ? 's' : ''}
                 {dateFilter ? ` · ${new Date(dateFilter).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}` : ' · All dates'}
             </p>
         </div>
