@@ -5,6 +5,9 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
+    target: 'esnext',
+    minify: 'esbuild',
+    cssMinify: true,
     sourcemap: false,
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
@@ -14,6 +17,7 @@ export default defineConfig({
             if (id.includes('recharts')) return 'vendor-charts';
             if (id.includes('lucide-react')) return 'vendor-icons';
             if (id.includes('react-router-dom') || id.includes('react-dom') || id.includes('react')) return 'vendor-react-core';
+            if (id.includes('framer-motion')) return 'vendor-motion';
             return 'vendor-libs';
           }
         }

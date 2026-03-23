@@ -21,7 +21,7 @@ const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
 const TeacherDashboard = React.lazy(() => import('./pages/TeacherDashboard'));
 const StudentDashboard = React.lazy(() => import('./pages/StudentDashboard'));
 const Gallery = React.lazy(() => import('./pages/Gallery'));
-import MainPage from './pages/MainPage';
+const MainPage = React.lazy(() => import('./pages/MainPage'));
 
 // Preload utility to fetch dashboard chunks in the background
 const preloadDashboard = (factory: () => Promise<any>) => {

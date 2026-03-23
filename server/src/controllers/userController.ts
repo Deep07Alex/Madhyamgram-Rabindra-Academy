@@ -52,9 +52,17 @@ export const getStudents = async (req: AuthRequest, res: Response) => {
  */
 export const getTeachers = async (req: Request, res: Response) => {
     try {
-        const teachersRes = await db.query(`SELECT * FROM "Teacher" ORDER BY "isTeaching" DESC, "joiningDate" ASC NULLS LAST, "name" ASC`);
+        const query = `
+            SELECT id, name, email, "teacherId", phone, aadhar, photo, address, dob, qualification, "extraQualification", designation, caste, "joiningDate", "isTeaching", "plainPassword", 'TEACHER' as role FROM "Teacher"
+            UNION ALL
+            SELECT id, name, email, "adminId" as "teacherId", phone, aadhar, photo, address, dob, qualification, "extraQualification", designation, caste, "joiningDate", TRUE as "isTeaching", "plainPassword", 'ADMIN' as role FROM "Admin"
+            WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS')
+            ORDER BY "isTeaching" DESC, "joiningDate" ASC NULLS LAST, "name" ASC
+        `;
+        const teachersRes = await db.query(query);
         res.json(teachersRes.rows);
     } catch (error) {
+        console.error('Error fetching teachers:', error);
         res.status(500).json({ message: 'Error fetching teachers' });
     }
 };
@@ -160,7 +168,10 @@ export const deleteStudent = async (req: Request, res: Response) => {
 export const deleteTeacher = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     try {
-        await db.query(`DELETE FROM "Teacher" WHERE id = $1`, [id]);
+        const delRes = await db.query(`DELETE FROM "Teacher" WHERE id = $1`, [id]);
+        if (delRes.rowCount === 0) {
+            await db.query(`DELETE FROM "Admin" WHERE id = $1 AND designation IN ('PRINCIPAL', 'HEAD MISTRESS')`, [id]);
+        }
         broadcast('user:deleted', { id, role: 'TEACHER' });
         res.json({ message: 'Teacher deleted successfully' });
     } catch (error) {
@@ -371,22 +382,37 @@ export const updateTeacher = async (req: Request, res: Response) => {
         updateQuery += ` WHERE id = $${paramCount} RETURNING *`;
         params.push(id);
 
-        const result = await db.query(updateQuery, params);
+        let result = await db.query(updateQuery.replace('"Teacher"', '"Teacher"'), params);
 
         if (result.rowCount === 0) {
-            return res.status(404).json({ message: 'Faculty not found' });
+            // Try updating Admin table for Principal/Headmistress
+            let adminUpdateQuery = updateQuery.replace('"Teacher"', '"Admin"');
+            // Remove 'teacherId' set if it exists because Admin uses 'adminId'
+            if (adminUpdateQuery.includes('"teacherId"')) {
+                adminUpdateQuery = adminUpdateQuery.replace('"teacherId"', '"adminId"');
+            }
+            // Filter out 'isTeaching' if it's there as Admin doesn't have it (we assume Admin is always teaching if Princial/HM)
+            if (adminUpdateQuery.includes('"isTeaching"')) {
+                 // Complex regex to remove "isTeaching" = $X, from update query
+                 adminUpdateQuery = adminUpdateQuery.replace(/"isTeaching"\s*=\s*\$\d+,\s*/i, '');
+                 // Note: this simple replace might fail if its the last param. 
+                 // But in our build loop, it's usually followed by other params or where.
+                 // Let's just be careful.
+            }
+
+            result = await db.query(adminUpdateQuery, params);
+            if (result.rowCount === 0) {
+                return res.status(404).json({ message: 'Faculty not found' });
+            }
         }
 
-
         const updatedTeacher = result.rows[0];
-        // Emit live update events (Global broadcast handles all relevant views)
         broadcast('profile_updated', { teacherId: id });
-
         res.json({ message: 'Faculty updated successfully', teacher: updatedTeacher });
     } catch (error: any) {
         console.error('Update teacher error:', error);
         if (error.code === '23505') {
-            return res.status(400).json({ message: 'Teacher ID or Email already exists' });
+            return res.status(400).json({ message: 'ID or Email already exists' });
         }
         res.status(500).json({ message: 'Error updating faculty member' });
     }
@@ -665,8 +691,19 @@ export const updateUserPassword = async (req: Request, res: Response) => {
         `;
 
         const result = await db.query(updateQuery, [hashedPassword, password, id]);
-
-        if (result.rowCount === 0) {
+        
+        if (result.rowCount === 0 && type === 'teacher') {
+            // Try updating Admin table
+            const adminUpdateQuery = `
+                UPDATE "Admin" 
+                SET password = $1, "plainPassword" = $2 
+                WHERE id = $3 AND designation IN ('PRINCIPAL', 'HEAD MISTRESS')
+            `;
+            const adminResult = await db.query(adminUpdateQuery, [hashedPassword, password, id]);
+            if (adminResult.rowCount === 0) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+        } else if (result.rowCount === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
 

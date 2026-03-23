@@ -39,6 +39,16 @@ export const initDb = async () => {
                 "password" TEXT NOT NULL,
                 "name" TEXT NOT NULL,
                 "email" TEXT UNIQUE,
+                "designation" TEXT,
+                "phone" TEXT,
+                "aadhar" TEXT,
+                "photo" TEXT,
+                "address" TEXT,
+                "dob" DATE,
+                "qualification" TEXT,
+                "extraQualification" TEXT,
+                "caste" TEXT,
+                "joiningDate" DATE,
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -368,29 +378,67 @@ export const initDb = async () => {
             END $$;
         `);
 
-        // 6. Create unique and performance indexes if they don't exist
+        // 7. Update Admin Table Schema and Perform Migration
         await db.query(`
-            CREATE UNIQUE INDEX IF NOT EXISTS "Attendance_student_date_unique" ON "Attendance"("studentId", "date");
-            CREATE UNIQUE INDEX IF NOT EXISTS "TeacherAttendance_teacher_date_unique" ON "TeacherAttendance"("teacherId", "date");
-            
-            -- Performance Indexes for common lookups
-            CREATE INDEX IF NOT EXISTS "idx_student_class" ON "Student"("classId");
-            CREATE INDEX IF NOT EXISTS "idx_student_rollNumber" ON "Student"("rollNumber");
-            CREATE INDEX IF NOT EXISTS "idx_student_name" ON "Student"("name");
-            CREATE INDEX IF NOT EXISTS "idx_attendance_date" ON "Attendance"("date");
-            CREATE INDEX IF NOT EXISTS "idx_attendance_class" ON "Attendance"("classId");
-            CREATE INDEX IF NOT EXISTS "idx_teacher_phone" ON "Teacher"("phone");
-            CREATE INDEX IF NOT EXISTS "idx_teacher_aadhar" ON "Teacher"("aadhar");
-            CREATE INDEX IF NOT EXISTS "idx_teacher_name" ON "Teacher"("name");
-            CREATE INDEX IF NOT EXISTS "idx_result_student" ON "Result"("studentId");
-            CREATE INDEX IF NOT EXISTS "idx_homework_class" ON "Homework"("classId");
-            CREATE INDEX IF NOT EXISTS "idx_homework_teacher" ON "Homework"("teacherId");
-            CREATE INDEX IF NOT EXISTS "idx_submission_status" ON "Submission"("status");
-            CREATE INDEX IF NOT EXISTS "idx_submission_homework" ON "Submission"("homeworkId");
-            CREATE INDEX IF NOT EXISTS "idx_submission_student" ON "Submission"("studentId");
-            CREATE INDEX IF NOT EXISTS "idx_notice_createdAt" ON "Notice"("createdAt");
-            CREATE INDEX IF NOT EXISTS "idx_notice_audience" ON "Notice"("targetAudience");
-            CREATE INDEX IF NOT EXISTS "idx_notice_type" ON "Notice"("type");
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'designation') THEN
+                    ALTER TABLE "Admin" ADD COLUMN "designation" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'phone') THEN
+                    ALTER TABLE "Admin" ADD COLUMN "phone" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'aadhar') THEN
+                    ALTER TABLE "Admin" ADD COLUMN "aadhar" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'photo') THEN
+                    ALTER TABLE "Admin" ADD COLUMN "photo" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'address') THEN
+                    ALTER TABLE "Admin" ADD COLUMN "address" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'dob') THEN
+                    ALTER TABLE "Admin" ADD COLUMN "dob" DATE;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'qualification') THEN
+                    ALTER TABLE "Admin" ADD COLUMN "qualification" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'extraQualification') THEN
+                    ALTER TABLE "Admin" ADD COLUMN "extraQualification" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'caste') THEN
+                    ALTER TABLE "Admin" ADD COLUMN "caste" TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Admin' AND column_name = 'joiningDate') THEN
+                    ALTER TABLE "Admin" ADD COLUMN "joiningDate" DATE;
+                END IF;
+            END $$;
+
+            -- Move Principal and Headmistress to Admin table if they are still in Teacher table
+            INSERT INTO "Admin" (
+                id, "adminId", password, "plainPassword", name, email, 
+                designation, phone, aadhar, photo, address, dob, 
+                qualification, "extraQualification", caste, "joiningDate"
+            )
+            SELECT 
+                id, "teacherId", password, "plainPassword", name, email, 
+                designation, phone, aadhar, photo, address, dob, 
+                qualification, "extraQualification", caste, "joiningDate"
+            FROM "Teacher"
+            WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS')
+            ON CONFLICT ("adminId") DO UPDATE SET
+                designation = EXCLUDED.designation,
+                phone = EXCLUDED.phone,
+                aadhar = EXCLUDED.aadhar,
+                photo = EXCLUDED.photo,
+                address = EXCLUDED.address,
+                dob = EXCLUDED.dob,
+                qualification = EXCLUDED.qualification,
+                "extraQualification" = EXCLUDED."extraQualification",
+                caste = EXCLUDED.caste,
+                "joiningDate" = EXCLUDED."joiningDate";
+
+            -- Remove them from Teacher table once moved
+            DELETE FROM "Teacher" WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS');
         `);
 
         console.log('Migrations applied successfully.');

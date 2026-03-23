@@ -95,6 +95,14 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
+// Stricter limiter for auth/login
+const loginLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: isProd ? 20 : 100, // Very strict for login
+    message: 'Too many login attempts, please try again after an hour'
+});
+app.use('/api/auth/login', loginLimiter);
+
 if (!process.env.NODE_ENV) {
     process.env.NODE_ENV = 'development';
 }

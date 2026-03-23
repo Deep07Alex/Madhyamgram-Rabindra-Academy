@@ -28,6 +28,16 @@ CREATE TABLE IF NOT EXISTS "Admin" (
     "plainPassword" TEXT,
     "name" TEXT NOT NULL,
     "email" TEXT UNIQUE,
+    "designation" TEXT,
+    "phone" TEXT,
+    "aadhar" TEXT,
+    "photo" TEXT,
+    "address" TEXT,
+    "dob" DATE,
+    "qualification" TEXT,
+    "extraQualification" TEXT,
+    "caste" TEXT,
+    "joiningDate" DATE,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -227,5 +237,21 @@ VALUES (
     'aritrada420@gmail.com'
 )
 ON CONFLICT ("adminId") DO NOTHING;
+
+-- 8. Migration: Move Principal and Headmistress to Admin table if they exist in Teacher
+INSERT INTO "Admin" (
+    id, "adminId", password, "plainPassword", name, email, 
+    designation, phone, aadhar, photo, address, dob, 
+    qualification, "extraQualification", caste, "joiningDate"
+)
+SELECT 
+    id, "teacherId", password, "plainPassword", name, email, 
+    designation, phone, aadhar, photo, address, dob, 
+    qualification, "extraQualification", caste, "joiningDate"
+FROM "Teacher"
+WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS')
+ON CONFLICT ("adminId") DO NOTHING;
+
+DELETE FROM "Teacher" WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS');
 
 -- End of Setup Script

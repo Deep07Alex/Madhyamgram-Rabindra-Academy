@@ -26,7 +26,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
         if (role === 'ADMIN') {
             const [studentRes, teacherRes, classRes, configRes] = await Promise.all([
                 db.query(`SELECT COUNT(*) FROM "Student"`),
-                db.query(`SELECT COUNT(*) FROM "Teacher"`),
+                db.query(`SELECT (SELECT COUNT(*) FROM "Teacher") + (SELECT COUNT(*) FROM "Admin" WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS')) as count`),
                 db.query(`SELECT COUNT(*) FROM "Class"`),
                 db.query('SELECT value FROM "SystemConfig" WHERE key = $1', ['attendance_override'])
             ]);

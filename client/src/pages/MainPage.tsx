@@ -171,7 +171,12 @@ function FestivalSection({ bannerUrl }: { bannerUrl: string }) {
   return (
     <section id="notice" className="landing-section notice">
       <h2>Upcoming Festivals</h2>
-      <img src={fullUrl} alt="Upcoming Festival" style={{ width: '100%', height: 'auto', maxHeight: '600px', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
+      <img 
+        src={fullUrl} 
+        alt="Upcoming Festival" 
+        loading="lazy"
+        style={{ width: '100%', height: 'auto', maxHeight: '600px', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} 
+      />
     </section>
   );
 }

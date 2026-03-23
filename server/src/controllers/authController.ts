@@ -50,13 +50,6 @@ export const login = async (req: Request, res: Response) => {
             );
             if (adminRes.rows.length > 0) {
                 userData = adminRes.rows[0];
-            } else {
-                // Allow Principal to log in as Admin if they have an 'A-' prefix or if we prepend it
-                const teacherRes = await db.query(
-                    `SELECT * FROM "Teacher" WHERE ("teacherId" = $1 OR "teacherId" = $2) AND designation IN ('PRINCIPAL', 'HEAD MISTRESS') LIMIT 1`,
-                    [adminLoginId, loginId]
-                );
-                if (teacherRes.rows.length > 0) userData = teacherRes.rows[0];
             }
         } else if (role === 'TEACHER') {
             let teacherLoginId = loginId;
@@ -176,61 +169,95 @@ export const register = async (req: Request, res: Response) => {
                 [newUserId, finalAdminId, username, hashedPassword, password, name, safeEmail]
             );
         } else if (role === 'TEACHER') {
-            let uniqueId = teacherId;
-            let hashedPassword = null;
-            
-            // Ensure ID and Password for all staff (Teaching or Non-Teaching)
-            // to satisfy DB constraints. The isTeaching flag will control login access.
-            if (['PRINCIPAL', 'HEAD MISTRESS'].includes(designation) && phone && !aadhar) {
-                uniqueId = `A-${phone}`;
-            } else if (aadhar && aadhar.length >= 8) {
-                const prefix = ['PRINCIPAL', 'HEAD MISTRESS'].includes(designation) ? 'A-' : 'T-';
-                uniqueId = `${prefix}${aadhar.slice(-8)}`;
-            }
-
-            if (!uniqueId) {
-                let isUnique = false;
-                const prefix = (['PRINCIPAL', 'HEAD MISTRESS'].includes(designation)) ? 'A-' : 'T-';
-                while (!isUnique) {
-                    uniqueId = prefix + generate8DigitId();
-                    const existingRes = await db.query(`SELECT id FROM "Teacher" WHERE "teacherId" = $1`, [uniqueId]);
-                    if (existingRes.rows.length === 0) isUnique = true;
-                }
-            } else if (['PRINCIPAL', 'HEAD MISTRESS'].includes(designation) && !uniqueId.toUpperCase().startsWith('A-')) {
-                uniqueId = `A-${uniqueId}`;
-            } else if (!uniqueId.toUpperCase().startsWith('T-') && !uniqueId.toUpperCase().startsWith('A-')) {
-                uniqueId = `T-${uniqueId}`;
-            }
-
-            if (password) {
-                hashedPassword = await bcrypt.hash(password, 10);
-            } else {
-                // Auto-generate password if empty
-                const cleanName = name.trim().toLowerCase().replace(/\s+/g, '');
-                const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-                const suffixDigits = (aadhar && aadhar.length >= 4) ? aadhar.slice(-4) : uniqueId.replace(/\D/g, '').slice(-4);
-                const finalPassword = `${capitalizedName}@${suffixDigits || '0000'}`;
-                hashedPassword = await bcrypt.hash(finalPassword, 10);
-                req.body.password = finalPassword; // Update request body for DB insert
-            }
-
             const safePhone = (phone && phone.trim()) ? phone.trim() : null;
             const safeAadhar = (aadhar && aadhar.trim()) ? aadhar.trim() : null;
             const safeJoiningDate = sanitizeDate(joiningDate);
             const safeDob = sanitizeDate(dob);
 
-            await db.query(
-                `INSERT INTO "Teacher" (
-                    id, password, "plainPassword", name, email, "teacherId", phone, aadhar, 
-                    designation, "joiningDate", "isTeaching",
-                    photo, address, dob, qualification, "extraQualification", caste
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
-                [
-                    newUserId, hashedPassword, req.body.password || password, name, safeEmail, uniqueId, safePhone, safeAadhar, 
-                    designation, safeJoiningDate, isTeaching ?? true,
-                    photo, address, safeDob, qualification, extraQualification, caste
-                ]
-            );
+            if (['PRINCIPAL', 'HEAD MISTRESS'].includes(designation)) {
+                // Register as Admin
+                let finalAdminId = teacherId;
+                if (phone && !finalAdminId) {
+                    finalAdminId = `A-${phone}`;
+                } else if (finalAdminId && !finalAdminId.toUpperCase().startsWith('A-')) {
+                    finalAdminId = `A-${finalAdminId}`;
+                } else if (!finalAdminId) {
+                    finalAdminId = `A-${generate8DigitId()}`;
+                }
+
+                if (!password) {
+                    const cleanName = name.trim().toLowerCase().replace(/\s+/g, '');
+                    const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+                    const suffixDigits = (aadhar && aadhar.length >= 4) ? aadhar.slice(-4) : finalAdminId.replace(/\D/g, '').slice(-4);
+                    const finalPassword = `${capitalizedName}@${suffixDigits || '0000'}`;
+                    const hashedFinalPassword = await bcrypt.hash(finalPassword, 10);
+                    await db.query(
+                        `INSERT INTO "Admin" (
+                            id, "adminId", password, "plainPassword", name, email, 
+                            designation, phone, aadhar, photo, address, dob, 
+                            qualification, "extraQualification", caste, "joiningDate"
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+                        [
+                            newUserId, finalAdminId, hashedFinalPassword, finalPassword, name, safeEmail,
+                            designation, safePhone, safeAadhar, photo, address, safeDob,
+                            qualification, extraQualification, caste, safeJoiningDate
+                        ]
+                    );
+                } else {
+                    await db.query(
+                        `INSERT INTO "Admin" (
+                            id, "adminId", password, "plainPassword", name, email, 
+                            designation, phone, aadhar, photo, address, dob, 
+                            qualification, "extraQualification", caste, "joiningDate"
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+                        [
+                            newUserId, finalAdminId, hashedPassword, password, name, safeEmail,
+                            designation, safePhone, safeAadhar, photo, address, safeDob,
+                            qualification, extraQualification, caste, safeJoiningDate
+                        ]
+                    );
+                }
+            } else {
+                // Original Teacher registration logic
+                let uniqueId = teacherId;
+                if (aadhar && aadhar.length >= 8) {
+                    uniqueId = `T-${aadhar.slice(-8)}`;
+                }
+
+                if (!uniqueId) {
+                    let isUnique = false;
+                    while (!isUnique) {
+                        uniqueId = 'T-' + generate8DigitId();
+                        const existingRes = await db.query(`SELECT id FROM "Teacher" WHERE "teacherId" = $1`, [uniqueId]);
+                        if (existingRes.rows.length === 0) isUnique = true;
+                    }
+                } else if (!uniqueId.toUpperCase().startsWith('T-')) {
+                    uniqueId = `T-${uniqueId}`;
+                }
+
+                let finalPassword = password;
+                let hashedFinalPassword = hashedPassword;
+                if (!password) {
+                    const cleanName = name.trim().toLowerCase().replace(/\s+/g, '');
+                    const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+                    const suffixDigits = (aadhar && aadhar.length >= 4) ? aadhar.slice(-4) : uniqueId.replace(/\D/g, '').slice(-4);
+                    finalPassword = `${capitalizedName}@${suffixDigits || '0000'}`;
+                    hashedFinalPassword = await bcrypt.hash(finalPassword, 10);
+                }
+
+                await db.query(
+                    `INSERT INTO "Teacher" (
+                        id, password, "plainPassword", name, email, "teacherId", phone, aadhar, 
+                        designation, "joiningDate", "isTeaching",
+                        photo, address, dob, qualification, "extraQualification", caste
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+                    [
+                        newUserId, hashedFinalPassword, finalPassword, name, safeEmail, uniqueId, safePhone, safeAadhar, 
+                        designation, safeJoiningDate, isTeaching ?? true,
+                        photo, address, safeDob, qualification, extraQualification, caste
+                    ]
+                );
+            }
         } else if (role === 'STUDENT') {
             const { studentId: manualStudentId, banglarSikkhaId, photo } = req.body;
             
