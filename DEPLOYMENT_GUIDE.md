@@ -70,13 +70,13 @@ NODE_ENV=production
 # Note: @ in password must be encoded as %40
 DATABASE_URL=postgresql://aritrada420:Aritradutta%402005@localhost:5432/Madhyamgram-Rabindra-Academy
 JWT_SECRET=your_super_secret_jwt_key
-ALLOWED_ORIGINS=https://your-academy-domain.com
+ALLOWED_ORIGINS=https://madhyamgramrabindraacademy.in,https://www.madhyamgramrabindraacademy.in
 ```
 
 **Frontend (`client/.env.production`):**
 
 ```env
-VITE_API_BASE_URL=https://your-academy-domain.com/api
+VITE_API_BASE_URL=https://madhyamgramrabindraacademy.in/api
 ```
 
 ---
@@ -118,7 +118,7 @@ Nginx serves the frontend static files and proxies API requests to the Node serv
    ```nginx
    server {
        listen 80;
-       server_name your-academy-domain.com;
+       server_name madhyamgramrabindraacademy.in www.madhyamgramrabindraacademy.in;
 
        # Frontend Static Files (Vite build output)
        location / {
@@ -158,7 +158,7 @@ Nginx serves the frontend static files and proxies API requests to the Node serv
 
 ```bash
 sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d your-academy-domain.com
+sudo certbot --nginx -d madhyamgramrabindraacademy.in -d www.madhyamgramrabindraacademy.in
 ```
 
 ---
