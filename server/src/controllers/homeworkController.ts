@@ -8,8 +8,14 @@
 import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { AuthRequest } from '../middleware/auth.js';
 import { broadcast, sendToUser, sendToRole, sendToClass } from '../lib/sseManager.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // --- Homework Management ---
 
@@ -19,8 +25,9 @@ import { broadcast, sendToUser, sendToRole, sendToClass } from '../lib/sseManage
  */
 export const createHomework = async (req: AuthRequest, res: Response) => {
     try {
-        const { title, description, dueDate, classId, subject, allowFileUpload } = req.body;
+        const { title, description, dueDate, classId, subject, allowFileUpload, isSubmissionRequired } = req.body;
         const teacherId = req.user?.id;
+        const subRequired = isSubmissionRequired === 'true' || isSubmissionRequired === true;
 
         let fileUrl = null;
         if (req.file) {
@@ -29,14 +36,17 @@ export const createHomework = async (req: AuthRequest, res: Response) => {
 
         if (!teacherId) return res.status(401).json({ message: 'Unauthorized' });
 
-        const finalDueDate = new Date(dueDate);
-        finalDueDate.setHours(23, 59, 59, 999);
+        let finalDueDate = null;
+        if (subRequired && dueDate) {
+            finalDueDate = new Date(dueDate);
+            finalDueDate.setHours(23, 59, 59, 999);
+        }
 
         const id = crypto.randomUUID();
         const homeworkRes = await db.query(
-            `INSERT INTO "Homework" (id, title, description, subject, "dueDate", "classId", "teacherId", "fileUrl", "allowFileUpload") 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-            [id, title, description, subject || null, finalDueDate, classId, teacherId, fileUrl, allowFileUpload === 'true' || allowFileUpload === true]
+            `INSERT INTO "Homework" (id, title, description, subject, "dueDate", "classId", "teacherId", "fileUrl", "allowFileUpload", "isSubmissionRequired") 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+            [id, title, description, subject || null, finalDueDate, classId, teacherId, fileUrl, (allowFileUpload === 'true' || allowFileUpload === true), subRequired]
         );
 
         const hw = homeworkRes.rows[0];
@@ -47,6 +57,55 @@ export const createHomework = async (req: AuthRequest, res: Response) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error creating homework' });
+    }
+};
+
+/**
+ * Updates an existing homework assignment.
+ */
+export const updateHomework = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { title, description, dueDate, classId, subject, allowFileUpload, isSubmissionRequired } = req.body;
+        const subRequired = isSubmissionRequired === 'true' || isSubmissionRequired === true;
+
+        let finalDueDate = null;
+        if (subRequired && dueDate) {
+            finalDueDate = new Date(dueDate);
+            finalDueDate.setHours(23, 59, 59, 999);
+        }
+
+        // Handle file update if provided
+        let fileUrlUpdate = "";
+        const params = [title, description, subject || null, finalDueDate, classId, (allowFileUpload === 'true' || allowFileUpload === true), subRequired, id];
+        
+        if (req.file) {
+            // Cleanup old file
+            const oldFileRes = await db.query('SELECT "fileUrl" FROM "Homework" WHERE id = $1', [id]);
+            const oldFileUrl = oldFileRes.rows[0]?.fileUrl;
+            if (oldFileUrl) {
+                const oldFilePath = path.join(__dirname, '../../', oldFileUrl);
+                if (fs.existsSync(oldFilePath)) fs.unlinkSync(oldFilePath);
+            }
+
+            fileUrlUpdate = `, "fileUrl" = $9`;
+            params.push(`/uploads/${req.file.filename}`);
+        }
+
+        const query = `
+            UPDATE "Homework" 
+            SET title = $1, description = $2, subject = $3, "dueDate" = $4, "classId" = $5, "allowFileUpload" = $6, "isSubmissionRequired" = $7 ${fileUrlUpdate}
+            WHERE id = $8 RETURNING *
+        `;
+
+        const result = await db.query(query, params);
+        if (result.rows.length === 0) return res.status(404).json({ message: 'Homework not found' });
+
+        broadcast('homework_updated', { id, classId: result.rows[0].classId });
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error updating homework' });
     }
 };
 
@@ -92,11 +151,12 @@ export const getHomeworks = async (req: AuthRequest, res: Response) => {
 
         let query = `
             SELECT h.*,
-                   row_to_json(t.*) as teacher,
+                   COALESCE(row_to_json(t.*), row_to_json(a.*)) as teacher,
                    row_to_json(c.*) as class,
                    ${submissionsSubquery}
             FROM "Homework" h
             LEFT JOIN "Teacher" t ON h."teacherId" = t.id
+            LEFT JOIN "Admin" a ON h."teacherId" = a.id
             LEFT JOIN "Class" c ON h."classId" = c.id
             WHERE 1=1
         `;
@@ -241,9 +301,9 @@ export const gradeSubmission = async (req: AuthRequest, res: Response) => {
         const id = req.params.id as string;
         const { status, feedback } = req.body; // status should be 'GRADED' etc.
 
-        // Check if deadline is passed
+        // Check if deadline is passed and if submission is required
         const checkRes = await db.query(`
-            SELECT h."dueDate" 
+            SELECT h."dueDate", h."isSubmissionRequired"
             FROM "Submission" s
             JOIN "Homework" h ON s."homeworkId" = h.id
             WHERE s.id = $1
@@ -251,8 +311,13 @@ export const gradeSubmission = async (req: AuthRequest, res: Response) => {
 
         if (checkRes.rows.length === 0) return res.status(404).json({ message: 'Submission not found' });
 
-        const dueDate = new Date(checkRes.rows[0].dueDate);
-        if (new Date() < dueDate) {
+        const { dueDate, isSubmissionRequired } = checkRes.rows[0];
+
+        if (!isSubmissionRequired) {
+            return res.status(403).json({ message: 'This assignment does not require grading.' });
+        }
+
+        if (dueDate && new Date() < new Date(dueDate)) {
             return res.status(403).json({ message: 'Grading is only permitted after the submission deadline has passed.' });
         }
 

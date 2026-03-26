@@ -17,6 +17,7 @@ export type SSEEventType =
     | 'attendance:updated'
     | 'homework_created'
     | 'homework_deleted'
+    | 'homework_updated'
     | 'homework_submitted'
     | 'homework_graded'
     | 'result:created'

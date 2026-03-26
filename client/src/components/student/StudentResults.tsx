@@ -31,7 +31,7 @@ function calculateGrade(marks: number, total: number) {
 
 const StudentResults = () => {
     const [reportData, setReportData] = useState<any>(null);
-    const [selectedYear, setSelectedYear] = useState(2025);
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchReport = useCallback(async () => {

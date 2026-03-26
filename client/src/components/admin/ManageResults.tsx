@@ -42,10 +42,10 @@ const ManageResults = () => {
     // Form States
     const [selectedClassId, setSelectedClassId] = useState('');
     const [selectedTerm, setSelectedTerm] = useState('Unit-I');
-    const [selectedYear, setSelectedYear] = useState(2025);
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     
     const [newResult, setNewResult] = useState({
-        studentId: '', semester: 'Unit-I', subject: '', marks: '', totalMarks: '100', academicYear: 2025, grade: ''
+        studentId: '', semester: 'Unit-I', subject: '', marks: '', totalMarks: '100', academicYear: new Date().getFullYear(), grade: ''
     });
 
     const fileInputRef = useRef<HTMLInputElement>(null);

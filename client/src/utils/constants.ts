@@ -90,4 +90,4 @@ export const getFullMarks = (subject: string, semester: string, className?: stri
 export const MAIN_SUBJECTS = Array.from(new Set(Object.values(SUBJECTS_BY_CLASS).flat())).sort();
 
 export const EXAMINATION_TERMS = ['Unit-I', 'Unit-II', 'Unit-III'];
-export const ACADEMIC_YEARS = [2024, 2025, 2026];
+export const ACADEMIC_YEARS = Array.from({ length: 12 }, (_, i) => 2024 + i);

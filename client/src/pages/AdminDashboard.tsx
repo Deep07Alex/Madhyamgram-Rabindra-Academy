@@ -22,6 +22,7 @@ const ManageAssets = lazy(() => import('../components/admin/ManageAssets'));
 const ManageAttendance = lazy(() => import('../components/admin/ManageAttendance'));
 const ManageNotices = lazy(() => import('../components/admin/ManageNotices'));
 const ManageFees = lazy(() => import('../components/admin/ManageFees'));
+const ManageHomework = lazy(() => import('../components/admin/ManageHomework'));
 const AdminOverview = lazy(() => import('../components/admin/AdminOverview'));
 
 import LiveClock from '../components/common/LiveClock';
@@ -41,7 +42,8 @@ import {
     X,
     UserCircle,
     Loader2,
-    Banknote
+    Banknote,
+    BookPlus
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -124,6 +126,7 @@ const AdminDashboard = () => {
         { path: '/admin/results', icon: <FileText size={20} />, label: 'Results' },
         { path: '/admin/fees', icon: <Banknote size={20} />, label: 'Fees' },
         { path: '/admin/notices', icon: <BellRing size={20} />, label: 'Notices' },
+        { path: '/admin/homework', icon: <BookPlus size={20} />, label: 'Assignments' },
         { path: '/admin/assets', icon: <ImageIcon size={20} />, label: 'Manage Assets' },
     ];
 
@@ -222,6 +225,7 @@ const AdminDashboard = () => {
                             <Route path="results" element={<ManageResults />} />
                             <Route path="fees" element={<ManageFees />} />
                             <Route path="notices" element={<ManageNotices />} />
+                            <Route path="homework" element={<ManageHomework />} />
                             <Route path="assets" element={<ManageAssets />} />
                             <Route path="/" element={<Navigate to="/admin/dashboard" />} />
                             <Route path="*" element={<Navigate to="/admin/dashboard" />} />

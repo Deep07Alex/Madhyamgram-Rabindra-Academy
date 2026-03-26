@@ -102,7 +102,7 @@ const StudentHomework = () => {
                     Academic Tasks & Assignments
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', marginTop: '24px' }}>
-                    {assignments.filter((hw: any) => new Date(hw.dueDate).getTime() >= new Date().getTime()).map((hw: any) => {
+                    {assignments.filter((hw: any) => !hw.isSubmissionRequired || new Date(hw.dueDate).getTime() >= new Date().getTime()).map((hw: any) => {
                         const hasSubmitted = hw.submissions?.length > 0;
                         const submission = hw.submissions?.[0];
                         const isPastDue = new Date(hw.dueDate).getTime() < new Date().getTime();
@@ -130,20 +130,26 @@ const StudentHomework = () => {
                                                 {submission.status === 'GRADED' ? <CheckCircle2 size={12} /> : <Clock size={12} />}
                                                 {submission.status}
                                             </span>
-                                        ) : (
+                                        ) : hw.isSubmissionRequired ? (
                                             <span className="badge" style={{ background: '#fff7ed', color: '#c2410c', border: '1px solid #ffedd5', fontSize: '0.7rem' }}>
                                                 Pending Action
+                                            </span>
+                                        ) : (
+                                            <span className="badge" style={{ background: 'var(--primary-soft)', color: 'var(--primary-bold)', border: '1px solid var(--border-soft)', fontSize: '0.7rem' }}>
+                                                Informational
                                             </span>
                                         )}
                                     </div>
                                     <h4 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>{hw.title}</h4>
                                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '20px' }}>{hw.description}</p>
 
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <Calendar size={14} /> Due: {new Date(hw.dueDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                    {hw.isSubmissionRequired && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <Calendar size={14} /> Due: {new Date(hw.dueDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     {hasSubmitted && submission.status === 'GRADED' && submission.feedback && (
                                         <div style={{
@@ -171,25 +177,29 @@ const StudentHomework = () => {
                                     ) : <div></div>}
 
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        {isPastDue ? (
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--error)', fontWeight: 600, background: 'var(--error-soft)', padding: '6px 12px', borderRadius: 'var(--radius-full)' }}>Closed</span>
-                                        ) : !hasSubmitted ? (
-                                            <button onClick={() => {
-                                                setSelectedAssignment(hw);
-                                                setContent('');
-                                                setFile(null);
-                                            }} className="btn-primary" style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', gap: '6px' }}>
-                                                Submit Assignment <ArrowRight size={14} />
-                                            </button>
-                                        ) : canEdit ? (
-                                            <button onClick={() => {
-                                                setSelectedAssignment(hw);
-                                                setContent(submission.content || '');
-                                                setFile(null);
-                                            }} style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-soft)', fontWeight: 600 }}>
-                                                Edit Submission <Send size={14} />
-                                            </button>
-                                        ) : null}
+                                        {hw.isSubmissionRequired ? (
+                                            isPastDue ? (
+                                                <span style={{ fontSize: '0.8rem', color: 'var(--error)', fontWeight: 600, background: 'var(--error-soft)', padding: '6px 12px', borderRadius: 'var(--radius-full)' }}>Closed</span>
+                                            ) : !hasSubmitted ? (
+                                                <button onClick={() => {
+                                                    setSelectedAssignment(hw);
+                                                    setContent('');
+                                                    setFile(null);
+                                                }} className="btn-primary" style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', gap: '6px' }}>
+                                                    Submit Assignment <ArrowRight size={14} />
+                                                </button>
+                                            ) : canEdit ? (
+                                                <button onClick={() => {
+                                                    setSelectedAssignment(hw);
+                                                    setContent(submission.content || '');
+                                                    setFile(null);
+                                                }} style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-soft)', fontWeight: 600 }}>
+                                                    Edit Submission <Send size={14} />
+                                                </button>
+                                            ) : null
+                                        ) : (
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--primary-bold)', fontWeight: 600 }}>Reference Material</span>
+                                        )}
                                     </div>
                                 </div>
                             </div>

@@ -9,6 +9,7 @@
  * - Classroom and submission metrics.
  */
 import { useState } from 'react';
+import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     BellRing,
@@ -21,7 +22,7 @@ import {
     EyeOff
 } from 'lucide-react';
 
-interface TeacherOverviewProps {
+export interface TeacherOverviewProps {
     user: any;
     profile?: any;
     stats: {
@@ -34,7 +35,7 @@ interface TeacherOverviewProps {
     onClearNotices: () => void;
 }
 
-const TeacherOverview = ({
+const TeacherOverview: FC<TeacherOverviewProps> = ({
     user,
     profile,
     stats,

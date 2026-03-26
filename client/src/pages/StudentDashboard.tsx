@@ -84,6 +84,8 @@ const StudentDashboard = () => {
             const localSubmittedIds = storedString ? new Set(JSON.parse(storedString)) : new Set();
 
             const pending = assignments.filter((hw: any) => {
+                if (!hw.isSubmissionRequired) return false;
+
                 // Defensive parsing for PostgreSQL json columns
                 let serverSubmissions = hw.submissions;
                 if (typeof serverSubmissions === 'string') {

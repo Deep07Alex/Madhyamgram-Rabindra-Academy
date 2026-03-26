@@ -8,6 +8,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';
 import {
     createHomework,
+    updateHomework,
     deleteHomework,
     getHomeworks,
     submitHomework,
@@ -20,8 +21,9 @@ const router = Router();
 router.use(authenticate);
 
 // Homework routes
-router.post('/', authorize(['TEACHER']), upload.single('file'), createHomework);
+router.post('/', authorize(['TEACHER', 'ADMIN']), upload.single('file'), createHomework);
 router.get('/', authorize(['ADMIN', 'TEACHER', 'STUDENT']), getHomeworks);
+router.patch('/:id', authorize(['TEACHER', 'ADMIN']), upload.single('file'), updateHomework);
 router.delete('/:id', authorize(['TEACHER', 'ADMIN']), deleteHomework);
 
 // Submission routes

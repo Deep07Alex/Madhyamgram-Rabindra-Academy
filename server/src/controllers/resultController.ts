@@ -25,7 +25,7 @@ export const createResult = async (req: Request, res: Response) => {
              ON CONFLICT ON CONSTRAINT "result_unique_entry" 
              DO UPDATE SET marks = EXCLUDED.marks, "totalMarks" = EXCLUDED."totalMarks", grade = EXCLUDED.grade
              RETURNING *`,
-            [id, semester, subject, parseFloat(marks as string), parseFloat(totalMarks as string), parseInt(academicYear as string || '2025'), grade || null, studentId]
+            [id, semester, subject, parseFloat(marks as string), parseFloat(totalMarks as string), parseInt(academicYear as string || new Date().getFullYear().toString()), grade || null, studentId]
         );
 
         broadcast('result_published', { studentId: resultRes.rows[0].studentId });
@@ -178,7 +178,7 @@ export const bulkUploadResults = async (req: Request, res: Response) => {
 export const getConsolidatedReport = async (req: AuthRequest, res: Response) => {
     try {
         const studentId = req.params.studentId || req.user?.id;
-        const academicYear = parseInt(req.query.academicYear as string || '2025');
+        const academicYear = parseInt(req.query.academicYear as string || new Date().getFullYear().toString());
 
         if (!studentId) return res.status(400).json({ message: 'Missing studentId' });
 
@@ -262,7 +262,8 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
             results: resultsRes.rows,
             attendance: attendanceData,
             rank: myRank,
-            highestMarks
+            highestMarks,
+            academicYear
         });
     } catch (error) {
         console.error('Report fetch error:', error);

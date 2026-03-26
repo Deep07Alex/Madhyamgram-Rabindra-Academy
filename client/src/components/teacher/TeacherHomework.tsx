@@ -41,9 +41,11 @@ const TeacherHomework = () => {
     const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
     const [gradingFeedback, setGradingFeedback] = useState('');
     const [newHomework, setNewHomework] = useState({
-        classId: '', title: '', description: '', subject: '', dueDate: '', allowFileUpload: false
+        classId: '', title: '', description: '', subject: '', dueDate: '', allowFileUpload: false, isSubmissionRequired: true
     });
+    const [editHomework, setEditHomework] = useState<any>(null);
     const [attachedFile, setAttachedFile] = useState<File | null>(null);
+    const [editAttachedFile, setEditAttachedFile] = useState<File | null>(null);
 
     const refreshHomework = useCallback(async () => {
         try {
@@ -96,15 +98,16 @@ const TeacherHomework = () => {
             formData.append('title', newHomework.title);
             formData.append('description', newHomework.description);
             formData.append('subject', newHomework.subject);
-            formData.append('dueDate', newHomework.dueDate);
+            formData.append('dueDate', newHomework.isSubmissionRequired ? newHomework.dueDate : '');
             formData.append('allowFileUpload', String(newHomework.allowFileUpload));
+            formData.append('isSubmissionRequired', String(newHomework.isSubmissionRequired));
             if (attachedFile) formData.append('file', attachedFile);
 
             await api.post('/homework', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             showToast('Assignment deployed successfully!', 'success');
-            setNewHomework({ classId: '', title: '', description: '', subject: '', dueDate: '', allowFileUpload: false });
+            setNewHomework({ classId: '', title: '', description: '', subject: '', dueDate: '', allowFileUpload: false, isSubmissionRequired: true });
             setAttachedFile(null);
             refreshHomework();
         } catch (error) {
@@ -136,6 +139,30 @@ const TeacherHomework = () => {
             console.error('Failed to update submission:', error);
             const msg = error.response?.data?.message || 'Failed to update submission.';
             showToast(msg, 'error');
+        }
+    };
+
+    const handleUpdateHomework = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const formData = new FormData();
+            formData.append('classId', editHomework.classId);
+            formData.append('title', editHomework.title);
+            formData.append('description', editHomework.description);
+            formData.append('subject', editHomework.subject);
+            formData.append('dueDate', editHomework.isSubmissionRequired ? editHomework.dueDate : '');
+            formData.append('allowFileUpload', String(editHomework.allowFileUpload));
+            formData.append('isSubmissionRequired', String(editHomework.isSubmissionRequired));
+            if (editAttachedFile) formData.append('file', editAttachedFile);
+
+            await api.patch(`/homework/${editHomework.id}`, formData);
+            showToast('Assignment updated successfully!', 'success');
+            setEditHomework(null);
+            setEditAttachedFile(null);
+            refreshHomework();
+        } catch (error) {
+            console.error('Failed to update homework:', error);
+            showToast('Failed to update assignment.', 'error');
         }
     };
 
@@ -178,13 +205,54 @@ const TeacherHomework = () => {
                             />
                         </div>
                     </div>
-                    <div className="form-group">
-                        <label>Submission Deadline</label>
-                        <div style={{ position: 'relative' }}>
-                            <Calendar size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                            <input type="date" value={newHomework.dueDate} onClick={(e) => (e.target as any).showPicker?.()} onChange={e => setNewHomework({ ...newHomework, dueDate: e.target.value })} required style={{ paddingLeft: '40px' }} />
-                        </div>
+                    
+                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                        <label
+                            onClick={() => setNewHomework(p => ({ ...p, isSubmissionRequired: !p.isSubmissionRequired }))}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '12px',
+                                padding: '14px 18px', borderRadius: 'var(--radius-md)',
+                                border: `2px solid ${newHomework.isSubmissionRequired ? 'var(--primary)' : 'var(--border-soft)'}`,
+                                background: newHomework.isSubmissionRequired ? 'var(--primary-soft)' : 'var(--bg-main)',
+                                cursor: 'pointer', transition: 'all 0.2s',
+                            }}
+                        >
+                            <div style={{
+                                width: '42px', height: '24px', borderRadius: '12px',
+                                background: newHomework.isSubmissionRequired ? 'var(--primary)' : '#cbd5e1',
+                                position: 'relative', transition: 'background 0.2s', flexShrink: 0
+                            }}>
+                                <div style={{
+                                    position: 'absolute', top: '3px',
+                                    left: newHomework.isSubmissionRequired ? '21px' : '3px',
+                                    width: '18px', height: '18px', borderRadius: '50%',
+                                    background: 'var(--bg-card)', transition: 'left 0.2s',
+                                    boxShadow: '0 1px 4px rgba(0,0,0,0.2)'
+                                }} />
+                            </div>
+                            <div>
+                                <p style={{ margin: 0, fontWeight: '800', fontSize: '0.875rem', color: newHomework.isSubmissionRequired ? 'var(--primary)' : 'var(--text-main)' }}>
+                                    Requires Student Answer/Submission
+                                </p>
+                                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                    {newHomework.isSubmissionRequired
+                                        ? 'Students must provide an answer or file. Includes a deadline and grading.'
+                                        : 'Informational only. Students just view materials, no submission or grading.'}
+                                </p>
+                            </div>
+                        </label>
                     </div>
+
+                    {newHomework.isSubmissionRequired && (
+                        <div className="form-group">
+                            <label>Submission Deadline</label>
+                            <div style={{ position: 'relative' }}>
+                                <Calendar size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                <input type="date" value={newHomework.dueDate} onClick={(e) => (e.target as any).showPicker?.()} onChange={e => setNewHomework({ ...newHomework, dueDate: e.target.value })} required style={{ paddingLeft: '40px' }} />
+                            </div>
+                        </div>
+                    )}
+
                     <div className="form-group" style={{ gridColumn: 'span 2' }}>
                         <label>Detailed Guidelines & Instructions</label>
                         <textarea
@@ -206,45 +274,47 @@ const TeacherHomework = () => {
                         />
                     </div>
                     {/* Allow student file upload toggle */}
-                    <div className="form-group">
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'transparent', marginBottom: '8px', userSelect: 'none' }}>
-                            Spacing Label
-                        </label>
-                        <label
-                            onClick={() => setNewHomework(p => ({ ...p, allowFileUpload: !p.allowFileUpload }))}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: '12px',
-                                padding: '14px 18px', borderRadius: 'var(--radius-md)',
-                                border: `2px solid ${newHomework.allowFileUpload ? 'var(--primary)' : 'var(--border-soft)'}`,
-                                background: newHomework.allowFileUpload ? 'var(--primary-soft)' : 'var(--bg-main)',
-                                cursor: 'pointer', transition: 'all 0.2s',
-                            }}
-                        >
-                            <div style={{
-                                width: '42px', height: '24px', borderRadius: '12px',
-                                background: newHomework.allowFileUpload ? 'var(--primary)' : '#cbd5e1',
-                                position: 'relative', transition: 'background 0.2s', flexShrink: 0
-                            }}>
+                    {newHomework.isSubmissionRequired && (
+                        <div className="form-group">
+                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'transparent', marginBottom: '8px', userSelect: 'none' }}>
+                                Spacing Label
+                            </label>
+                            <label
+                                onClick={() => setNewHomework(p => ({ ...p, allowFileUpload: !p.allowFileUpload }))}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '12px',
+                                    padding: '14px 18px', borderRadius: 'var(--radius-md)',
+                                    border: `2px solid ${newHomework.allowFileUpload ? 'var(--primary)' : 'var(--border-soft)'}`,
+                                    background: newHomework.allowFileUpload ? 'var(--primary-soft)' : 'var(--bg-main)',
+                                    cursor: 'pointer', transition: 'all 0.2s',
+                                }}
+                            >
                                 <div style={{
-                                    position: 'absolute', top: '3px',
-                                    left: newHomework.allowFileUpload ? '21px' : '3px',
-                                    width: '18px', height: '18px', borderRadius: '50%',
-                                    background: 'var(--bg-card)', transition: 'left 0.2s',
-                                    boxShadow: '0 1px 4px rgba(0,0,0,0.2)'
-                                }} />
-                            </div>
-                            <div>
-                                <p style={{ margin: 0, fontWeight: '800', fontSize: '0.875rem', color: newHomework.allowFileUpload ? 'var(--primary)' : 'var(--text-main)' }}>
-                                    Allow Students to Upload Files
-                                </p>
-                                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                    {newHomework.allowFileUpload
-                                        ? 'Students will see a file upload option in their submission form'
-                                        : 'Students can only submit a written text response'}
-                                </p>
-                            </div>
-                        </label>
-                    </div>
+                                    width: '42px', height: '24px', borderRadius: '12px',
+                                    background: newHomework.allowFileUpload ? 'var(--primary)' : '#cbd5e1',
+                                    position: 'relative', transition: 'background 0.2s', flexShrink: 0
+                                }}>
+                                    <div style={{
+                                        position: 'absolute', top: '3px',
+                                        left: newHomework.allowFileUpload ? '21px' : '3px',
+                                        width: '18px', height: '18px', borderRadius: '50%',
+                                        background: 'var(--bg-card)', transition: 'left 0.2s',
+                                        boxShadow: '0 1px 4px rgba(0,0,0,0.2)'
+                                    }} />
+                                </div>
+                                <div>
+                                    <p style={{ margin: 0, fontWeight: '800', fontSize: '0.875rem', color: newHomework.allowFileUpload ? 'var(--primary)' : 'var(--text-main)' }}>
+                                        Allow Students to Upload Files
+                                    </p>
+                                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                        {newHomework.allowFileUpload
+                                            ? 'Students will see a file upload option in their submission form'
+                                            : 'Students can only submit a written text response'}
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+                    )}
                     <div className="form-group" style={{ alignSelf: 'end' }}>
                         <button type="submit" className="btn-primary" style={{ width: '100%', height: '48px' }}>
                             <BookPlus size={18} /> Deploy Assignment
@@ -287,14 +357,23 @@ const TeacherHomework = () => {
                                         </div>
                                     </td>
                                     <td style={{ textAlign: 'center' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                            <Calendar size={14} /> {new Date(hw.dueDate).toLocaleDateString()}
-                                        </div>
+                                        {hw.isSubmissionRequired ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                                <Calendar size={14} /> {new Date(hw.dueDate).toLocaleDateString()}
+                                            </div>
+                                        ) : (
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--primary-bold)', fontWeight: '700' }}>GENERAL INFO</span>
+                                        )}
                                     </td>
                                     <td style={{ textAlign: 'right' }}>
-                                        <button onClick={() => setDeleteModal({ isOpen: true, id: hw.id })} className="btn-danger btn-sm" style={{ padding: '6px 12px' }}>
-                                            <Trash2 size={14} /> Remove
-                                        </button>
+                                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                            <button onClick={() => setEditHomework({ ...hw, dueDate: hw.dueDate ? hw.dueDate.split('T')[0] : '' })} className="btn-primary btn-sm" style={{ padding: '6px 12px' }}>
+                                                <Eye size={14} /> Edit
+                                            </button>
+                                            <button onClick={() => setDeleteModal({ isOpen: true, id: hw.id })} className="btn-danger btn-sm" style={{ padding: '6px 12px' }}>
+                                                <Trash2 size={14} /> Remove
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -313,7 +392,7 @@ const TeacherHomework = () => {
                     label="Select Workspace to Audit"
                     value={selectedHomework}
                     onChange={val => setSelectedHomework(val)}
-                    options={homeworkList.map((hw: any) => ({ value: hw.id, label: `${hw.title} (${hw.class?.name})` }))}
+                    options={homeworkList.filter((hw: any) => hw.isSubmissionRequired).map((hw: any) => ({ value: hw.id, label: `${hw.title} (${hw.class?.name})` }))}
                     icon={<FileText size={16} />}
                     placeholder="Choose Assignment..."
                 />
@@ -545,6 +624,71 @@ const TeacherHomework = () => {
                     </div>
                 );
             })()}
+
+            {/* Edit Assignment Modal */}
+            {editHomework && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(5px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div className="card" style={{ maxWidth: '700px', width: '100%', maxHeight: '90vh', overflowY: 'auto', animation: 'scaleUp 0.3s ease-out' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <h3 style={{ margin: 0 }}>Modify Assignment Profile</h3>
+                            <button onClick={() => setEditHomework(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></button>
+                        </div>
+                        <form onSubmit={handleUpdateHomework} className="form-grid">
+                            <CustomSelect 
+                                label="Target Grade"
+                                value={editHomework.classId}
+                                onChange={val => setEditHomework({ ...editHomework, classId: val })}
+                                options={classes.map((c: any) => ({ value: c.id, label: c.name }))}
+                                icon={<School size={16} />}
+                            />
+                            <CustomSelect 
+                                label="Subject Domain"
+                                value={editHomework.subject}
+                                onChange={val => setEditHomework({ ...editHomework, subject: val })}
+                                options={(SUBJECTS_BY_CLASS[classes.find((c: any) => c.id === editHomework.classId)?.name || ''] || MAIN_SUBJECTS).map(sub => ({ value: sub, label: sub }))}
+                                icon={<GraduationCap size={16} />}
+                            />
+                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                <label>Assignment Objective</label>
+                                <textarea
+                                    value={editHomework.title}
+                                    onChange={e => setEditHomework({ ...editHomework, title: e.target.value })}
+                                    required
+                                    rows={2}
+                                />
+                            </div>
+                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                <label>Detailed Guidelines & Instructions</label>
+                                <textarea
+                                    value={editHomework.description}
+                                    onChange={e => setEditHomework({ ...editHomework, description: e.target.value })}
+                                    rows={4}
+                                />
+                            </div>
+                            {editHomework.isSubmissionRequired && (
+                                <div className="form-group">
+                                    <label>Submission Deadline</label>
+                                    <input type="date" value={editHomework.dueDate} onChange={e => setEditHomework({ ...editHomework, dueDate: e.target.value })} required />
+                                </div>
+                            )}
+                            <div className="form-group">
+                                <FileUploadPicker 
+                                    file={editAttachedFile}
+                                    onChange={setEditAttachedFile}
+                                    label="Replace Reference Document (Optional)"
+                                />
+                                {editHomework.fileUrl && !editAttachedFile && (
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Current: {editHomework.fileUrl.split('/').pop()}</p>
+                                )}
+                            </div>
+                            <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
+                                <button type="button" onClick={() => setEditHomework(null)} className="btn-secondary">Cancel</button>
+                                <button type="submit" className="btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             <ConfirmModal 
                 isOpen={deleteModal.isOpen}

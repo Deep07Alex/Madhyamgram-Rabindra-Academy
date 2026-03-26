@@ -25,6 +25,10 @@ const AssignmentBanner = ({ assignment }: { assignment: Assignment }) => {
 
     useEffect(() => {
         const calculateTime = () => {
+            if (!assignment.dueDate) {
+                setTimeLeft('NO DEADLINE');
+                return;
+            }
             const now = new Date().getTime();
             const due = new Date(assignment.dueDate).getTime();
             const diff = due - now;

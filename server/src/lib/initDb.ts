@@ -148,12 +148,20 @@ export const initDb = async () => {
                 "description" TEXT NOT NULL,
                 "subject" TEXT,
                 "fileUrl" TEXT,
-                "dueDate" TIMESTAMP(3) NOT NULL,
-                "teacherId" TEXT NOT NULL REFERENCES "Teacher"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+                "dueDate" TIMESTAMP(3),
+                "teacherId" TEXT NOT NULL,
                 "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE,
                 "allowFileUpload" BOOLEAN DEFAULT TRUE,
+                "isSubmissionRequired" BOOLEAN DEFAULT TRUE,
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+
+            -- Ensure teacherId isn't strictly bound to Teacher table (Allow Admins)
+            DO $$ BEGIN
+                IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Homework_teacherId_fkey') THEN
+                    ALTER TABLE "Homework" DROP CONSTRAINT "Homework_teacherId_fkey";
+                END IF;
+            END $$;
 
             -- Submission Table
             CREATE TABLE IF NOT EXISTS "Submission" (

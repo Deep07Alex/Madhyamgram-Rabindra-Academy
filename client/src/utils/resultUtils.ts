@@ -104,7 +104,7 @@ export const generateResultPDF = async (data: any) => {
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         doc.line(margin, addressY + 10, pageWidth - margin, addressY + 10);
-        doc.text(`YEARLY PROGRESS REPORT - 2025`, pageWidth / 2, addressY + 18, { align: 'center' });
+        doc.text(`YEARLY PROGRESS REPORT - ${data.academicYear || new Date().getFullYear()}`, pageWidth / 2, addressY + 18, { align: 'center' });
         doc.line(margin, addressY + 22, pageWidth - margin, addressY + 22);
 
 
@@ -314,7 +314,7 @@ export const generateResultPDF = async (data: any) => {
         doc.line(pageWidth - margin - 70, footerY, pageWidth - margin - 10, footerY);
         doc.text('Signature of the Principal', pageWidth - margin - 40, footerY + 5, { align: 'center' });
 
-        doc.save(`${(student.name || 'Report').replace(/\s+/g, '_')}_Progress_Report_2025.pdf`);
+        doc.save(`${(student.name || 'Report').replace(/\s+/g, '_')}_Progress_Report_${data.academicYear || new Date().getFullYear()}.pdf`);
     } catch (err) {
         console.error('Critical Error during PDF generation:', err);
         alert('Failed to generate PDF. Please contact the administrator.');

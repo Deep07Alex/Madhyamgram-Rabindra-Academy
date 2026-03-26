@@ -96,21 +96,26 @@ const InlineStatusEdit = React.memo(({
     const [editing, setEditing] = useState(false);
     const [status, setStatus] = useState<AttendanceStatus | ''>(currentStatus || '');
     const [reason, setReason] = useState(initialReason || '');
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const { showToast } = useToast();
 
     useEffect(() => {
-        if (!editing) {
+        if (!editing && !isSubmitting) {
             setStatus(currentStatus || '');
             setReason(initialReason || '');
         }
-    }, [currentStatus, initialReason, editing]);
+        // Auto-clear submitting state when prop catches up
+        if (isSubmitting && currentStatus === status && (!reason || reason === initialReason)) {
+            setIsSubmitting(false);
+        }
+    }, [currentStatus, initialReason, editing, isSubmitting, status, reason]);
 
     const save = async () => {
         if (!status) {
             showToast('Please select a valid status', 'error');
             return;
         }
-        // Absent reasons are now optional (can be NULL)
+        setIsSubmitting(true);
         try {
             if (attendanceId) {
                 const endpoint = type === 'student'
@@ -132,24 +137,27 @@ const InlineStatusEdit = React.memo(({
             onUpdated(true);
         } catch {
             showToast('Failed to update attendance.', 'error');
+            setIsSubmitting(false);
         }
     };
 
     if (!editing) {
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start', opacity: isSubmitting ? 0.7 : 1, transition: 'opacity 0.2s' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <StatusBadge status={currentStatus} />
-                    <button onClick={() => setEditing(true)} style={{
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        color: 'var(--text-muted)', padding: '2px', display: 'flex'
-                    }} title="Edit">
-                        <Pencil size={14} />
-                    </button>
+                    <StatusBadge status={(isSubmitting && status) ? (status as AttendanceStatus) : currentStatus} />
+                    {!isSubmitting && (
+                        <button onClick={() => setEditing(true)} style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: 'var(--text-muted)', padding: '2px', display: 'flex'
+                        }} title="Edit">
+                            <Pencil size={14} />
+                        </button>
+                    )}
                 </div>
-                {type === 'teacher' && currentStatus === 'ABSENT' && reason && (
+                {type === 'teacher' && (isSubmitting ? status : currentStatus) === 'ABSENT' && (reason || initialReason) && (
                     <span style={{ fontSize: '0.75rem', color: '#ef4444', background: 'var(--bg-main)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                        {reason}
+                        {isSubmitting ? reason : initialReason}
                     </span>
                 )}
             </div>
@@ -207,20 +215,29 @@ const InlineTimeEdit = React.memo(({
 }) => {
     const [editing, setEditing] = useState(false);
     const [time, setTime] = useState(initialTime || '');
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const { showToast } = useToast();
 
     useEffect(() => {
-        if (!editing) setTime(initialTime || '');
-    }, [initialTime, editing]);
+        if (!editing && !isSubmitting) setTime(initialTime || '');
+        // Sync submitting state if prop catches up (null/empty string equivalence check)
+        if (isSubmitting && (initialTime === time || (!initialTime && !time))) {
+            setIsSubmitting(false);
+        }
+    }, [initialTime, editing, isSubmitting, time]);
 
     const save = async () => {
+        // If user cleared the input, treat as null
+        const timeToSave = time.trim() || null;
+
+        setIsSubmitting(true);
         try {
             const status = currentStatus || 'PRESENT';
             const payload = {
                 status,
                 reason: currentReason,
-                arrivalTime: type === 'arrival' ? time : otherTime,
-                departureTime: type === 'departure' ? time : otherTime
+                arrivalTime: type === 'arrival' ? timeToSave : otherTime,
+                departureTime: type === 'departure' ? timeToSave : otherTime
             };
 
             if (attendanceId) {
@@ -237,14 +254,15 @@ const InlineTimeEdit = React.memo(({
             onUpdated(true);
         } catch {
             showToast('Failed to update time.', 'error');
+            setIsSubmitting(false);
         }
     };
 
     if (!editing) {
         return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-main)' }} onClick={() => setEditing(true)}>
-                <span>{initialTime || '—'}</span>
-                <Pencil size={12} style={{ opacity: 0.5 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: isSubmitting ? 'default' : 'pointer', color: 'var(--text-main)', opacity: isSubmitting ? 0.6 : 1 }} onClick={() => !isSubmitting && setEditing(true)}>
+                <span>{(isSubmitting ? time : initialTime) || '—'}</span>
+                {!isSubmitting && <Pencil size={12} style={{ opacity: 0.5 }} />}
             </div>
         );
     }
@@ -387,7 +405,7 @@ const TeacherAttendanceRow = React.memo(({
             </td>
             <td style={{ padding: '14px 20px', fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: '600' }}>
                 {dateFilter ? (
-                    <InlineTimeEdit 
+                    <InlineTimeEdit
                         attendanceId={row.attendanceId}
                         personId={row.id}
                         date={dateFilter}
@@ -404,7 +422,7 @@ const TeacherAttendanceRow = React.memo(({
             </td>
             <td style={{ padding: '14px 20px', fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: '600' }}>
                 {dateFilter ? (
-                    <InlineTimeEdit 
+                    <InlineTimeEdit
                         attendanceId={row.attendanceId}
                         personId={row.id}
                         date={dateFilter}
@@ -534,10 +552,10 @@ const ManageAttendance = () => {
     const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
     const [search, setSearch] = useState('');
 
-    // ── Fetch students + attendance for date ──────────────────────────────
+    // ── Fetch students + attendance for date
     const fetchStudentData = useCallback(async (silent = false) => {
         if (viewMode !== 'daily') return;
-        if (!silent) {}
+        if (!silent) { }
         try {
             const [stuRes, attRes, clsRes] = await Promise.all([
                 api.get('/users/students', {
@@ -593,10 +611,11 @@ const ManageAttendance = () => {
         }
     }, [dateFilter, viewMode, showToast, page, limit, selectedClass, search]);
 
+
     // ── Fetch teachers + attendance for date ──────────────────────────────
     const fetchTeacherData = useCallback(async (silent = false) => {
         if (viewMode !== 'daily') return;
-        if (!silent) {}
+        if (!silent) { }
         try {
             const [teachRes, attRes] = await Promise.all([
                 api.get('/users/teachers', {
@@ -661,7 +680,7 @@ const ManageAttendance = () => {
             return;
         }
 
-        if (!silent) {}
+        if (!silent) { }
         try {
             // Calculate start and end dates
             let startDate = `${monthFilter}-01`;
@@ -800,8 +819,8 @@ const ManageAttendance = () => {
                         padding: '10px 20px',
                         borderRadius: '12px',
                         border: `1px solid ${attendanceStatus === 'OPEN' ? '#22c55e' :
-                                attendanceStatus === 'CLOSED' ? '#ef4444' :
-                                    'var(--border-soft)'
+                            attendanceStatus === 'CLOSED' ? '#ef4444' :
+                                'var(--border-soft)'
                             }`,
                         background:
                             attendanceStatus === 'OPEN' ? '#22c55e10' :
@@ -984,7 +1003,7 @@ const ManageAttendance = () => {
                             </tr>
                         </thead>
                         <tbody key={page} className="animate-fade-in">
-                            {(tab === 'students' ? filteredStudents : filteredTeachers).length > 0 ? 
+                            {(tab === 'students' ? filteredStudents : filteredTeachers).length > 0 ?
                                 (tab === 'students' ? filteredStudents : filteredTeachers).map((row: any) => (
                                     tab === 'students' ? (
                                         <StudentAttendanceRow
@@ -1007,18 +1026,18 @@ const ManageAttendance = () => {
                                         />
                                     )
                                 )) : (
-                                <tr>
-                                    <td colSpan={tab === 'students' ? 4 : 5} style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-                                            <Users size={48} style={{ opacity: 0.1 }} />
-                                            <div>
-                                                <p style={{ fontWeight: '600', fontSize: '1.1rem', margin: 0 }}>No records matches your criteria</p>
-                                                <p style={{ fontSize: '0.85rem', margin: '4px 0 0' }}>Try adjusting your filters or search query</p>
+                                    <tr>
+                                        <td colSpan={tab === 'students' ? 4 : 5} style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                                                <Users size={48} style={{ opacity: 0.1 }} />
+                                                <div>
+                                                    <p style={{ fontWeight: '600', fontSize: '1.1rem', margin: 0 }}>No records matches your criteria</p>
+                                                    <p style={{ fontSize: '0.85rem', margin: '4px 0 0' }}>Try adjusting your filters or search query</p>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )}
+                                        </td>
+                                    </tr>
+                                )}
                         </tbody>
                     </table>
                 </div>

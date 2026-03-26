@@ -14,6 +14,8 @@ import {
     ReceiptText, ClipboardList, Calendar, RefreshCw
 } from 'lucide-react';
 
+import { ACADEMIC_YEARS } from '../../utils/constants';
+
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -238,8 +240,13 @@ const MonthlyFeeTab = () => {
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
                         <label>Academic Year</label>
-                        <input type="number" value={form.academicYear}
-                            onChange={e => setForm(f => ({ ...f, academicYear: parseInt(e.target.value) }))} />
+                        <select
+                            value={form.academicYear}
+                            onChange={e => setForm(f => ({ ...f, academicYear: parseInt(e.target.value) }))}
+                            style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.9rem' }}
+                        >
+                            {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
                         <label>Fee (₹)</label>
