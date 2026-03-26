@@ -6,7 +6,7 @@ import CustomSelect from '../common/CustomSelect';
  * Clock Out Modal Component
  * Prompted when a teacher ends their day.
  */
-export const ClockOutModal = React.memo(({ onClockOut, onCancel, isSubmitting }: { onClockOut: (reason?: string) => void, onCancel: () => void, isSubmitting: boolean }) => {
+export const ClockOutModal = React.memo(({ onClockOut, onCancel, isSubmitting, isMandatory }: { onClockOut: (reason?: string) => void, onCancel: () => void, isSubmitting: boolean, isMandatory?: boolean }) => {
     const [reason, setReason] = useState('');
 
     return (
@@ -24,9 +24,11 @@ export const ClockOutModal = React.memo(({ onClockOut, onCancel, isSubmitting }:
                     <LogOut size={32} color="#dc2626" />
                 </div>
 
-                <h2 style={{ marginBottom: '8px', fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)' }}>End Your Day?</h2>
+                <h2 style={{ marginBottom: '8px', fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)' }}>{isMandatory ? 'Mandatory Check Out' : 'End Your Day?'}</h2>
                 <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontSize: '0.9rem' }}>
-                    Confirm your departure time. You can optionally provide a reason if leaving before scheduled hours.
+                    {isMandatory 
+                        ? 'The school day has ended (3:30 PM). Please record your dispersal time to proceed.' 
+                        : 'Confirm your departure time. You can optionally provide a reason if leaving before scheduled hours.'}
                 </p>
 
                 <div style={{ display: 'grid', gap: '20px', textAlign: 'left' }}>
@@ -42,23 +44,25 @@ export const ClockOutModal = React.memo(({ onClockOut, onCancel, isSubmitting }:
                         />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
-                        <button
-                            className="btn-secondary"
-                            style={{ padding: '14px', borderRadius: '12px', border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 700 }}
-                            onClick={onCancel}
-                            disabled={isSubmitting}
-                        >
-                            Cancel
-                        </button>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMandatory ? '1fr' : '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                        {!isMandatory && (
+                            <button
+                                className="btn-secondary"
+                                style={{ padding: '14px', borderRadius: '12px', border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 700 }}
+                                onClick={onCancel}
+                                disabled={isSubmitting}
+                            >
+                                Cancel
+                            </button>
+                        )}
                         <button
                             className="btn-primary"
-                            style={{ padding: '14px', borderRadius: '12px', background: '#dc2626', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                            style={{ padding: '14px', borderRadius: '12px', background: isMandatory ? 'var(--primary-bold)' : '#dc2626', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                             onClick={() => onClockOut(reason.trim() || undefined)}
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <LogOut size={20} />}
-                            {isSubmitting ? 'Logging...' : 'Clock Out'}
+                            {isSubmitting ? 'Logging...' : isMandatory ? 'Record Dispersal' : 'Check Out'}
                         </button>
                     </div>
                 </div>

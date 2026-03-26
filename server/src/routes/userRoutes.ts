@@ -6,7 +6,7 @@
  */
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
-import { getStudents, getTeachers, getClasses, createClass, deleteStudent, deleteTeacher, deleteClass, updateUserPassword, updateStudent, updateTeacher, assignTeacherToClass, removeTeacherFromClass, bulkStudentImport, deleteAllStudents, enrollStudent } from '../controllers/userController.js';
+import { getStudents, getTeachers, getClasses, createClass, deleteStudent, deleteTeacher, deleteClass, updateUserPassword, updateStudent, updateTeacher, assignTeacherToClass, removeTeacherFromClass, bulkStudentImport, deleteAllStudents, enrollStudent, downloadStudentCredentials } from '../controllers/userController.js';
 import multer from 'multer';
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -27,6 +27,7 @@ router.patch('/teachers/:id', authorize(['ADMIN']), updateTeacher);
 router.delete('/classes/:id', authorize(['ADMIN']), deleteClass);
 router.patch('/:id/password', authorize(['ADMIN']), updateUserPassword);
 router.post('/students/bulk', authorize(['ADMIN']), upload.single('file'), bulkStudentImport);
+router.get('/students/download-credentials', authorize(['ADMIN']), downloadStudentCredentials);
 
 // Class-Teacher Assignments
 router.post('/classes/:id/teachers', authorize(['ADMIN']), assignTeacherToClass);

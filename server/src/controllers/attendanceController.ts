@@ -317,16 +317,45 @@ export const updateStudentAttendance = async (req: AuthRequest, res: Response) =
  */
 export const updateTeacherAttendance = async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
-    const { status, reason } = req.body;
+    const { status, reason, arrivalTime, departureTime } = req.body;
+    const reasonProvided = req.body.hasOwnProperty('reason');
+    const arrivalProvided = req.body.hasOwnProperty('arrivalTime');
+    const departureProvided = req.body.hasOwnProperty('departureTime');
 
     if (!['PRESENT', 'ABSENT'].includes(status)) {
         return res.status(400).json({ message: 'Invalid status value' });
     }
 
     try {
+        console.log(`Admin updating teacher attendance ${id}:`, req.body);
+        
         const result = await db.query(
-            `UPDATE "TeacherAttendance" SET status = $1, reason = $2 WHERE id = $3 RETURNING *`,
-            [status, status === 'ABSENT' ? reason : null, id]
+            `UPDATE "TeacherAttendance" 
+             SET status = CAST($1 AS "AttendanceStatus"), 
+                 reason = CASE 
+                    WHEN $1 = 'ABSENT' THEN (CASE WHEN $6 = true THEN $2 ELSE reason END) 
+                    ELSE NULL 
+                 END,
+                 "arrivalTime" = CASE 
+                    WHEN $1 = 'ABSENT' THEN NULL 
+                    ELSE (CASE WHEN $7 = true THEN $3 ELSE "arrivalTime" END) 
+                 END,
+                 "departureTime" = CASE 
+                    WHEN $1 = 'ABSENT' THEN NULL 
+                    ELSE (CASE WHEN $8 = true THEN $4 ELSE "departureTime" END) 
+                 END
+             WHERE id = $5 
+             RETURNING *`,
+            [
+                status, 
+                reason || null, 
+                arrivalTime || null, 
+                departureTime || null, 
+                id,
+                reasonProvided,
+                arrivalProvided,
+                departureProvided
+            ]
         );
         if (result.rowCount === 0) {
             return res.status(404).json({ message: 'Attendance record not found' });

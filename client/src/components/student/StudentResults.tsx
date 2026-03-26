@@ -11,7 +11,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import useServerEvents from '../../hooks/useServerEvents';
 import { generateResultPDF } from '../../utils/resultUtils';
-import { ACADEMIC_YEARS } from '../../utils/constants';
+import { ACADEMIC_YEARS, SUBJECTS_BY_CLASS } from '../../utils/constants';
 import CustomSelect from '../common/CustomSelect';
 import {
     Award, TrendingUp, FileText, Calendar, Target,
@@ -80,8 +80,12 @@ const StudentResults = () => {
 
     const { student, results, attendance, rank } = reportData;
 
-    // Build unique subject list in order of first appearance
-    const subjects: string[] = Array.from(new Set(results.map((r: any) => r.subject)));
+    // Build unique subject list and sort by prescribed order
+    const subjectsList = SUBJECTS_BY_CLASS[student.className] || [];
+    const subjects: string[] = Array.from(new Set(results.map((r: any) => r.subject))) as string[];
+    if (subjectsList.length > 0) {
+        subjects.sort((a, b) => subjectsList.indexOf(a) - subjectsList.indexOf(b));
+    }
 
     // Helper to find a unit result for a given subject
     const getResult = (sub: string, sem: string) =>

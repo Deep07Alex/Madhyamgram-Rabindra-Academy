@@ -71,20 +71,51 @@ export const bulkUploadResults = async (req: Request, res: Response) => {
         const resultsToInsert = [];
         const ignoredColumns = ['Admission No', 'Roll', 'Name', 'Admission Regn. No.', 'Admission Register No'];
 
-        for (const row of dataRows) {
+        // Determine if first row is "Full Marks" row
+        let fullMarksRow = dataRows[0];
+        let startIndex = 0;
+        const isFullMarksRow = String(fullMarksRow['Name'] || fullMarksRow['Roll']).includes('Full Marks');
+        
+        if (isFullMarksRow) {
+            startIndex = 1;
+            console.log('Detected Full Marks row in Excel');
+        } else {
+            fullMarksRow = null;
+        }
+
+        for (let i = startIndex; i < dataRows.length; i++) {
+            const row = dataRows[i];
             const rawAdmissionNo = row['Admission No'] || row['Admission Regn. No.'] || row['Admission Register No'];
             if (!rawAdmissionNo) continue;
 
             const admissionNo = String(rawAdmissionNo).trim();
             const studentDbId = studentMap.get(admissionNo);
 
-            if (!studentDbId) continue;
+            if (!studentDbId) {
+                console.warn(`Student not found for Admission No: ${admissionNo}`);
+                continue;
+            }
 
             for (const key of Object.keys(row)) {
                 if (ignoredColumns.includes(key)) continue;
 
-                const marks = parseFloat(row[key]);
+                const marksValue = row[key];
+                if (marksValue === undefined || marksValue === null || marksValue === '') continue;
+                
+                const marks = parseFloat(marksValue);
                 if (isNaN(marks)) continue;
+
+                // Determine total marks for this subject
+                let totalMarks = 100;
+                if (fullMarksRow && fullMarksRow[key]) {
+                    totalMarks = parseFloat(fullMarksRow[key]) || 100;
+                } else {
+                    // Fallback to 100 or term-based logic if row is missing
+                    totalMarks = (semester === 'Unit-III') ? 100 : 50;
+                    // Special case for computer if not in row
+                    if (key.includes('Computer Oral') || key.includes('Computer Written')) totalMarks = (semester === 'Unit-III') ? 20 : 10;
+                    if (key.includes('Computer Practical')) totalMarks = (semester === 'Unit-III') ? 80 : 40;
+                }
 
                 resultsToInsert.push({
                     id: crypto.randomUUID(),
@@ -93,8 +124,8 @@ export const bulkUploadResults = async (req: Request, res: Response) => {
                     semester,
                     academicYear: parseInt(academicYear),
                     marks: marks,
-                    totalMarks: 100, // Default base
-                    grade: calculateGrade(marks, 100)
+                    totalMarks: totalMarks,
+                    grade: calculateGrade(marks, totalMarks)
                 });
             }
         }

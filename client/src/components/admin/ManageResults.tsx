@@ -10,7 +10,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
-import { MAIN_SUBJECTS, EXAMINATION_TERMS, ACADEMIC_YEARS } from '../../utils/constants';
+import { MAIN_SUBJECTS, EXAMINATION_TERMS, ACADEMIC_YEARS, SUBJECTS_BY_CLASS, getFullMarks } from '../../utils/constants';
 import { FilePlus, List, Trash2, Download, Upload, FileSpreadsheet, Loader2, Search, X, Calendar, GraduationCap, School, FileCheck } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import * as XLSX from 'xlsx';
@@ -88,7 +88,20 @@ const ManageResults = () => {
 
     useEffect(() => {
         fetchData();
-    }, [selectedYear, selectedTerm]);
+        // Update newResult totalMarks when term changes
+        if (newResult.subject) {
+            const className = classes.find(c => c.id === selectedClassId)?.name;
+            setNewResult(prev => ({ ...prev, totalMarks: getFullMarks(prev.subject, selectedTerm, className).toString() }));
+        }
+    }, [selectedYear, selectedTerm, selectedClassId]);
+
+    // Update totalMarks when subject changes in manual entry
+    useEffect(() => {
+        if (newResult.subject) {
+            const className = classes.find(c => c.id === selectedClassId)?.name;
+            setNewResult(prev => ({ ...prev, totalMarks: getFullMarks(prev.subject, selectedTerm, className).toString() }));
+        }
+    }, [newResult.subject, selectedTerm, selectedClassId]);
 
     const handleCreateResult = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -128,11 +141,13 @@ const ManageResults = () => {
         const classStudents = students.filter((s: any) => s.classId === selectedClassId);
         if (classStudents.length === 0) return showToast('No students found in this class', 'error');
 
-        // Prepare Header rows (One row for subjects)
-        const headers = ['Admission No', 'Roll', 'Name', ...MAIN_SUBJECTS];
-        const data = classStudents.map(s => [s.studentId, s.rollNumber, s.name, ...MAIN_SUBJECTS.map(() => '')]);
+        // Prepare Header rows (Subjects + Full Marks)
+        const subjectsList = SUBJECTS_BY_CLASS[selectedClass.name] || MAIN_SUBJECTS;
+        const headers = ['Admission No', 'Roll', 'Name', ...subjectsList];
+        const fullMarksRow = ['', '', 'Full Marks', ...subjectsList.map(sub => getFullMarks(sub, selectedTerm, selectedClass.name))];
+        const data = classStudents.map(s => [s.studentId, s.rollNumber, s.name, ...subjectsList.map(() => '')]);
 
-        const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
+        const worksheet = XLSX.utils.aoa_to_sheet([headers, fullMarksRow, ...data]);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Results');
         
@@ -357,7 +372,7 @@ const ManageResults = () => {
                             label="Subject"
                             value={newResult.subject}
                             onChange={val => setNewResult({ ...newResult, subject: val })}
-                            options={MAIN_SUBJECTS.map(sub => ({ value: sub, label: sub }))}
+                            options={(SUBJECTS_BY_CLASS[classes.find(c => c.id === selectedClassId)?.name || ''] || MAIN_SUBJECTS).map(sub => ({ value: sub, label: sub }))}
                             placeholder="Choose Subject..."
                         />
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>

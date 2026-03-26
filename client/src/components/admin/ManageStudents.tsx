@@ -219,6 +219,30 @@ const ManageStudents = () => {
         }
     };
 
+    const downloadCredentials = async () => {
+        try {
+            const response = await api.get('/users/students/download-credentials', {
+                params: { classId: selectedClassId },
+                responseType: 'blob'
+            });
+            
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            const className = selectedClassId 
+                ? (classes.find((c: any) => c.id === selectedClassId)?.name || 'Class')
+                : 'All_Classes';
+            link.setAttribute('download', `Student_Credentials_${className}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            showToast('Credentials downloaded successfully', 'success');
+        } catch (error: any) {
+            console.error('Failed to download credentials:', error);
+            showToast('Failed to download credentials', 'error');
+        }
+    };
+
     // Reset to page 1 when search or class changes
     useEffect(() => {
         setPage(1);
@@ -467,6 +491,23 @@ const ManageStudents = () => {
                             icon={<School size={16} />}
                             placeholder="All Classes"
                         />
+                        <button 
+                            onClick={downloadCredentials}
+                            className="btn-secondary"
+                            style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px', 
+                                padding: '10px 16px', 
+                                fontSize: '0.85rem', 
+                                fontWeight: 700,
+                                background: 'var(--primary-bold)',
+                                color: 'white',
+                                border: 'none'
+                            }}
+                        >
+                            <Download size={16} /> Download {selectedClassId ? 'Class' : 'All'} Credentials
+                        </button>
                         <div style={{ position: 'relative', width: '250px' }}>
                             <input
                                 type="text"

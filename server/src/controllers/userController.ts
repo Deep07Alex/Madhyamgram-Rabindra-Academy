@@ -865,4 +865,49 @@ export const updateUserPassword = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Generates an Excel sheet containing student login IDs and passwords.
+ * Useful for distribution when accounts are first created or reset.
+ */
+export const downloadStudentCredentials = async (req: AuthRequest, res: Response) => {
+    try {
+        const { classId } = req.query;
+        let query = `
+            SELECT s."studentId", s.name, s."plainPassword", c.name as "className", s."rollNumber"
+            FROM "Student" s
+            JOIN "Class" c ON s."classId" = c.id
+        `;
+        const params = [];
+        if (classId) {
+            query += ` WHERE s."classId" = $1`;
+            params.push(classId);
+        }
+        query += ` ORDER BY c.grade ASC, CAST(s."rollNumber" AS INTEGER) ASC`;
+
+        const studentsRes = await db.query(query, params);
+        
+        const data = studentsRes.rows.map(row => ({
+            'Class': row.className,
+            'Roll Number': row.rollNumber,
+            'Student Name': row.name,
+            'Login ID': row.studentId,
+            'Password': row.plainPassword
+        }));
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb, ws, "Student Credentials");
+        
+        const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=student_credentials.xlsx');
+        res.send(buffer);
+
+    } catch (error) {
+        console.error('Error downloading credentials:', error);
+        res.status(500).json({ message: 'Error downloading credentials' });
+    }
+};
+
 

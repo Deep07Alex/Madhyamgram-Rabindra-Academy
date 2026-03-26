@@ -28,11 +28,15 @@ const FINAL_JWT_SECRET = JWT_SECRET || 'dev_fallback_secret_key_123_change_for_p
  */
 export const login = async (req: Request, res: Response) => {
     // The frontend sends 'username' but it functionally acts as the login ID
-    const { username: loginId, password, role: requestedRole } = req.body;
+    const { username: rawLoginId, password: rawPassword, role: requestedRole } = req.body;
+    const loginId = (rawLoginId || '').trim();
+    const password = (rawPassword || '').trim();
 
     if (!requestedRole) {
         return res.status(400).json({ message: 'User role is required' });
     }
+
+    console.log('[DEBUG] Login attempt:', { loginId, role: requestedRole });
 
     try {
         let userData: any = null;
@@ -50,6 +54,9 @@ export const login = async (req: Request, res: Response) => {
             );
             if (adminRes.rows.length > 0) {
                 userData = adminRes.rows[0];
+                console.log('[DEBUG] User found in Admin table:', userData.adminId);
+            } else {
+                console.log('[DEBUG] User NOT found in Admin table for ID:', adminLoginId);
             }
         } else if (role === 'TEACHER') {
             let teacherLoginId = loginId;
@@ -105,6 +112,7 @@ export const login = async (req: Request, res: Response) => {
         }
 
         const isPasswordValid = await bcrypt.compare(password, userData.password);
+        console.log('[DEBUG] Password valid:', isPasswordValid);
         if (!isPasswordValid) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }

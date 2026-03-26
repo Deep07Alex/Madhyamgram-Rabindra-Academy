@@ -143,9 +143,12 @@ export const generateResultPDF = async (data: any) => {
         doc.line(margin, infoY + 14, pageWidth - margin, infoY + 14);
 
         // 5. Marks Table (Dominant Center)
-        const subjectsList = ['Bengali Literature', 'Bengali Language', 'English Literature', 'English Language', 'Hindi', 'Mathematics', 'Science', 'History', 'Geography', 'General Knowledge', 'Computer Written', 'Computer Practical', 'Physical Education', 'Work Education', 'Spoken English', 'Project'];
-        const actualSubjects = Array.from(new Set(results.map((r: any) => r.subject)));
-        const listToUse = actualSubjects.length > 0 ? actualSubjects : subjectsList;
+        const { SUBJECTS_BY_CLASS } = await import('./constants');
+        const subjectsList = SUBJECTS_BY_CLASS[student.className] || [
+            'Bengali Literature', 'Bengali Language', 'English Literature', 'English Language', 'Hindi', 'Mathematics', 'Science', 'History', 'Geography', 'General Knowledge', 'Computer Written', 'Computer Practical', 'Physical Education', 'Work Education', 'Spoken English', 'Project'
+        ];
+        const actualSubjects = Array.from(new Set(results.map((r: any) => r.subject))) as string[];
+        const listToUse = actualSubjects.length > 0 ? actualSubjects.sort((a, b) => subjectsList.indexOf(a) - subjectsList.indexOf(b)) : subjectsList;
 
         const tableData = listToUse.map(subject => {
             const getMarks = (sem: string) => results.find((r: any) => r.subject === subject && r.semester === sem);
@@ -172,11 +175,26 @@ export const generateResultPDF = async (data: any) => {
         const grandTotalObtained = listToUse.reduce((acc: number, sub: any) => acc + results.filter((r: any) => r.subject === sub).reduce((a: number, b: any) => a + (b.marks || 0), 0), 0);
         const grandTotalFull = listToUse.reduce((acc: number, sub: any) => acc + results.filter((r: any) => r.subject === sub).reduce((a: number, b: any) => a + (b.totalMarks || 0), 0), 0);
 
+        const getSemesterTotals = (sem: string) => {
+            const semResults = listToUse.map(sub => results.find((r: any) => r.subject === sub && r.semester === sem)).filter(Boolean);
+            return {
+                fm: semResults.reduce((a, r) => a + (r.totalMarks || 0), 0),
+                mo: semResults.reduce((a, r) => a + (r.marks || 0), 0)
+            };
+        };
+
+        const t1 = getSemesterTotals('Unit-I');
+        const t2 = getSemesterTotals('Unit-II');
+        const t3 = getSemesterTotals('Unit-III');
+
         tableData.push([
             { content: 'Grand Total', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
-            { content: (grandTotalFull / 3).toFixed(0), colSpan: 2, styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
-            { content: (grandTotalFull / 3).toFixed(0), colSpan: 2, styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
-            { content: (grandTotalFull / 3).toFixed(0), colSpan: 2, styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
+            { content: t1.fm || '-', colSpan: 1, styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
+            { content: t1.mo || '-', colSpan: 1, styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
+            { content: t2.fm || '-', colSpan: 1, styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
+            { content: t2.mo || '-', colSpan: 1, styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
+            { content: t3.fm || '-', colSpan: 1, styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
+            { content: t3.mo || '-', colSpan: 1, styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
             { content: grandTotalFull.toString(), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
             { content: grandTotalObtained.toString(), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },
             { content: calculateGrade(grandTotalObtained, grandTotalFull), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } },

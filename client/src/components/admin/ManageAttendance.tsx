@@ -110,10 +110,7 @@ const InlineStatusEdit = React.memo(({
             showToast('Please select a valid status', 'error');
             return;
         }
-        if (type === 'teacher' && status === 'ABSENT' && !reason.trim()) {
-            showToast('Please provide an absent reason for the teacher.', 'error');
-            return;
-        }
+        // Absent reasons are now optional (can be NULL)
         try {
             if (attendanceId) {
                 const endpoint = type === 'student'
@@ -194,6 +191,88 @@ const InlineStatusEdit = React.memo(({
         </div>
     );
 });
+
+const InlineTimeEdit = React.memo(({
+    attendanceId, personId, date, type, initialTime, currentStatus, currentReason, otherTime, onUpdated
+}: {
+    attendanceId: string | null;
+    personId: string;
+    date: string;
+    type: 'arrival' | 'departure';
+    initialTime: string | null;
+    currentStatus: AttendanceStatus | null;
+    currentReason?: string | null;
+    otherTime: string | null;
+    onUpdated: (silent?: boolean) => void;
+}) => {
+    const [editing, setEditing] = useState(false);
+    const [time, setTime] = useState(initialTime || '');
+    const { showToast } = useToast();
+
+    useEffect(() => {
+        if (!editing) setTime(initialTime || '');
+    }, [initialTime, editing]);
+
+    const save = async () => {
+        try {
+            const status = currentStatus || 'PRESENT';
+            const payload = {
+                status,
+                reason: currentReason,
+                arrivalTime: type === 'arrival' ? time : otherTime,
+                departureTime: type === 'departure' ? time : otherTime
+            };
+
+            if (attendanceId) {
+                await api.patch(`/attendance/admin/teacher/${attendanceId}`, payload);
+            } else {
+                await api.post('/attendance/teacher', {
+                    date,
+                    ...payload,
+                    teacherId: personId
+                });
+            }
+            showToast('Time updated!', 'success');
+            setEditing(false);
+            onUpdated(true);
+        } catch {
+            showToast('Failed to update time.', 'error');
+        }
+    };
+
+    if (!editing) {
+        return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-main)' }} onClick={() => setEditing(true)}>
+                <span>{initialTime || '—'}</span>
+                <Pencil size={12} style={{ opacity: 0.5 }} />
+            </div>
+        );
+    }
+
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <input
+                type="text"
+                value={time}
+                placeholder="HH:MM:SS"
+                onChange={e => setTime(e.target.value)}
+                autoFocus
+                style={{
+                    border: '1px solid var(--border-soft)', borderRadius: '4px',
+                    padding: '2px 6px', fontSize: '0.8rem', width: '85px',
+                    background: 'var(--bg-input)', color: 'var(--text-main)'
+                }}
+            />
+            <button onClick={(e) => { e.stopPropagation(); save(); }} style={{ background: '#22c55e', border: 'none', borderRadius: '4px', padding: '2px 4px', cursor: 'pointer', color: 'white' }}>
+                <Check size={12} />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); setEditing(false); }} style={{ background: '#ef4444', border: 'none', borderRadius: '4px', padding: '2px 4px', cursor: 'pointer', color: 'white' }}>
+                <X size={12} />
+            </button>
+        </div>
+    );
+});
+
 
 const MonthlySummaryDisplay = React.memo(({ personId, dataMap }: { personId: string; dataMap: Record<string, Record<string, any>> }) => {
     const records = dataMap[personId] || {};
@@ -307,10 +386,38 @@ const TeacherAttendanceRow = React.memo(({
                 )}
             </td>
             <td style={{ padding: '14px 20px', fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: '600' }}>
-                {row.arrivalTime || '—'}
+                {dateFilter ? (
+                    <InlineTimeEdit 
+                        attendanceId={row.attendanceId}
+                        personId={row.id}
+                        date={dateFilter}
+                        type="arrival"
+                        initialTime={row.arrivalTime}
+                        otherTime={row.departureTime}
+                        currentStatus={row.status}
+                        currentReason={row.reason}
+                        onUpdated={fetchTeacherData}
+                    />
+                ) : (
+                    row.arrivalTime || '—'
+                )}
             </td>
             <td style={{ padding: '14px 20px', fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: '600' }}>
-                {row.departureTime || '—'}
+                {dateFilter ? (
+                    <InlineTimeEdit 
+                        attendanceId={row.attendanceId}
+                        personId={row.id}
+                        date={dateFilter}
+                        type="departure"
+                        initialTime={row.departureTime}
+                        otherTime={row.arrivalTime}
+                        currentStatus={row.status}
+                        currentReason={row.reason}
+                        onUpdated={fetchTeacherData}
+                    />
+                ) : (
+                    row.departureTime || '—'
+                )}
             </td>
             <td style={{ padding: '14px 20px' }}>
                 {viewMode === 'daily' ? (
