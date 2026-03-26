@@ -12,7 +12,9 @@ import {
     getAdmissionFees,
     getAdmissionDueReport,
     lookupStudent,
-    searchStudents
+    searchStudents,
+    deleteMonthlyFee,
+    deleteAdmissionFee
 } from '../controllers/feesController.js';
 
 const router = Router();
@@ -26,10 +28,12 @@ router.get('/search', searchStudents);
 router.post('/monthly', recordMonthlyFee);
 router.get('/monthly', getMonthlyFees);
 router.get('/monthly/dues', getMonthlyDueReport);
+router.delete('/monthly/:id', deleteMonthlyFee);
 
 // Admission Fees
 router.post('/admission', recordAdmissionFee);
 router.get('/admission', getAdmissionFees);
 router.get('/admission/dues', getAdmissionDueReport);
+router.delete('/admission/:id', deleteAdmissionFee);
 
 export default router;

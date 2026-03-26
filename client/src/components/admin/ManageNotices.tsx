@@ -221,7 +221,7 @@ const ManageNotices = () => {
                     border: '1px solid var(--glass-border)',
                     boxShadow: 'var(--shadow-premium)',
                     position: 'relative',
-                    overflow: 'hidden'
+                    // overflow: 'hidden'
                 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
                         <h3 style={{ margin: 0 }}>Create New Announcement</h3>
@@ -259,48 +259,54 @@ const ManageNotices = () => {
 
                         {/* Visibility Type Removed - All notices are INTERNAL */}
 
-                        <CustomSelect 
-                            label="Target Audience"
-                            value={formData.targetAudience}
-                            onChange={val => setFormData({
-                                ...formData, 
-                                targetAudience: val as 'ALL' | 'TEACHER' | 'STUDENT',
-                                targetClassId: '',
-                                targetStudentId: ''
-                            })}
-                            options={[
-                                { value: 'ALL', label: 'Everyone' },
-                                { value: 'TEACHER', label: 'Teaching Staff' },
-                                { value: 'STUDENT', label: 'Students' }
-                            ]}
-                            icon={<Target size={16} />}
-                        />
+                        <div className="form-group">
+                            <CustomSelect 
+                                label="Target Audience"
+                                value={formData.targetAudience}
+                                onChange={val => setFormData({
+                                    ...formData, 
+                                    targetAudience: val as 'ALL' | 'TEACHER' | 'STUDENT',
+                                    targetClassId: '',
+                                    targetStudentId: ''
+                                })}
+                                options={[
+                                    { value: 'ALL', label: 'Everyone' },
+                                    { value: 'TEACHER', label: 'Teaching Staff' },
+                                    { value: 'STUDENT', label: 'Students' }
+                                ]}
+                                icon={<Target size={16} />}
+                            />
+                        </div>
 
                         {formData.targetAudience === 'STUDENT' && (
                             <>
-                                <CustomSelect 
-                                    label="Filter by Class (Optional)"
-                                    value={formData.targetClassId}
-                                    onChange={val => setFormData({...formData, targetClassId: val, targetStudentId: ''})}
-                                    options={[
-                                        { value: '', label: 'All Classes' },
-                                        ...classes.map(c => ({ value: c.id, label: c.name }))
-                                    ]}
-                                    icon={<UsersIcon size={16} />}
-                                    placeholder="All Classes"
-                                />
-                                <CustomSelect 
-                                    label="Individual Student (Optional)"
-                                    value={formData.targetStudentId}
-                                    onChange={val => setFormData({...formData, targetStudentId: val})}
-                                    options={[
-                                        { value: '', label: 'All Students in Class' },
-                                        ...filteredStudents.map(s => ({ value: s.id, label: s.name }))
-                                    ]}
-                                    icon={<User size={16} />}
-                                    disabled={!formData.targetClassId}
-                                    placeholder="All Students in Class"
-                                />
+                                <div className="form-group">
+                                    <CustomSelect 
+                                        label="Filter by Class (Optional)"
+                                        value={formData.targetClassId}
+                                        onChange={val => setFormData({...formData, targetClassId: val, targetStudentId: ''})}
+                                        options={[
+                                            { value: '', label: 'All Classes' },
+                                            ...classes.map(c => ({ value: c.id, label: c.name }))
+                                        ]}
+                                        icon={<UsersIcon size={16} />}
+                                        placeholder="All Classes"
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <CustomSelect 
+                                        label="Individual Student (Optional)"
+                                        value={formData.targetStudentId}
+                                        onChange={val => setFormData({...formData, targetStudentId: val})}
+                                        options={[
+                                            { value: '', label: 'All Students in Class' },
+                                            ...filteredStudents.map(s => ({ value: s.id, label: s.name }))
+                                        ]}
+                                        icon={<User size={16} />}
+                                        disabled={!formData.targetClassId}
+                                        placeholder="All Students in Class"
+                                    />
+                                </div>
                             </>
                         )}
 
@@ -336,7 +342,7 @@ const ManageNotices = () => {
             )}
 
             {/* Notices Table Section */}
-            <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
+            <div className="card" style={{ padding: '0' }}>
                 <div style={{ padding: '24px 32px', borderBottom: '1px solid var(--border-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Archived Announcements</h3>
                     <div style={{ display: 'flex', gap: '12px' }}>

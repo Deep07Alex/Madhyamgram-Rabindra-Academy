@@ -34,14 +34,53 @@ export const recordMonthlyFee = async (req: Request, res: Response) => {
             return res.status(404).json({ message: `No student found with ID ${studentId}` });
         }
         const stuUUID = stuRes.rows[0].id;
+        const year = academicYear || new Date().getFullYear();
 
-        const result = await db.query(
-            `INSERT INTO "MonthlyFee"
-                (id, "studentId", date, month, "academicYear", fee, fine, others, total)
-             VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8)
-             RETURNING *`,
-            [stuUUID, date, month, academicYear || new Date().getFullYear(), feeAmt, fineAmt, othersAmt, total]
+        // CHECK IF RECORD EXISTS FOR THIS STUDENT/MONTH/YEAR
+        const existing = await db.query(
+            `SELECT id FROM "MonthlyFee" WHERE "studentId" = $1 AND month = $2 AND "academicYear" = $3`,
+            [stuUUID, month, year]
         );
+
+        let result;
+        if (existing.rows.length > 0) {
+            // OVERWRITE (Update)
+            result = await db.query(
+                `UPDATE "MonthlyFee" 
+                 SET date = $1, fee = $2, fine = $3, others = $4, total = $5, "createdAt" = CURRENT_TIMESTAMP
+                 WHERE id = $6 RETURNING *`,
+                [date, feeAmt, fineAmt, othersAmt, total, existing.rows[0].id]
+            );
+        } else {
+            // INSERT NEW
+            result = await db.query(
+                `INSERT INTO "MonthlyFee"
+                    (id, "studentId", date, month, "academicYear", fee, fine, others, total)
+                 VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8)
+                 RETURNING *`,
+                [stuUUID, date, month, year, feeAmt, fineAmt, othersAmt, total]
+            );
+        }
+
+        // CREATE AUTO-NOTICE FOR STUDENT (Valid for 24 HOURS)
+        try {
+            const expiresAt = new Date();
+            expiresAt.setHours(expiresAt.getHours() + 24);
+
+            await db.query(
+                `INSERT INTO "Notice" 
+                    (id, title, content, type, "targetAudience", "targetStudentId", "expiresAt")
+                 VALUES (gen_random_uuid(), $1, $2, 'INTERNAL', 'STUDENT', $3, $4)`,
+                [
+                    `Fee Record: ${month} ${year}`,
+                    `Your fees for ${month} ${year} has been updated/cleared successfully. Total paid: ₹${total.toFixed(2)}.`,
+                    stuUUID,
+                    expiresAt
+                ]
+            );
+        } catch (noticeErr) {
+            console.error('Failed to create auto-notice for fee payment:', noticeErr);
+        }
 
         res.status(201).json(result.rows[0]);
     } catch (error: any) {
@@ -127,6 +166,18 @@ export const getMonthlyDueReport = async (req: Request, res: Response) => {
     }
 };
 
+/** Delete a monthly fee record */
+export const deleteMonthlyFee = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        await db.query(`DELETE FROM "MonthlyFee" WHERE id = $1`, [id]);
+        res.json({ message: 'Fee record deleted successfully' });
+    } catch (error) {
+        console.error('deleteMonthlyFee error:', error);
+        res.status(500).json({ message: 'Failed to delete fee record' });
+    }
+};
+
 // ─────────────────────────────────────────────
 // ADMISSION FEES
 // ─────────────────────────────────────────────
@@ -153,12 +204,47 @@ export const recordAdmissionFee = async (req: Request, res: Response) => {
         }
         const stuUUID = stuRes.rows[0].id;
 
-        const result = await db.query(
-            `INSERT INTO "AdmissionFee" (id, "studentId", date, "totalAdmissionFee", "amountPaid", due)
-             VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)
-             RETURNING *`,
-            [stuUUID, date, total, paid, due]
-        );
+        // CHECK IF RECORD EXISTS
+        const existing = await db.query(`SELECT id FROM "AdmissionFee" WHERE "studentId" = $1 LIMIT 1`, [stuUUID]);
+
+        let result;
+        if (existing.rows.length > 0) {
+            // OVERWRITE
+            result = await db.query(
+                `UPDATE "AdmissionFee"
+                 SET date = $1, "totalAdmissionFee" = $2, "amountPaid" = $3, due = $4, "createdAt" = CURRENT_TIMESTAMP
+                 WHERE id = $5 RETURNING *`,
+                [date, total, paid, due, existing.rows[0].id]
+            );
+        } else {
+            // INSERT
+            result = await db.query(
+                `INSERT INTO "AdmissionFee" (id, "studentId", date, "totalAdmissionFee", "amountPaid", due)
+                 VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)
+                 RETURNING *`,
+                [stuUUID, date, total, paid, due]
+            );
+        }
+
+        // CREATE AUTO-NOTICE FOR STUDENT (Valid for 24 HOURS)
+        try {
+            const expiresAt = new Date();
+            expiresAt.setHours(expiresAt.getHours() + 24);
+
+            await db.query(
+                `INSERT INTO "Notice" 
+                    (id, title, content, type, "targetAudience", "targetStudentId", "expiresAt")
+                 VALUES (gen_random_uuid(), $1, $2, 'INTERNAL', 'STUDENT', $3, $4)`,
+                [
+                    `Admission Fee Update`,
+                    `Your admission fee record has been updated on ${date}. Paid: ₹${paid.toFixed(2)}, Remaining Due: ₹${due.toFixed(2)}.`,
+                    stuUUID,
+                    expiresAt
+                ]
+            );
+        } catch (noticeErr) {
+            console.error('Failed to create admission notice:', noticeErr);
+        }
 
         res.status(201).json(result.rows[0]);
     } catch (error: any) {
@@ -227,6 +313,18 @@ export const getAdmissionDueReport = async (req: Request, res: Response) => {
     }
 };
 
+/** Delete an admission fee record */
+export const deleteAdmissionFee = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        await db.query(`DELETE FROM "AdmissionFee" WHERE id = $1`, [id]);
+        res.json({ message: 'Admission fee record deleted successfully' });
+    } catch (error) {
+        console.error('deleteAdmissionFee error:', error);
+        res.status(500).json({ message: 'Failed to delete admission fee record' });
+    }
+};
+
 /** Lookup student by admission ID for auto-fill */
 export const lookupStudent = async (req: Request, res: Response) => {
     const raw = req.params.studentId as string;
@@ -253,13 +351,28 @@ export const lookupStudent = async (req: Request, res: Response) => {
     }
 };
 
-/** Live search students by admission ID or name for dropdowns */
+/** Live search students by admission ID or name for dropdowns, or list by classId */
 export const searchStudents = async (req: Request, res: Response) => {
-    const q = req.query.q as string;
-    if (!q || q.trim().length < 2) return res.json([]);
+    const { q, classId } = req.query;
 
     try {
-        const queryStr = `%${q.trim().toUpperCase()}%`;
+        if (classId) {
+            // Fetch all students for a specific class - ordered by roll number
+            const result = await db.query(
+                `SELECT s.id, s."studentId", s.name, s."rollNumber",
+                        c.name AS "className", c.id AS "classId"
+                 FROM "Student" s
+                 JOIN "Class" c ON c.id = s."classId"
+                 WHERE s."classId" = $1
+                 ORDER BY s."rollNumber" ASC, s.name ASC`,
+                [classId]
+            );
+            return res.json(result.rows);
+        }
+
+        if (!q || (q as string).trim().length < 2) return res.json([]);
+
+        const queryStr = `%${(q as string).trim().toUpperCase()}%`;
         const result = await db.query(
             `SELECT s.id, s."studentId", s.name, s."rollNumber",
                     c.name AS "className", c.id AS "classId"

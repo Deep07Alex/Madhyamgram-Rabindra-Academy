@@ -7,12 +7,86 @@
  *
  * Both tabs support auto-filling student details by Admission ID lookup.
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import api from '../../services/api';
+import { useToast } from '../../context/ToastContext';
 import {
     Banknote, Search, CheckCircle2, AlertCircle, Loader2,
-    ReceiptText, ClipboardList, Calendar, RefreshCw
+    ReceiptText, ClipboardList, Calendar, RefreshCw, Trash2
 } from 'lucide-react';
+
+// Responsive CSS for Fees Module
+const RESPONSIVE_CSS = `
+    .manage-fees-container {
+        padding: 40px;
+    }
+    .fees-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+    }
+    @media (max-width: 768px) {
+        .manage-fees-container {
+            padding: 16px !important;
+        }
+        .fees-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+        }
+        .fees-tabs {
+            width: 100% !important;
+            justify-content: center !important;
+        }
+        .fees-tabs button {
+            flex: 1 !important;
+            padding: 10px 12px !important;
+            font-size: 0.8rem !important;
+        }
+        .selector-container {
+            padding: 16px !important;
+            gap: 16px !important;
+        }
+        .selector-item {
+            min-width: 100% !important;
+        }
+        .fee-card {
+            padding: 20px !important;
+        }
+        .total-amount-display {
+            width: 100% !important;
+        }
+        .submit-btn-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+        }
+        .submit-btn-row button {
+            width: 100% !important;
+        }
+        .fees-filter-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+        }
+        .fees-filter-row .form-group {
+            width: 100% !important;
+            min-width: 100% !important;
+        }
+        .fees-filter-row button {
+            width: 100% !important;
+        }
+        .recent-filter-row {
+            width: 100% !important;
+            display: grid !important;
+            grid-template-columns: 1fr 1fr auto !important;
+        }
+        .recent-filter-row select {
+            width: 100% !important;
+        }
+        .fees-header button {
+            width: 100% !important;
+            margin-top: 8px !important;
+        }
+    }
+`;
 
 import { ACADEMIC_YEARS } from '../../utils/constants';
 
@@ -21,109 +95,132 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
 
 const CURRENT_YEAR = new Date().getFullYear();
 
-// ─── Shared student lookup widget ─────────────────────────────────────────────
-const StudentLookup = ({ onFound }: { onFound: (s: any) => void }) => {
-    const [query, setQuery] = useState('');
-    const [results, setResults] = useState<any[]>([]);
+// ─── Shared student selection widget ─────────────────────────────────────────────
+const StudentSelector = ({ onFound, resetTrigger }: { onFound: (s: any) => void, resetTrigger?: any }) => {
+    const [classes, setClasses] = useState<any[]>([]);
+    const [selectedClassId, setSelectedClassId] = useState('');
+    const [students, setStudents] = useState<any[]>([]);
+    const [rollNumber, setRollNumber] = useState('');
     const [loading, setLoading] = useState(false);
-    const [showDropdown, setShowDropdown] = useState(false);
     const [error, setError] = useState('');
 
-    const handleSearch = async (val: string) => {
-        setQuery(val);
-        if (val.trim().length < 2) {
-            setResults([]);
-            setShowDropdown(false);
-            return;
-        }
-        
-        setLoading(true);
-        try {
-            const res = await api.get(`/fees/search?q=${encodeURIComponent(val)}`);
-            setResults(res.data);
-            setShowDropdown(true);
-            setError('');
-        } catch {
-            setError('Failed to search');
-        } finally {
-            setLoading(false);
-        }
-    };
+    useEffect(() => {
+        const fetchClasses = async () => {
+            try {
+                const res = await api.get('/users/classes');
+                setClasses(res.data);
+            } catch {
+                setError('Failed to load classes.');
+            }
+        };
+        fetchClasses();
+    }, []);
 
-    const selectStudent = async (studentId: string) => {
-        setQuery(studentId);
-        setShowDropdown(false);
-        setLoading(true);
-        setError('');
-        try {
-            const res = await api.get(`/fees/lookup/${studentId}`);
-            onFound(res.data);
-        } catch {
-            setError('Student not found.');
-        } finally {
-            setLoading(false);
-        }
-    };
+    // Clear input when resetTrigger changes
+    useEffect(() => {
+        setRollNumber('');
+    }, [resetTrigger]);
+
+    // Load students when class changes
+    useEffect(() => {
+        const fetchStudents = async () => {
+            if (!selectedClassId) {
+                setStudents([]);
+                return;
+            }
+            setLoading(true);
+            try {
+                const res = await api.get('/fees/search', { params: { classId: selectedClassId } });
+                setStudents(res.data);
+                setRollNumber('');
+            } catch {
+                setError('Failed to load students.');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchStudents();
+    }, [selectedClassId]);
+
+    // Live fetching when roll number is entered
+    useEffect(() => {
+        const fetchByRoll = async () => {
+            // If roll number is cleared, immediately clear parent state
+            if (!rollNumber) {
+                onFound(null);
+                setError('');
+                return;
+            }
+
+            if (!selectedClassId || students.length === 0) return;
+            
+            // Search locally first to avoid unnecessary API calls
+            const match = students.find(s => s.rollNumber.toString() === rollNumber);
+            if (match) {
+                setLoading(true);
+                setError('');
+                try {
+                    const res = await api.get(`/fees/lookup/${match.studentId}`);
+                    onFound(res.data);
+                } catch {
+                    setError('Student record not found.');
+                } finally {
+                    setLoading(false);
+                }
+            } else {
+                // If no match is found, we should probably clear the parent record too
+                onFound(null);
+                if (rollNumber.length >= 1) setError('No student found with this roll in the selected class.');
+            }
+        };
+
+        const timer = setTimeout(fetchByRoll, 300); // Small debounce
+        return () => clearTimeout(timer);
+    }, [rollNumber, selectedClassId, students, onFound]);
 
     return (
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap', position: 'relative' }}>
-            <div className="form-group" style={{ flex: '1 1 250px', margin: 0, position: 'relative' }}>
-                <label>Find Student (by Name or Admission ID)</label>
-                <div style={{ position: 'relative' }}>
-                    <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                    <input
-                        type="text"
-                        placeholder="Search student..."
-                        value={query}
-                        onChange={e => handleSearch(e.target.value)}
-                        onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
-                        onBlur={() => setTimeout(() => setShowDropdown(false), 200)} // delay for click
-                        style={{ fontSize: '1rem', paddingLeft: '38px', width: '100%', boxSizing: 'border-box' }}
-                    />
-                    {loading && <Loader2 size={16} className="animate-spin" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-bold)' }} />}
-                </div>
+        <div className="selector-container" style={{ padding: '24px', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1.5px solid var(--border-soft)', display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-end', boxShadow: 'var(--shadow-premium)', marginBottom: '16px' }}>
+            <div className="form-group selector-item" style={{ flex: '1.2', minWidth: '240px', margin: 0 }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--primary-bold)', letterSpacing: '0.05em' }}>1. Filter by Class</label>
+                <select 
+                    value={selectedClassId} 
+                    onChange={e => setSelectedClassId(e.target.value)}
+                    style={{ width: '100%', height: '52px', marginTop: '10px', fontSize: '1.1rem', fontWeight: 700 }}
+                >
+                    <option value="">-- Choose Class --</option>
+                    {classes.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                </select>
+            </div>
 
-                {/* Dropdown Results */}
-                {showDropdown && results.length > 0 && (
-                    <div style={{ 
-                        position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
-                        background: 'var(--bg-main)', border: '1px solid var(--border-color)', 
-                        borderRadius: 'var(--radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', 
-                        maxHeight: '200px', overflowY: 'auto', marginTop: '4px' 
-                    }}>
-                        {results.map(s => (
-                            <div 
-                                key={s.id}
-                                onClick={() => selectStudent(s.studentId)}
-                                style={{ 
-                                    padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border-soft)',
-                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.background = 'var(--primary-soft)'}
-                                onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-main)'}
-                            >
-                                <div>
-                                    <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{s.name}</div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Class: {s.className} | Roll: {s.rollNumber}</div>
-                                </div>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary-bold)', background: 'var(--bg-card)', padding: '2px 8px', borderRadius: '4px' }}>
-                                    {s.studentId}
-                                </div>
-                            </div>
-                        ))}
+            <div className="form-group selector-item" style={{ flex: '1', minWidth: '180px', margin: 0 }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--primary-bold)', letterSpacing: '0.05em' }}>2. Enter Roll No</label>
+                <div style={{ position: 'relative', marginTop: '10px' }}>
+                    <input 
+                        type="number" 
+                        placeholder="e.g. 15"
+                        value={rollNumber}
+                        onChange={e => setRollNumber(e.target.value)}
+                        disabled={!selectedClassId}
+                        autoComplete="off"
+                        style={{ width: '100%', height: '52px', fontSize: '1.2rem', fontWeight: 900, paddingLeft: '48px', border: '2px solid var(--primary-bold)' }}
+                    />
+                    <Search size={22} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-bold)' }} />
+                    {loading && <Loader2 className="animate-spin" size={20} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-bold)' }} />}
+                </div>
+            </div>
+
+            <div style={{ flex: '0.5', minWidth: '150px' }} className="selector-item">
+                {rollNumber && students.find(s => s.rollNumber.toString() === rollNumber) && (
+                    <div style={{ padding: '8px 16px', background: 'var(--primary-soft)', borderRadius: '12px', border: '1px solid var(--primary-bold)', display: 'flex', alignItems: 'center', gap: '8px', animation: 'fadeIn 0.3s ease-out' }}>
+                        <CheckCircle2 size={16} color="var(--primary-bold)" />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--primary-bold)' }}>{students.find(s => s.rollNumber.toString() === rollNumber).name}</span>
                     </div>
                 )}
-                {error && <p style={{ color: 'var(--danger, #ef4444)', margin: '4px 0 0 0', fontSize: '0.85rem' }}>{error}</p>}
             </div>
-            
-            <button
-                onClick={() => selectStudent(query)}
-                disabled={loading || !query.trim()}
-                className="btn-primary"
-                style={{ padding: '0 20px', display: 'flex', alignItems: 'center', gap: '8px', height: '44px', alignSelf: 'flex-end' }}
-            >
-                Confirm Selection
-            </button>
+
+            {error && <p style={{ color: 'var(--error)', fontSize: '0.875rem', fontWeight: 700, width: '100%', marginTop: '12px' }}>{error}</p>}
         </div>
     );
 };
@@ -159,25 +256,61 @@ const MonthlyFeeTab = () => {
         academicYear: CURRENT_YEAR,
         fee: '', fine: '', others: ''
     });
+    // Separate filter state to avoid accidental recording for wrong month/year
+    const [viewFilter, setViewFilter] = useState({
+        month: MONTHS[new Date().getMonth()],
+        academicYear: CURRENT_YEAR
+    });
     const [recent, setRecent] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
     const [dueList, setDueList] = useState<any[]>([]);
+    const [dueClassId, setDueClassId] = useState('');
+    const [classes, setClasses] = useState<any[]>([]);
     const [showDues, setShowDues] = useState(false);
-    const [toast, setToast] = useState({ msg: '', type: '' });
+    const [resetCounter, setResetCounter] = useState(0);
+    const { showToast } = useToast();
 
-    const showToast = (msg: string, type: string) => {
-        setToast({ msg, type });
-        setTimeout(() => setToast({ msg: '', type: '' }), 3500);
-    };
+    // Load classes on mount (for dues filter)
+    useEffect(() => {
+        const fetchClasses = async () => {
+            try {
+                const res = await api.get('/users/classes');
+                setClasses(res.data);
+            } catch { 
+                showToast('Failed to load classes', 'error');
+            }
+        };
+        fetchClasses();
+    }, []);
+
+    const [loading, setLoading] = useState(false);
+
 
     const total = (parseFloat(form.fee) || 0) + (parseFloat(form.fine) || 0) + (parseFloat(form.others) || 0);
 
     const fetchRecent = useCallback(async () => {
         try {
-            const res = await api.get('/fees/monthly', { params: { month: form.month, academicYear: form.academicYear, limit: '20' } });
+            const res = await api.get('/fees/monthly', { params: { month: viewFilter.month, academicYear: viewFilter.academicYear, limit: '50' } });
             setRecent(res.data.fees || []);
-        } catch { /* ignore */ }
-    }, [form.month, form.academicYear]);
+        } catch { 
+            showToast('Failed to load recent payments', 'error');
+        }
+    }, [viewFilter.month, viewFilter.academicYear]);
+
+    // Auto-fetch on mount and when month/year changes
+    useEffect(() => {
+        fetchRecent();
+    }, [fetchRecent]);
+
+    const handleDelete = async (id: string) => {
+        if (!window.confirm('Are you sure you want to delete this fee record?')) return;
+        try {
+            await api.delete(`/fees/monthly/${id}`);
+            showToast('Fee record deleted', 'success');
+            fetchRecent();
+        } catch {
+            showToast('Failed to delete fee record', 'error');
+        }
+    };
 
     const handleSubmit = async () => {
         if (!student) return showToast('Please find a student first', 'error');
@@ -191,6 +324,7 @@ const MonthlyFeeTab = () => {
             showToast('Monthly fee recorded successfully!', 'success');
             setStudent(null);
             setForm(f => ({ ...f, fee: '', fine: '', others: '' }));
+            setResetCounter(c => c + 1); // Trigger roll number clear
             fetchRecent();
         } catch (e: any) {
             showToast(e?.response?.data?.message || 'Failed to record fee', 'error');
@@ -200,8 +334,9 @@ const MonthlyFeeTab = () => {
     };
 
     const fetchDues = async () => {
+        if (!dueClassId) return showToast('Please select a class to load dues', 'error');
         try {
-            const res = await api.get('/fees/monthly/dues', { params: { month: form.month, academicYear: form.academicYear } });
+            const res = await api.get('/fees/monthly/dues', { params: { month: form.month, academicYear: form.academicYear, classId: dueClassId } });
             setDueList(res.data.dues || []);
             setShowDues(true);
         } catch { showToast('Failed to load due report', 'error'); }
@@ -209,24 +344,18 @@ const MonthlyFeeTab = () => {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {toast.msg && (
-                <div style={{ padding: '12px 20px', borderRadius: 'var(--radius-md)', background: toast.type === 'success' ? '#22c55e20' : '#ef444420', color: toast.type === 'success' ? '#22c55e' : '#ef4444', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-                    {toast.msg}
-                </div>
-            )}
 
             {/* Entry Form */}
-            <div className="card" style={{ margin: 0 }}>
+            <div className="card fee-card" style={{ margin: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
                     <ReceiptText size={22} color="var(--primary-bold)" />
                     <h3 style={{ margin: 0 }}>Monthly Fee Entry</h3>
                 </div>
 
-                <StudentLookup onFound={setStudent} />
+                <StudentSelector onFound={setStudent} resetTrigger={resetCounter} />
                 {student && <StudentCard student={student} />}
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginTop: '24px' }}>
+                <div className="fees-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginTop: '24px' }}>
                     <div className="form-group" style={{ margin: 0 }}>
                         <label>Date</label>
                         <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
@@ -266,10 +395,10 @@ const MonthlyFeeTab = () => {
                 </div>
 
                 {/* Total + Submit */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px', flexWrap: 'wrap', gap: '12px' }}>
-                    <div style={{ padding: '16px 28px', borderRadius: 'var(--radius-md)', background: 'var(--primary-soft)', border: '2px solid var(--primary-bold)' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--primary-bold)', display: 'block', marginBottom: '4px' }}>TOTAL AMOUNT</span>
-                        <span style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--primary-bold)' }}>₹ {total.toFixed(2)}</span>
+                <div className="submit-btn-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                    <div className="total-amount-display" style={{ padding: '14px 24px', borderRadius: 'var(--radius-md)', background: 'var(--primary-soft)', border: '2px solid var(--primary-bold)' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary-bold)', display: 'block' }}>TOTAL AMOUNT</span>
+                        <span style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--primary-bold)' }}>₹ {total.toFixed(2)}</span>
                     </div>
                     <button onClick={handleSubmit} disabled={loading} className="btn-primary"
                         style={{ padding: '14px 32px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem' }}>
@@ -279,14 +408,30 @@ const MonthlyFeeTab = () => {
                 </div>
             </div>
 
-            {/* Due Report */}
-            <div className="card" style={{ margin: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+            {/* Dues Report Section */}
+            <div className="card fee-card" style={{ margin: 0 }}>
+                <div className="fees-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <AlertCircle size={20} color="var(--primary-bold)" />
                         <h3 style={{ margin: 0 }}>Monthly Due Report — {form.month} {form.academicYear}</h3>
                     </div>
-                    <button onClick={fetchDues} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px' }}>
+                </div>
+
+                <div className="fees-filter-row" style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', marginBottom: '32px', padding: '20px', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-soft)' }}>
+                    <div className="form-group" style={{ flex: 1, minWidth: '200px', margin: 0 }}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Filter by Class</label>
+                        <select 
+                            value={dueClassId} 
+                            onChange={e => setDueClassId(e.target.value)}
+                            style={{ width: '100%', height: '44px', marginTop: '6px' }}
+                        >
+                            <option value="">-- Choose Class --</option>
+                            {classes.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <button onClick={fetchDues} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 24px', height: '44px' }}>
                         <RefreshCw size={16} /> Load Dues
                     </button>
                 </div>
@@ -324,19 +469,36 @@ const MonthlyFeeTab = () => {
                 )}
             </div>
 
-            {/* Recent Payments */}
-            <div className="card" style={{ margin: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            {/* Recent Payments Section */}
+            <div className="card fee-card" style={{ margin: 0 }}>
+                <div className="fees-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <ClipboardList size={20} color="var(--primary-bold)" />
-                        <h3 style={{ margin: 0 }}>Recent Payments</h3>
+                        <h3 style={{ margin: 0 }}>Recent Payments — {viewFilter.month} {viewFilter.academicYear}</h3>
                     </div>
-                    <button onClick={fetchRecent} className="btn-secondary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <RefreshCw size={16} /> Refresh
-                    </button>
+                    
+                    <div className="recent-filter-row" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <select 
+                            value={viewFilter.month} 
+                            onChange={e => setViewFilter(f => ({ ...f, month: e.target.value }))}
+                            style={{ height: '38px', padding: '0 12px', borderRadius: '8px', border: '1.5px solid var(--border-soft)', background: 'var(--bg-card)', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                            {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                        <select 
+                            value={viewFilter.academicYear} 
+                            onChange={e => setViewFilter(f => ({ ...f, academicYear: parseInt(e.target.value) }))}
+                            style={{ height: '38px', padding: '0 12px', borderRadius: '8px', border: '1.5px solid var(--border-soft)', background: 'var(--bg-card)', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                            {[CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR+1].map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                        <button onClick={fetchRecent} className="btn-secondary" style={{ height: '38px', width: '38px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Reload latest">
+                            <RefreshCw size={16} />
+                        </button>
+                    </div>
                 </div>
                 {recent.length === 0 ? (
-                    <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '24px' }}>No payments recorded yet. Click Refresh to load.</p>
+                    <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '32px' }}>No payments found for the selected period.</p>
                 ) : (
                     <div className="table-responsive">
                         <table className="data-table">
@@ -351,6 +513,7 @@ const MonthlyFeeTab = () => {
                                     <th>Fine</th>
                                     <th>Others</th>
                                     <th>Total</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -365,6 +528,15 @@ const MonthlyFeeTab = () => {
                                         <td style={{ textAlign: 'center' }}>₹{r.fine}</td>
                                         <td style={{ textAlign: 'center' }}>₹{r.others}</td>
                                         <td style={{ textAlign: 'center', fontWeight: 900, color: 'var(--primary-bold)' }}>₹{r.total}</td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <button 
+                                                onClick={() => handleDelete(r.id)}
+                                                style={{ padding: '4px', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
+                                                title="Delete record"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -384,16 +556,12 @@ const AdmissionFeeTab = () => {
         totalAdmissionFee: '',
         amountPaid: ''
     });
+    const [resetCounter, setResetCounter] = useState(0);
     const [loading, setLoading] = useState(false);
     const [records, setRecords] = useState<any[]>([]);
     const [dueList, setDueList] = useState<any[]>([]);
     const [showDues, setShowDues] = useState(false);
-    const [toast, setToast] = useState({ msg: '', type: '' });
-
-    const showToast = (msg: string, type: string) => {
-        setToast({ msg, type });
-        setTimeout(() => setToast({ msg: '', type: '' }), 3500);
-    };
+    const { showToast } = useToast();
 
     const due = (parseFloat(form.totalAdmissionFee) || 0) - (parseFloat(form.amountPaid) || 0);
 
@@ -401,8 +569,26 @@ const AdmissionFeeTab = () => {
         try {
             const res = await api.get('/fees/admission');
             setRecords(res.data.fees || []);
-        } catch { /* ignore */ }
+        } catch { 
+            showToast('Failed to load admission records', 'error');
+        }
     }, []);
+
+    // Auto-fetch on mount
+    useEffect(() => {
+        fetchRecords();
+    }, [fetchRecords]);
+
+    const handleDelete = async (id: string) => {
+        if (!window.confirm('Are you sure you want to delete this admission record?')) return;
+        try {
+            await api.delete(`/fees/admission/${id}`);
+            showToast('Admission fee record deleted', 'success');
+            fetchRecords();
+        } catch {
+            showToast('Failed to delete admission fee record', 'error');
+        }
+    };
 
     const handleSubmit = async () => {
         if (!student) return showToast('Please find a student first', 'error');
@@ -416,6 +602,7 @@ const AdmissionFeeTab = () => {
             showToast('Admission fee recorded!', 'success');
             setStudent(null);
             setForm(f => ({ ...f, totalAdmissionFee: '', amountPaid: '' }));
+            setResetCounter(c => c + 1); // Trigger roll number clear
             fetchRecords();
         } catch (e: any) {
             showToast(e?.response?.data?.message || 'Failed to record admission fee', 'error');
@@ -434,24 +621,18 @@ const AdmissionFeeTab = () => {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {toast.msg && (
-                <div style={{ padding: '12px 20px', borderRadius: 'var(--radius-md)', background: toast.type === 'success' ? '#22c55e20' : '#ef444420', color: toast.type === 'success' ? '#22c55e' : '#ef4444', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-                    {toast.msg}
-                </div>
-            )}
 
             {/* Entry Form */}
-            <div className="card" style={{ margin: 0 }}>
+            <div className="card fee-card" style={{ margin: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
                     <Banknote size={22} color="var(--primary-bold)" />
                     <h3 style={{ margin: 0 }}>Admission Fee Entry</h3>
                 </div>
 
-                <StudentLookup onFound={setStudent} />
+                <StudentSelector onFound={setStudent} resetTrigger={resetCounter} />
                 {student && <StudentCard student={student} />}
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginTop: '24px' }}>
+                <div className="fees-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginTop: '24px' }}>
                     <div className="form-group" style={{ margin: 0 }}>
                         <label>Date</label>
                         <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
@@ -469,13 +650,13 @@ const AdmissionFeeTab = () => {
                 </div>
 
                 {/* Due preview + Submit */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px', flexWrap: 'wrap', gap: '12px' }}>
-                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                        <div style={{ padding: '14px 24px', borderRadius: 'var(--radius-md)', background: 'var(--primary-soft)', border: '2px solid var(--primary-bold)' }}>
+                <div className="submit-btn-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }} className="total-amount-display">
+                        <div style={{ padding: '14px 24px', borderRadius: 'var(--radius-md)', background: 'var(--primary-soft)', border: '2px solid var(--primary-bold)', flex: 1 }}>
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary-bold)', display: 'block' }}>AMOUNT PAID</span>
                             <span style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--primary-bold)' }}>₹ {(parseFloat(form.amountPaid) || 0).toFixed(2)}</span>
                         </div>
-                        <div style={{ padding: '14px 24px', borderRadius: 'var(--radius-md)', background: due > 0 ? '#ef444415' : '#22c55e15', border: `2px solid ${due > 0 ? '#ef4444' : '#22c55e'}` }}>
+                        <div style={{ padding: '14px 24px', borderRadius: 'var(--radius-md)', background: due > 0 ? '#ef444415' : '#22c55e15', border: `2px solid ${due > 0 ? '#ef4444' : '#22c55e'}`, flex: 1 }}>
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: due > 0 ? '#ef4444' : '#22c55e', display: 'block' }}>DUE AMOUNT</span>
                             <span style={{ fontSize: '1.8rem', fontWeight: 900, color: due > 0 ? '#ef4444' : '#22c55e' }}>₹ {Math.max(due, 0).toFixed(2)}</span>
                         </div>
@@ -489,8 +670,8 @@ const AdmissionFeeTab = () => {
             </div>
 
             {/* Dues Report */}
-            <div className="card" style={{ margin: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+            <div className="card fee-card" style={{ margin: 0 }}>
+                <div className="fees-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <AlertCircle size={20} color="#ef4444" />
                         <h3 style={{ margin: 0 }}>Admission Fee Due Report</h3>
@@ -540,8 +721,8 @@ const AdmissionFeeTab = () => {
             </div>
 
             {/* All Records */}
-            <div className="card" style={{ margin: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div className="card fee-card" style={{ margin: 0 }}>
+                <div className="fees-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <ClipboardList size={20} color="var(--primary-bold)" />
                         <h3 style={{ margin: 0 }}>All Admission Fee Records</h3>
@@ -563,6 +744,7 @@ const AdmissionFeeTab = () => {
                                     <th>Total Fee</th>
                                     <th>Paid</th>
                                     <th>Due</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -574,6 +756,15 @@ const AdmissionFeeTab = () => {
                                         <td style={{ textAlign: 'center' }}>₹{parseFloat(r.totalAdmissionFee).toFixed(2)}</td>
                                         <td style={{ textAlign: 'center', color: '#22c55e', fontWeight: 700 }}>₹{parseFloat(r.amountPaid).toFixed(2)}</td>
                                         <td style={{ textAlign: 'center', color: parseFloat(r.due) > 0 ? '#ef4444' : '#22c55e', fontWeight: 900 }}>₹{parseFloat(r.due).toFixed(2)}</td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <button 
+                                                onClick={() => handleDelete(r.id)}
+                                                style={{ padding: '4px', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
+                                                title="Delete record"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -603,15 +794,16 @@ const ManageFees = () => {
     });
 
     return (
-        <div className="manage-section">
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
+        <div className="manage-fees-container" style={{ animation: 'fadeIn 0.4s ease-out' }}>
+            <style>{RESPONSIVE_CSS}</style>
+            <header className="fees-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                     <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <Banknote color="var(--primary-bold)" /> Student Fees
                     </h2>
                     <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontWeight: 500 }}>Record and track monthly and admission fee payments</p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', padding: '6px', background: 'var(--bg-main)', borderRadius: '40px', border: '1px solid var(--border-soft)' }}>
+                <div className="fees-tabs" style={{ display: 'flex', gap: '8px', padding: '6px', background: 'var(--bg-main)', borderRadius: '40px', border: '1px solid var(--border-soft)', flexWrap: 'wrap' }}>
                     <button style={tabStyle(tab === 'monthly')} onClick={() => setTab('monthly')}>
                         <Calendar size={16} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
                         Monthly Fee

@@ -216,9 +216,13 @@ export const createClass = async (req: Request, res: Response) => {
 export const deleteStudent = async (req: Request, res: Response) => {
     const id = req.params.id as string;
     try {
+        // Explicitly clear fees (just in case cascade is missing)
+        await db.query(`DELETE FROM "MonthlyFee" WHERE "studentId" = $1`, [id]);
+        await db.query(`DELETE FROM "AdmissionFee" WHERE "studentId" = $1`, [id]);
+        
         await db.query(`DELETE FROM "Student" WHERE id = $1`, [id]);
         broadcast('user:deleted', { id, role: 'STUDENT' });
-        res.json({ message: 'Student deleted successfully' });
+        res.json({ message: 'Student and related records deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting student' });
     }
@@ -245,9 +249,13 @@ export const deleteTeacher = async (req: Request, res: Response) => {
  */
 export const deleteAllStudents = async (req: Request, res: Response) => {
     try {
+        // Explicitly clear all fee records
+        await db.query(`DELETE FROM "MonthlyFee"`);
+        await db.query(`DELETE FROM "AdmissionFee"`);
+        
         await db.query(`DELETE FROM "Student"`);
         broadcast('user:deleted', { all: true, role: 'STUDENT' });
-        res.json({ message: 'All students deleted successfully' });
+        res.json({ message: 'All students and fee records deleted successfully' });
     } catch (error) {
         console.error('Error deleting all students:', error);
         res.status(500).json({ message: 'Error deleting all students' });

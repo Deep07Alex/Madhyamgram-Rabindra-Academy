@@ -172,10 +172,16 @@ export const getUnifiedDashboardData = async (req: AuthRequest, res: Response) =
                     FROM Stats
                 `, [userId]),
                 db.query(`
-                    SELECT * FROM "Notice" 
-                    WHERE ("expiresAt" IS NULL OR "expiresAt" > CURRENT_TIMESTAMP)
-                    ORDER BY "createdAt" DESC LIMIT 5
-                `),
+                    SELECT n.* FROM "Notice" n
+                    JOIN "Student" s ON s.id = $1
+                    WHERE (
+                        n."targetAudience" IN ('ALL', 'STUDENT')
+                        AND (n."targetClassId" IS NULL OR n."targetClassId" = s."classId")
+                        AND (n."targetStudentId" IS NULL OR n."targetStudentId" = $1)
+                    )
+                    AND (n."expiresAt" IS NULL OR n."expiresAt" > CURRENT_TIMESTAMP)
+                    ORDER BY n."createdAt" DESC LIMIT 5
+                `, [userId]),
                 db.query(`
                     SELECT h.*, t.name as "teacherName",
                     COALESCE((SELECT json_agg(json_build_object('id', s2.id, 'status', s2.status))
@@ -214,7 +220,12 @@ export const getUnifiedDashboardData = async (req: AuthRequest, res: Response) =
                         (SELECT COUNT(*) FROM "_ClassToTeacher" WHERE "B" = $1) as assigned_classes,
                         (SELECT COUNT(*) FROM "Submission" s JOIN "Homework" h ON s."homeworkId" = h.id WHERE h."teacherId" = $1 AND s.status = 'PENDING') as pending_submissions
                 `, [userId]),
-                db.query(`SELECT * FROM "Notice" ORDER BY "createdAt" DESC LIMIT 5`),
+                db.query(`
+                    SELECT * FROM "Notice" 
+                    WHERE "targetAudience" IN ('ALL', 'TEACHER')
+                    AND ("expiresAt" IS NULL OR "expiresAt" > CURRENT_TIMESTAMP)
+                    ORDER BY "createdAt" DESC LIMIT 5
+                `),
                 db.query(`
                     SELECT * FROM "TeacherAttendance" 
                     WHERE "teacherId" = $1 AND date::date = CURRENT_DATE
