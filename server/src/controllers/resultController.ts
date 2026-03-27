@@ -83,61 +83,58 @@ export const bulkUploadResults = async (req: Request, res: Response) => {
             fullMarksRow = null;
         }
 
-        for (let i = startIndex; i < dataRows.length; i++) {
-            const row = dataRows[i];
-            const rawAdmissionNo = row['Admission No'] || row['Admission Regn. No.'] || row['Admission Register No'];
-            if (!rawAdmissionNo) continue;
-
-            const admissionNo = String(rawAdmissionNo).trim();
-            const studentDbId = studentMap.get(admissionNo);
-
-            if (!studentDbId) {
-                console.warn(`Student not found for Admission No: ${admissionNo}`);
-                continue;
-            }
-
-            for (const key of Object.keys(row)) {
-                if (ignoredColumns.includes(key)) continue;
-
-                const marksValue = row[key];
-                if (marksValue === undefined || marksValue === null || marksValue === '') continue;
-                
-                const marks = parseFloat(marksValue);
-                if (isNaN(marks)) continue;
-
-                // Determine total marks for this subject
-                let totalMarks = 100;
-                if (fullMarksRow && fullMarksRow[key]) {
-                    totalMarks = parseFloat(fullMarksRow[key]) || 100;
-                } else {
-                    // Fallback to 100 or term-based logic if row is missing
-                    totalMarks = (semester === 'Unit-III') ? 100 : 50;
-                    // Special case for computer if not in row
-                    if (key.includes('Computer Oral') || key.includes('Computer Written')) totalMarks = (semester === 'Unit-III') ? 20 : 10;
-                    if (key.includes('Computer Practical')) totalMarks = (semester === 'Unit-III') ? 80 : 40;
-                }
-
-                resultsToInsert.push({
-                    id: crypto.randomUUID(),
-                    studentId: studentDbId,
-                    subject: key,
-                    semester,
-                    academicYear: parseInt(academicYear),
-                    marks: marks,
-                    totalMarks: totalMarks,
-                    grade: calculateGrade(marks, totalMarks)
-                });
-            }
-        }
-
-        if (resultsToInsert.length === 0) {
-            return res.status(400).json({ message: 'No valid results found. Ensure "Admission No" matches student records.' });
-        }
-
         // Process in a single transaction for efficiency using Bulk INSERT
         const client = await db.connect();
         try {
             await client.query('BEGIN');
+
+            const classRes = await client.query('SELECT name FROM "Class" WHERE id = $1', [classId]);
+            const className = classRes.rows[0]?.name || '';
+
+            for (let i = startIndex; i < dataRows.length; i++) {
+                const row = dataRows[i];
+                const rawAdmissionNo = row['Admission No'] || row['Admission Regn. No.'] || row['Admission Register No'];
+                if (!rawAdmissionNo) continue;
+
+                const admissionNo = String(rawAdmissionNo).trim();
+                const studentDbId = studentMap.get(admissionNo);
+
+                if (!studentDbId) {
+                    console.warn(`Student not found for Admission No: ${admissionNo}`);
+                    continue;
+                }
+
+                for (const key of Object.keys(row)) {
+                    if (ignoredColumns.includes(key)) continue;
+
+                    const marksValue = row[key];
+                    if (marksValue === undefined || marksValue === null || marksValue === '') continue;
+                    
+                    const marks = parseFloat(marksValue);
+                    if (isNaN(marks)) continue;
+
+                    // PERMANENT FIX: Overwrite the Excel Full Marks with the Official Rulebook
+                    // This ensures Unit-III is always individual marks (e.g., 50) and never cumulative (100)
+                    const totalMarks = getOfficialFullMarks(key, className);
+
+                    resultsToInsert.push({
+                        id: crypto.randomUUID(),
+                        studentId: studentDbId,
+                        subject: key,
+                        semester,
+                        academicYear: parseInt(academicYear),
+                        marks: marks,
+                        totalMarks: totalMarks,
+                        grade: calculateGrade(marks, totalMarks)
+                    });
+                }
+            }
+            
+            if (resultsToInsert.length === 0) {
+                await client.query('ROLLBACK');
+                client.release();
+                return res.status(400).json({ message: 'No valid results found. Ensure "Admission No" matches student records.' });
+            }
             
             const columns = '(id, "studentId", subject, semester, "academicYear", marks, "totalMarks", grade)';
             const values: any[] = [];
@@ -381,6 +378,7 @@ export const deleteClassResults = async (req: Request, res: Response) => {
  * Helper to calculate grade based on percentage
  */
 function calculateGrade(marks: number, total: number) {
+    if (!total || total === 0) return 'C';
     const p = (marks / total) * 100;
     if (p >= 90) return 'AA';
     if (p >= 80) return 'A+';
@@ -388,4 +386,66 @@ function calculateGrade(marks: number, total: number) {
     if (p >= 50) return 'B+';
     if (p >= 30) return 'B';
     return 'C';
+}
+
+/**
+ * STRICT SERVER RULEBOOK — exact subject name matching (switch/case).
+ * Mirrors the client-side getFullMarks in constants.ts exactly.
+ * No .includes() — prevents Mathematics Oral being matched as Mathematics.
+ */
+function getOfficialFullMarks(subject: string, className: string = ''): number {
+    switch (subject.trim()) {
+        // 50-mark subjects (all classes)
+        case 'Bengali Literature':
+        case 'Bengali Language':
+        case 'English Literature':
+        case 'English Language':
+        case 'Mathematics':
+            return 50;
+
+        // Science / Social — 50 for STD-IV, 25 elsewhere
+        case 'Science':
+        case 'History':
+        case 'Geography':
+        case 'General Knowledge':
+            return className === 'STD-IV' ? 50 : 25;
+
+        // Fixed 25-mark subjects
+        case 'Hindi':
+        case 'HGS':
+        case 'Physical Education':
+        case 'Work Education':
+            return 25;
+
+        // Project — 20 for KG-II A/B, 25 elsewhere
+        case 'Project':
+            return (className === 'KG-II A' || className === 'KG-II B') ? 20 : 25;
+
+        // Computer subjects
+        case 'Computer Written':
+            return 20;
+        case 'Computer Practical':
+            return 10;
+        case 'Computer Oral':
+            return 15;
+
+        // Spoken English
+        case 'Spoken English':
+            return 20;
+
+        // Handwriting — 10 for KG-I, 15 elsewhere
+        case 'Bengali Handwriting':
+        case 'Bengali Handwraiting': // typo variant
+        case 'English Handwriting':
+            return className === 'KG-I' ? 10 : 15;
+
+        // Oral / Rhymes — 10 for KG-I, 15 elsewhere
+        case 'Mathematics Oral':
+        case 'Bengali Rhymes':
+        case 'English Rhymes':
+            return className === 'KG-I' ? 10 : 15;
+
+        default:
+            return 50;
+    }
 }

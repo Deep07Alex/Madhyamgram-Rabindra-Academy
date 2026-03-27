@@ -45,7 +45,7 @@ const ManageResults = () => {
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
     const [newResult, setNewResult] = useState({
-        studentId: '', semester: 'Unit-I', subject: '', marks: '', totalMarks: '100', academicYear: new Date().getFullYear(), grade: ''
+        studentId: '', semester: 'Unit-I', subject: '', marks: '', totalMarks: '50', academicYear: new Date().getFullYear(), grade: ''
     });
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -91,7 +91,7 @@ const ManageResults = () => {
         // Update newResult totalMarks when term changes
         if (newResult.subject) {
             const className = classes.find(c => c.id === selectedClassId)?.name;
-            setNewResult(prev => ({ ...prev, totalMarks: getFullMarks(prev.subject, selectedTerm, className).toString() }));
+            setNewResult(prev => ({ ...prev, totalMarks: getFullMarks(prev.subject, className).toString() }));
         }
     }, [selectedYear, selectedTerm, selectedClassId]);
 
@@ -99,7 +99,7 @@ const ManageResults = () => {
     useEffect(() => {
         if (newResult.subject) {
             const className = classes.find(c => c.id === selectedClassId)?.name;
-            setNewResult(prev => ({ ...prev, totalMarks: getFullMarks(prev.subject, selectedTerm, className).toString() }));
+            setNewResult(prev => ({ ...prev, totalMarks: getFullMarks(prev.subject, className).toString() }));
         }
     }, [newResult.subject, selectedTerm, selectedClassId]);
 
@@ -144,7 +144,8 @@ const ManageResults = () => {
         // Prepare Header rows (Subjects + Full Marks)
         const subjectsList = SUBJECTS_BY_CLASS[selectedClass.name] || MAIN_SUBJECTS;
         const headers = ['Admission No', 'Roll', 'Name', ...subjectsList];
-        const fullMarksRow = ['', '', 'Full Marks', ...subjectsList.map(sub => getFullMarks(sub, selectedTerm, selectedClass.name))];
+        // FIX: Always use official full marks for the specific unit (don't sum I+II for Unit-III)
+        const fullMarksRow = ['', '', 'Full Marks', ...subjectsList.map(sub => getFullMarks(sub, selectedClass.name))];
         const data = classStudents.map(s => [s.studentId, s.rollNumber, s.name, ...subjectsList.map(() => '')]);
 
         const worksheet = XLSX.utils.aoa_to_sheet([headers, fullMarksRow, ...data]);
@@ -255,7 +256,7 @@ const ManageResults = () => {
         }
         acc[sid].marks.push(curr);
         acc[sid].totalObtained += parseFloat(curr.marks || 0);
-        acc[sid].totalPossible += parseFloat(curr.totalMarks || 100);
+        acc[sid].totalPossible += parseFloat(curr.totalMarks || 50);
         return acc;
     }, {});
 

@@ -206,6 +206,7 @@ function Footer() {
   return (
     <footer id="contact" className="landing-footer">
       <div className="footer-main-info">
+        <p>Madhyamgram</p>
         <h3 className="footer-title">RABINDRA ACADEMY</h3>
         <p className="footer-mission">Education ★ Culture ★ Art</p>
         <div className="footer-level">K.G. & PRIMARY SCHOOL</div>
