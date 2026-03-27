@@ -127,16 +127,59 @@ const StudentResults = () => {
                         <Calendar size={14} style={{ marginRight: '6px' }} />Academic Session {selectedYear}
                     </p>
                 </div>
-                <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <CustomSelect
                         value={selectedYear.toString()}
                         onChange={val => setSelectedYear(parseInt(val))}
                         options={ACADEMIC_YEARS.map(y => ({ value: y.toString(), label: y.toString() }))}
                         icon={<Calendar size={16} />}
                     />
-                    <button onClick={async () => await generateResultPDF(reportData)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 24px' }}>
-                        <Download size={18} /> Download PDF
-                    </button>
+                    
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {/* Individual Unit Downloads */}
+                        {hasUnit1 && (
+                            <button 
+                                onClick={async () => await generateResultPDF({ ...reportData, targetSemester: 'Unit-I' })} 
+                                className="btn-primary" 
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'var(--accent)', borderColor: 'var(--accent)', fontSize: '0.85rem' }}
+                                title="Download only Unit-I Report"
+                            >
+                                <Download size={16} /> Unit-I
+                            </button>
+                        )}
+                        
+                        {hasUnit2 && (
+                            <button 
+                                onClick={async () => await generateResultPDF({ ...reportData, targetSemester: 'Unit-II' })} 
+                                className="btn-primary" 
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'var(--accent)', borderColor: 'var(--accent)', fontSize: '0.85rem' }}
+                                title="Download only Unit-II Report"
+                            >
+                                <Download size={16} /> Unit-II
+                            </button>
+                        )}
+
+                        {hasUnit3 && (
+                            <button 
+                                onClick={async () => await generateResultPDF({ ...reportData, targetSemester: 'Unit-III' })} 
+                                className="btn-primary" 
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'var(--accent)', borderColor: 'var(--accent)', fontSize: '0.85rem' }}
+                                title="Download only Unit-III Report"
+                            >
+                                <Download size={16} /> Unit-III
+                            </button>
+                        )}
+
+                        {/* Cumulative Download */}
+                        <button 
+                            onClick={async () => await generateResultPDF(reportData)} 
+                            className="btn-primary" 
+                            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px', fontSize: '0.85rem' }}
+                            title="Download Full Yearly Progress Report"
+                        >
+                            <Download size={18} /> {hasUnit3 ? 'Yearly Report' : hasUnit2 ? 'Cumulative (I+II)' : 'Progress Report'}
+                        </button>
+                    </div>
                 </div>
             </header>
 

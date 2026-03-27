@@ -177,7 +177,7 @@ export const bulkUploadResults = async (req: Request, res: Response) => {
  */
 export const getConsolidatedReport = async (req: AuthRequest, res: Response) => {
     try {
-        const studentId = req.params.studentId || req.user?.id;
+        const studentId = req.params.studentId || (req.query.studentId as string) || req.user?.id;
         const academicYear = parseInt(req.query.academicYear as string || new Date().getFullYear().toString());
 
         if (!studentId) return res.status(400).json({ message: 'Missing studentId' });

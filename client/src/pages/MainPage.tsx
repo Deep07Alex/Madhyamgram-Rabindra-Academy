@@ -171,11 +171,11 @@ function FestivalSection({ bannerUrl }: { bannerUrl: string }) {
   return (
     <section id="notice" className="landing-section notice">
       <h2>Upcoming Festivals</h2>
-      <img 
-        src={fullUrl} 
-        alt="Upcoming Festival" 
+      <img
+        src={fullUrl}
+        alt="Upcoming Festival"
         loading="lazy"
-        style={{ width: '100%', height: 'auto', maxHeight: '600px', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} 
+        style={{ width: '100%', height: 'auto', maxHeight: '600px', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}
       />
     </section>
   );
@@ -220,7 +220,6 @@ function Footer() {
       <div className="footer-registration-box">
         <p>Registered by West Bengal Govt.</p>
         <p>Following West Bengal Board of Primary Education Syllabus</p>
-        <p className="footer-reg-no">Regd. No. : SO165438 of 2009-2010</p>
         <p className="footer-udise">Udise No. : 19112601311</p>
       </div>
 
@@ -228,11 +227,11 @@ function Footer() {
         <p><strong>Mob. No & Whatsapp No. :</strong> 8240267850 / 9830286767</p>
         <p><strong>E-mail:</strong> rabindra.academy@gmail.com / sdssarkar9@gmail.com</p>
         <p><strong>Facebook page :</strong> madhyamgramrabindraacademy</p>
-        <p><strong>Website :</strong> <a href="http://www.rabindraacademy.in" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none' }}>www.rabindraacademy.in</a></p>
+        <p><strong>Website :</strong> <a href="https://madhyamgramrabindraacademy.in" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none' }}>www.madhyamgramrabindraacademy.in</a></p>
       </div>
 
       <div className="social-icons" style={{ marginTop: '1rem' }}>
-        <a href="http://www.rabindraacademy.in" target="_blank" rel="noopener noreferrer" title="Website">🌐</a>
+        <a href="https://madhyamgramrabindraacademy.in" target="_blank" rel="noopener noreferrer" title="Website">🌐</a>
         <a href="https://facebook.com/madhyamgramrabindraacademy" target="_blank" rel="noopener noreferrer" title="Facebook">📘</a>
         <a href="#" title="Instagram">📸</a>
         <a href="#" title="Twitter">🐦</a>

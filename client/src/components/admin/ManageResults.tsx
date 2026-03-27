@@ -11,7 +11,7 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
 import { MAIN_SUBJECTS, EXAMINATION_TERMS, ACADEMIC_YEARS, SUBJECTS_BY_CLASS, getFullMarks } from '../../utils/constants';
-import { FilePlus, List, Trash2, Download, Upload, FileSpreadsheet, Loader2, Search, X, Calendar, GraduationCap, School, FileCheck } from 'lucide-react';
+import { FilePlus, List, Trash2, Download, Upload, FileSpreadsheet, Loader2, Search, X, Calendar, GraduationCap, School } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import * as XLSX from 'xlsx';
 import CustomSelect from '../common/CustomSelect';
@@ -38,12 +38,12 @@ const ManageResults = () => {
     const [classes, setClasses] = useState<SchoolClass[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
-    
+
     // Form States
     const [selectedClassId, setSelectedClassId] = useState('');
     const [selectedTerm, setSelectedTerm] = useState('Unit-I');
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-    
+
     const [newResult, setNewResult] = useState({
         studentId: '', semester: 'Unit-I', subject: '', marks: '', totalMarks: '100', academicYear: new Date().getFullYear(), grade: ''
     });
@@ -63,7 +63,7 @@ const ManageResults = () => {
         isOpen: false,
         title: '',
         message: '',
-        onConfirm: () => {},
+        onConfirm: () => { },
         type: 'info'
     });
 
@@ -150,13 +150,37 @@ const ManageResults = () => {
         const worksheet = XLSX.utils.aoa_to_sheet([headers, fullMarksRow, ...data]);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Results');
-        
+
         XLSX.writeFile(workbook, `${selectedClass.name}_${selectedTerm}_Template.xlsx`);
     };
 
     const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        // Validation: Prevent accidental cross-class or cross-term uploads
+        const selectedClass = classes.find((c: any) => c.id === selectedClassId);
+        if (selectedClass) {
+            const normalizedFileName = file.name.toLowerCase().replace(/[\s_-]/g, '');
+            const normalizedClass = selectedClass.name.toLowerCase().replace(/[\s_-]/g, '');
+
+            // Check for Term mismatch (Checked in reverse to prevent Unit-I matching Unit-III)
+            const terms = ['Unit-III', 'Unit-II', 'Unit-I'];
+            const fileTerm = terms.find(t => normalizedFileName.includes(t.toLowerCase().replace(/[\s_-]/g, '')));
+
+            if (fileTerm && fileTerm !== selectedTerm) {
+                showToast(`Incorrect Exam Term! You selected "${selectedTerm}" but the file "${file.name}" appears to be for "${fileTerm}".`, 'error');
+                if (fileInputRef.current) fileInputRef.current.value = '';
+                return;
+            }
+
+            // Check for Class mismatch
+            if (!normalizedFileName.includes(normalizedClass)) {
+                showToast(`Incorrect Class! You selected "${selectedClass.name}" but the file "${file.name}" belongs to another class.`, 'error');
+                if (fileInputRef.current) fileInputRef.current.value = '';
+                return;
+            }
+        }
 
         setIsUploading(true);
         const formData = new FormData();
@@ -245,14 +269,14 @@ const ManageResults = () => {
             </header>
 
             {/* Top Filters */}
-            <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                gap: '20px', 
-                marginBottom: '32px' 
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '20px',
+                marginBottom: '32px'
             }}>
                 <div className="card" style={{ margin: 0, padding: '20px 24px' }}>
-                    <CustomSelect 
+                    <CustomSelect
                         label="Academic Year"
                         value={selectedYear.toString()}
                         onChange={val => setSelectedYear(parseInt(val))}
@@ -261,7 +285,7 @@ const ManageResults = () => {
                     />
                 </div>
                 <div className="card" style={{ margin: 0, padding: '20px 24px' }}>
-                    <CustomSelect 
+                    <CustomSelect
                         label="Examination Term"
                         value={selectedTerm}
                         onChange={val => setSelectedTerm(val)}
@@ -270,20 +294,23 @@ const ManageResults = () => {
                     />
                 </div>
                 <div className="card" style={{ margin: 0, padding: '20px 24px' }}>
-                    <CustomSelect 
+                    <CustomSelect
                         label="Target Class"
                         value={selectedClassId}
-                        onChange={val => setSelectedClassId(val)}
+                        onChange={val => {
+                            setSelectedClassId(val);
+                            setNewResult(prev => ({ ...prev, subject: '' }));
+                        }}
                         options={classes.map((c: any) => ({ value: c.id, label: c.name }))}
                         icon={<School size={16} />}
                     />
                 </div>
             </div>
 
-            <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', 
-                gap: '32px', 
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                gap: '32px',
                 alignItems: 'start',
                 marginBottom: '32px'
             }}>
@@ -300,8 +327,8 @@ const ManageResults = () => {
                             <Download size={14} /> Download Template
                         </button>
                     </div>
-                    
-                    <div 
+
+                    <div
                         onClick={() => fileInputRef.current?.click()}
                         style={{
                             border: '2px dashed var(--border-soft)',
@@ -325,14 +352,14 @@ const ManageResults = () => {
                             </div>
                         ) : (
                             <>
-                                <div style={{ 
-                                    width: '64px', 
-                                    height: '64px', 
-                                    borderRadius: '50%', 
-                                    background: 'var(--bg-main)', 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
+                                <div style={{
+                                    width: '64px',
+                                    height: '64px',
+                                    borderRadius: '50%',
+                                    background: 'var(--bg-main)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
                                     margin: '0 auto 20px',
                                     border: '1px solid var(--border-soft)',
                                     color: 'var(--primary-bold)'
@@ -355,20 +382,20 @@ const ManageResults = () => {
                         </div>
                         <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Manual Entry</h3>
                     </div>
-                    
+
                     <form onSubmit={handleCreateResult} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                        <CustomSelect 
+                        <CustomSelect
                             label="Student"
                             value={newResult.studentId}
                             onChange={val => setNewResult({ ...newResult, studentId: val })}
-                            options={students.filter(s => s.classId === selectedClassId).map((s: any) => ({ 
-                                value: s.id, 
-                                label: `${s.name} (${s.rollNumber})` 
+                            options={students.filter(s => s.classId === selectedClassId).map((s: any) => ({
+                                value: s.id,
+                                label: `${s.name} (${s.rollNumber})`
                             }))}
                             placeholder="Choose Student..."
                             searchable
                         />
-                        <CustomSelect 
+                        <CustomSelect
                             label="Subject"
                             value={newResult.subject}
                             onChange={val => setNewResult({ ...newResult, subject: val })}
@@ -378,22 +405,22 @@ const ManageResults = () => {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                             <div className="form-group" style={{ margin: 0 }}>
                                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>Obtained</label>
-                                <input 
-                                    type="number" 
+                                <input
+                                    type="number"
                                     placeholder="Score"
-                                    value={newResult.marks} 
-                                    onChange={e => setNewResult({ ...newResult, marks: e.target.value })} 
-                                    required 
+                                    value={newResult.marks}
+                                    onChange={e => setNewResult({ ...newResult, marks: e.target.value })}
+                                    required
                                     style={{ height: '44px' }}
                                 />
                             </div>
                             <div className="form-group" style={{ margin: 0 }}>
                                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>Max Marks</label>
-                                <input 
-                                    type="number" 
-                                    value={newResult.totalMarks} 
-                                    onChange={e => setNewResult({ ...newResult, totalMarks: e.target.value })} 
-                                    required 
+                                <input
+                                    type="number"
+                                    value={newResult.totalMarks}
+                                    onChange={e => setNewResult({ ...newResult, totalMarks: e.target.value })}
+                                    required
                                     style={{ height: '44px' }}
                                 />
                             </div>
@@ -415,16 +442,16 @@ const ManageResults = () => {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                         {studentList.length > 0 && (
-                            <button 
+                            <button
                                 onClick={handleDeleteClassAllResults}
                                 className="btn-danger"
-                                style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: '8px', 
-                                    padding: '8px 16px', 
-                                    fontSize: '0.75rem', 
-                                    fontWeight: 700 
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '8px 16px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700
                                 }}
                             >
                                 <Trash2 size={14} /> Bulk Delete Class Results
@@ -433,7 +460,7 @@ const ManageResults = () => {
                         {isLoading && <Loader2 size={18} className="animate-spin" color="var(--primary-bold)" />}
                     </div>
                 </div>
-                
+
                 <div className="table-responsive" style={{ maxHeight: '600px', overflowY: 'auto' }}>
                     <table className="data-table">
                         <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
@@ -460,31 +487,31 @@ const ManageResults = () => {
                                         </div>
                                     </td>
                                     <td style={{ textAlign: 'center' }}>
-                                        <span style={{ 
-                                            display: 'inline-flex', 
-                                            alignItems: 'center', 
+                                        <span style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
                                             justifyContent: 'center',
-                                            padding: '4px 12px', 
-                                            background: 'var(--bg-main)', 
+                                            padding: '4px 12px',
+                                            background: 'var(--bg-main)',
                                             border: '1px solid var(--border-soft)',
-                                            borderRadius: '6px', 
-                                            fontSize: '0.9rem', 
+                                            borderRadius: '6px',
+                                            fontSize: '0.9rem',
                                             fontWeight: 800,
-                                            minWidth: '44px' 
+                                            minWidth: '44px'
                                         }}>
                                             {data.marks.length} Subjects
                                         </span>
                                     </td>
                                     <td style={{ textAlign: 'right' }}>
                                         <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                                            <button 
-                                                onClick={() => { setSelectedStudent(data); setIsModalOpen(true); }} 
+                                            <button
+                                                onClick={() => { setSelectedStudent(data); setIsModalOpen(true); }}
                                                 className="btn-view-details"
                                             >
                                                 View Details
                                             </button>
-                                            <button 
-                                                onClick={() => handleDeleteStudentAllResults(data.student.id, data.student.name)} 
+                                            <button
+                                                onClick={() => handleDeleteStudentAllResults(data.student.id, data.student.name)}
                                                 className="btn-danger"
                                                 title="Delete all marks for this student"
                                                 style={{ width: '38px', height: '38px', borderRadius: '10px', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
@@ -526,11 +553,11 @@ const ManageResults = () => {
                     zIndex: 2000,
                     padding: '20px'
                 }}>
-                    <div className="card" style={{ 
-                        margin: 0, 
-                        width: '100%', 
-                        maxWidth: '700px', 
-                        maxHeight: '80vh', 
+                    <div className="card" style={{
+                        margin: 0,
+                        width: '100%',
+                        maxWidth: '700px',
+                        maxHeight: '80vh',
                         overflow: 'hidden',
                         display: 'flex',
                         flexDirection: 'column',
@@ -567,18 +594,18 @@ const ManageResults = () => {
                                                 <span style={{ fontSize: '0.7rem', opacity: 0.4, marginLeft: '4px' }}>/{m.totalMarks}</span>
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
-                                                <span style={{ 
-                                                    padding: '4px 10px', 
-                                                    background: 'var(--primary-soft)', 
-                                                    color: 'var(--primary-bold)', 
-                                                    borderRadius: '6px', 
+                                                <span style={{
+                                                    padding: '4px 10px',
+                                                    background: 'var(--primary-soft)',
+                                                    color: 'var(--primary-bold)',
+                                                    borderRadius: '6px',
                                                     fontWeight: 900,
                                                     fontSize: '0.8rem'
                                                 }}>{m.grade}</span>
                                             </td>
                                             <td style={{ textAlign: 'right' }}>
-                                                <button 
-                                                    onClick={() => handleDeleteResult(m.id)} 
+                                                <button
+                                                    onClick={() => handleDeleteResult(m.id)}
                                                     className="btn-danger"
                                                     style={{ width: '32px', height: '32px', padding: 0, borderRadius: '8px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >
@@ -590,36 +617,57 @@ const ManageResults = () => {
                                 </tbody>
                             </table>
                         </div>
-
                         <div style={{ padding: '24px', borderTop: '1px solid var(--border-soft)', background: 'var(--bg-main)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                             <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>
                                 Term Aggregate: <span style={{ color: 'var(--primary-bold)', fontSize: '1.2rem', marginLeft: '8px' }}>{selectedStudent.totalObtained}</span> / {selectedStudent.totalPossible}
                             </div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <button 
+                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                <button
                                     onClick={async () => {
                                         try {
-                                            showToast('Generating consolidated report...', 'info');
+                                            showToast(`Generating ${selectedTerm} report...`, 'info');
+                                            const res = await api.get(`/results/report?studentId=${selectedStudent.student.id}&academicYear=${selectedYear}`);
+                                            await generateResultPDF({ ...res.data, targetSemester: selectedTerm });
+                                            showToast('Report generated successfully', 'success');
+                                        } catch (err) {
+                                            showToast('Failed to generate report', 'error');
+                                        }
+                                    }}
+                                    className="btn-primary"
+                                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: 'var(--accent)', borderColor: 'var(--accent)' }}
+                                >
+                                    <Download size={18} /> {selectedTerm} Report Only
+                                </button>
+
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            const isYearly = selectedTerm === 'Unit-III';
+                                            const title = isYearly ? 'Full Yearly' : 'Progressive';
+                                            showToast(`Generating ${title} report...`, 'info');
                                             const res = await api.get(`/results/report?studentId=${selectedStudent.student.id}&academicYear=${selectedYear}`);
                                             await generateResultPDF(res.data);
                                             showToast('Report generated successfully', 'success');
                                         } catch (err) {
                                             showToast('Failed to generate report', 'error');
                                         }
-                                    }} 
-                                    className="btn-primary" 
+                                    }}
+                                    className="btn-primary"
                                     style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px' }}
                                 >
-                                    <FileCheck size={18} /> Download Official PDF
+                                    <Download size={18} /> Full Progress Report
                                 </button>
-                                <button onClick={() => setIsModalOpen(false)} className="btn-secondary" style={{ padding: '8px 24px' }}>Close View</button>
+
+                                <button onClick={() => setIsModalOpen(false)} className="btn-secondary" style={{ padding: '10px 20px' }}>
+                                    Close View
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            <ConfirmModal 
+            <ConfirmModal
                 isOpen={confirmModal.isOpen}
                 onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
                 onConfirm={confirmModal.onConfirm}

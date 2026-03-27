@@ -1,33 +1,32 @@
 export const SUBJECTS_BY_CLASS: Record<string, string[]> = {
     'Nursery': [
-        'Bengali Language', 'English Literature', 'English Language', 'Hindi', 'Mathematics', 
-        'General Knowledge', 'Computer Oral', 'Computer Practical', 'Physical Education', 
-        'Work Education', 'Bengali Handwriting', 'English Handwriting', 'Mathematics Oral', 
-        'Bengali Rhymes', 'English Rhymes'
+        'Bengali Literature', 'English Literature', 'Mathematics', 
+        'General Knowledge', 'Physical Education', 
+        'Work Education', 'Bengali Handwriting', 'English Handwriting', 
+        'Mathematics Oral', 'Bengali Rhymes', 'English Rhymes'
     ],
     'KG-I': [
-        'Bengali Language', 'English Literature', 'English Language', 'Hindi', 'Mathematics', 
+        'Bengali Literature', 'English Literature', 'Mathematics', 
         'General Knowledge', 'Computer Oral', 'Computer Practical', 'Physical Education', 
         'Work Education', 'Bengali Handwriting', 'English Handwriting', 'Mathematics Oral', 
         'Bengali Rhymes', 'English Rhymes'
     ],
     'KG-II A': [
-        'Bengali Language', 'English Literature', 'English Language', 'Hindi', 'Mathematics', 
-        'Science', 'General Knowledge', 'Computer Written', 'Computer Practical', 
+        'Bengali Literature', 'English Literature', 'Hindi', 'Mathematics', 
+        'General Knowledge', 'Computer Written', 'Computer Practical', 
         'Physical Education', 'Work Education', 'Bengali Handwriting', 'English Handwriting', 
         'Spoken English', 'Project'
     ],
     'KG-II B': [
-        'Bengali Language', 'English Literature', 'English Language', 'Hindi', 'Mathematics', 
-        'Science', 'General Knowledge', 'Computer Written', 'Computer Practical', 
+        'Bengali Literature', 'English Literature', 'Hindi', 'Mathematics', 
+        'General Knowledge', 'Computer Written', 'Computer Practical', 
         'Physical Education', 'Work Education', 'Bengali Handwriting', 'English Handwriting', 
         'Spoken English', 'Project'
     ],
     'STD-I': [
-        'Bengali Literature', 'Bengali Language', 'English Literature', 'English Language', 
-        'Hindi', 'Mathematics', 'HGS', 'History', 'Geography', 'General Knowledge', 
-        'Computer Written', 'Computer Practical', 'Physical Education', 'Work Education', 
-        'Spoken English', 'Project'
+        'Bengali Literature', 'English Literature', 'Hindi', 'Mathematics', 
+        'HGS', 'General Knowledge', 'Computer Written', 'Computer Practical', 
+        'Physical Education', 'Work Education', 'Spoken English', 'Project'
     ],
     'STD-II': [
         'Bengali Literature', 'Bengali Language', 'English Literature', 'English Language', 
@@ -49,41 +48,78 @@ export const SUBJECTS_BY_CLASS: Record<string, string[]> = {
     ]
 };
 
-export const SUBJECT_FULL_MARKS: Record<string, { unit12: number; unit3: number }> = {
-    'Bengali Literature': { unit12: 50, unit3: 100 },
-    'Bengali Language': { unit12: 50, unit3: 100 },
-    'English Literature': { unit12: 50, unit3: 100 },
-    'English Language': { unit12: 50, unit3: 100 },
-    'Hindi': { unit12: 25, unit3: 50 },
-    'Mathematics': { unit12: 50, unit3: 100 },
-    'Science': { unit12: 25, unit3: 50 },
-    'History': { unit12: 25, unit3: 50 },
-    'Geography': { unit12: 25, unit3: 50 },
-    'General Knowledge': { unit12: 25, unit3: 50 },
-    'Computer Written': { unit12: 20, unit3: 40 },
-    'Computer Practical': { unit12: 10, unit3: 20 },
-    'Physical Education': { unit12: 25, unit3: 50 },
-    'Work Education': { unit12: 25, unit3: 50 },
-    'Spoken English': { unit12: 20, unit3: 40 },
-    'Project': { unit12: 25, unit3: 50 },
-    'Bengali Handwriting': { unit12: 15, unit3: 30 },
-    'English Handwriting': { unit12: 15, unit3: 30 },
-    'Mathematics Oral': { unit12: 15, unit3: 30 },
-    'Bengali Rhymes': { unit12: 15, unit3: 30 },
-    'English Rhymes': { unit12: 15, unit3: 30 },
-    'HGS': { unit12: 25, unit3: 50 },
-    'Computer Oral': { unit12: 15, unit3: 30 },
-    'default': { unit12: 50, unit3: 100 }
-};
-
 export const getFullMarks = (subject: string, semester: string, className?: string): number => {
-    let marks = SUBJECT_FULL_MARKS[subject] || SUBJECT_FULL_MARKS['default'];
-    
-    // Special Case: STD-IV Science is 50 instead of 25
-    if (subject === 'Science' && className === 'STD-IV') {
-        marks = { unit12: 50, unit3: 100 };
+    let baseMarks = 50; // default
+
+    if (subject === 'Bengali Literature') {
+        baseMarks = 50;
+    } else if (subject === 'Bengali Language') {
+        baseMarks = 50;
+    } else if (subject === 'English Literature') {
+        baseMarks = 50;
+    } else if (subject === 'English Language') {
+        baseMarks = 50;
+    } else if (subject === 'Hindi') {
+        baseMarks = 25;
+    } else if (subject === 'Mathematics') {
+        baseMarks = 50;
+    } else if (subject === 'Science') {
+        if (className === 'STD-IV') baseMarks = 50;
+        else baseMarks = 25;
+    } else if (subject === 'History') {
+        if (className === 'STD-IV') baseMarks = 50;
+        else baseMarks = 25;
+    } else if (subject === 'Geography') {
+        if (className === 'STD-IV') baseMarks = 50;
+        else baseMarks = 25;
+    } else if (subject === 'General Knowledge') {
+        if (className === 'STD-IV') baseMarks = 50;
+        else baseMarks = 25;
+    } else if (subject === 'Computer Written') {
+        baseMarks = 20;
+    } else if (subject === 'Computer Practical') {
+        baseMarks = 10;
+    } else if (subject === 'Physical Education') {
+        baseMarks = 25;
+    } else if (subject === 'Work Education') {
+        baseMarks = 25;
+    } else if (subject === 'Spoken English') {
+        baseMarks = 20;
+    } else if (subject === 'Project') {
+        if (className === 'KG-II A' || className === 'KG-II B') {
+            baseMarks = 20;
+        } else {
+            baseMarks = 25;
+        }
+    } else if (subject === 'Bengali Handwriting' || subject === 'Bengali Handwraiting') {
+        if (className === 'Nursery') baseMarks = 15;
+        else if (className === 'KG-I') baseMarks = 10;
+        else if (className === 'KG-II A' || className === 'KG-II B') baseMarks = 15;
+        else baseMarks = 15;
+    } else if (subject === 'English Handwriting') {
+        if (className === 'Nursery') baseMarks = 15;
+        else if (className === 'KG-I') baseMarks = 10;
+        else if (className === 'KG-II A' || className === 'KG-II B') baseMarks = 15;
+        else baseMarks = 15;
+    } else if (subject === 'Mathematics Oral') {
+        if (className === 'Nursery') baseMarks = 15;
+        else if (className === 'KG-I') baseMarks = 10;
+        else baseMarks = 15;
+    } else if (subject === 'Bengali Rhymes') {
+        if (className === 'Nursery') baseMarks = 15;
+        else if (className === 'KG-I') baseMarks = 10;
+        else baseMarks = 15;
+    } else if (subject === 'English Rhymes') {
+        if (className === 'Nursery') baseMarks = 15;
+        else if (className === 'KG-I') baseMarks = 10;
+        else baseMarks = 15;
+    } else if (subject === 'HGS') {
+        baseMarks = 25;
+    } else if (subject === 'Computer Oral') {
+        baseMarks = 15;
     }
-    
+
+    const marks = { unit12: baseMarks, unit3: baseMarks * 2 };
     return (semester === 'Unit-III') ? marks.unit3 : marks.unit12;
 };
 

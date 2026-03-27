@@ -323,7 +323,10 @@ const TeacherAttendance = () => {
                         <CustomSelect 
                             label="Target Class"
                             value={markClass}
-                            onChange={val => setMarkClass(val)}
+                            onChange={val => {
+                                setMarkClass(val);
+                                setMarkSubject('');
+                            }}
                             options={classes.map((c: any) => ({ value: c.id, label: c.name }))}
                             icon={<School size={16} />}
                             placeholder="Select Class"

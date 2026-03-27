@@ -177,7 +177,7 @@ const TeacherHomework = () => {
                     <CustomSelect 
                         label="Target Grade"
                         value={newHomework.classId}
-                        onChange={val => setNewHomework({ ...newHomework, classId: val })}
+                        onChange={val => setNewHomework({ ...newHomework, classId: val, subject: '' })}
                         options={classes.map((c: any) => ({ value: c.id, label: c.name }))}
                         icon={<School size={16} />}
                         placeholder={classes.length === 0 ? "Loading Classes..." : "Choose Class..."}
