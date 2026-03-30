@@ -264,6 +264,8 @@ const MonthlyFeeTab = () => {
     const [recent, setRecent] = useState<any[]>([]);
     const [dueList, setDueList] = useState<any[]>([]);
     const [dueClassId, setDueClassId] = useState('');
+    const [dueMonth, setDueMonth] = useState(MONTHS[new Date().getMonth()]);
+    const [dueYear, setDueYear] = useState(CURRENT_YEAR);
     const [classes, setClasses] = useState<any[]>([]);
     const [showDues, setShowDues] = useState(false);
     const [resetCounter, setResetCounter] = useState(0);
@@ -336,7 +338,7 @@ const MonthlyFeeTab = () => {
     const fetchDues = async () => {
         if (!dueClassId) return showToast('Please select a class to load dues', 'error');
         try {
-            const res = await api.get('/fees/monthly/dues', { params: { month: form.month, academicYear: form.academicYear, classId: dueClassId } });
+            const res = await api.get('/fees/monthly/dues', { params: { month: dueMonth, academicYear: dueYear, classId: dueClassId } });
             setDueList(res.data.dues || []);
             setShowDues(true);
         } catch { showToast('Failed to load due report', 'error'); }
@@ -413,12 +415,34 @@ const MonthlyFeeTab = () => {
                 <div className="fees-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <AlertCircle size={20} color="var(--primary-bold)" />
-                        <h3 style={{ margin: 0 }}>Monthly Due Report — {form.month} {form.academicYear}</h3>
+                        <h3 style={{ margin: 0 }}>Monthly Due Report — {dueMonth} {dueYear}</h3>
                     </div>
                 </div>
 
-                <div className="fees-filter-row" style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', marginBottom: '32px', padding: '20px', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-soft)' }}>
-                    <div className="form-group" style={{ flex: 1, minWidth: '200px', margin: 0 }}>
+                <div className="fees-filter-row" style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', marginBottom: '32px', padding: '20px', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-soft)', flexWrap: 'wrap' }}>
+                    <div className="form-group" style={{ flex: 1, minWidth: '150px', margin: 0 }}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Filter by Month</label>
+                        <select 
+                            value={dueMonth} 
+                            onChange={e => setDueMonth(e.target.value)}
+                            style={{ width: '100%', height: '44px', marginTop: '6px' }}
+                        >
+                            {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="form-group" style={{ flex: 0.5, minWidth: '100px', margin: 0 }}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Year</label>
+                        <select 
+                            value={dueYear} 
+                            onChange={e => setDueYear(parseInt(e.target.value))}
+                            style={{ width: '100%', height: '44px', marginTop: '6px' }}
+                        >
+                            {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="form-group" style={{ flex: 1.5, minWidth: '200px', margin: 0 }}>
                         <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Filter by Class</label>
                         <select 
                             value={dueClassId} 
@@ -440,7 +464,7 @@ const MonthlyFeeTab = () => {
                     dueList.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                             <CheckCircle2 size={40} color="#22c55e" style={{ marginBottom: '12px' }} />
-                            <p style={{ fontWeight: 700 }}>All students have paid for {form.month}!</p>
+                            <p style={{ fontWeight: 700 }}>All students have paid for {dueMonth}!</p>
                         </div>
                     ) : (
                         <div className="table-responsive">
