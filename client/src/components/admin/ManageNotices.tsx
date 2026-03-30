@@ -16,18 +16,20 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '../../context/ToastContext';
 
-import { 
-    Plus, 
-    Trash2, 
-    Users as UsersIcon, 
-    GraduationCap, 
-    Megaphone, 
-    X, 
-    Send, 
+import {
+    Plus,
+    Trash2,
+    Users as UsersIcon,
+    GraduationCap,
+    Megaphone,
+    X,
+    Send,
     Lock,
     Calendar,
     Target,
-    User
+    User,
+    Edit,
+    Clock
 } from 'lucide-react';
 import api from '../../services/api';
 import CustomSelect from '../common/CustomSelect';
@@ -37,11 +39,12 @@ interface Notice {
     id: string;
     title: string;
     content: string;
-    type: 'INTERNAL';
-    targetAudience: 'ALL' | 'TEACHER' | 'STUDENT';
+    type: 'INTERNAL' | 'PUBLIC';
+    targetAudience: 'PUBLIC' | 'ALL' | 'TEACHER' | 'STUDENT';
     targetClassId: string | null;
     targetStudentId: string | null;
-    expiresAt: string | null;
+    expiresAt?: string | null;
+    expiresat?: string | null;
     createdAt: string;
 }
 
@@ -62,15 +65,15 @@ const ManageNotices = () => {
     const [students, setStudents] = useState<Student[]>([]);
     const [loading, setLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: '' });
     const { showToast } = useToast();
 
-    
+
     const [formData, setFormData] = useState({
         title: '',
         content: '',
-        type: 'INTERNAL' as const,
-        targetAudience: 'ALL' as 'ALL' | 'TEACHER' | 'STUDENT',
+        targetAudience: 'PUBLIC' as 'PUBLIC' | 'ALL' | 'TEACHER' | 'STUDENT',
         targetClassId: '',
         targetStudentId: '',
         expiresAt: ''
@@ -98,15 +101,6 @@ const ManageNotices = () => {
         loadInitialData();
     }, []);
 
-    const refreshNotices = async () => {
-        try {
-            const res = await api.get('/notices');
-            setNotices(res.data);
-        } catch (error) {
-            console.error('Failed to refresh:', error);
-        }
-    };
-
 
     const handleDeleteNotice = async () => {
         if (!deleteModal.id) return;
@@ -114,48 +108,62 @@ const ManageNotices = () => {
             await api.delete(`/notices/${deleteModal.id}`);
             showToast('Notice successfully removed.', 'success');
             setDeleteModal({ isOpen: false, id: '' });
-            refreshNotices();
+            setNotices(notices.filter(n => n.id !== deleteModal.id));
         } catch (error) {
             console.error('Failed to delete notice:', error);
             showToast('Failed to remove notice. Critical error.', 'error');
         }
     };
 
+    const handleEdit = (notice: Notice) => {
+        setEditingId(notice.id);
+        setFormData({
+            title: notice.title,
+            content: notice.content,
+            targetAudience: notice.type === 'PUBLIC' ? 'PUBLIC' : notice.targetAudience,
+            targetClassId: notice.targetClassId || '',
+            targetStudentId: notice.targetStudentId || '',
+            expiresAt: notice.expiresAt ? new Date(new Date(notice.expiresAt).getTime() - new Date(notice.expiresAt).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''
+        });
+        setIsFormOpen(true);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             const payload = { ...formData };
-            /**
-             * Business Logic: 
-             * If the notice is PUBLIC, it must be available to EVERYONE.
-             * If targeted at TEACHERS, we can't specify a class or student.
-             */
-            payload.type = 'INTERNAL';
             if (payload.targetAudience !== 'STUDENT') {
                 payload.targetClassId = '';
                 payload.targetStudentId = '';
             }
 
-            const res = await api.post('/notices', payload);
-            setNotices([res.data, ...notices]);
+            if (editingId) {
+                const res = await api.patch(`/notices/${editingId}`, payload);
+                setNotices(notices.map(n => n.id === editingId ? res.data : n));
+                showToast('Announcement updated successfully!', 'success');
+            } else {
+                const res = await api.post('/notices', payload);
+                setNotices([res.data, ...notices]);
+                showToast('Announcement broadcasted successfully!', 'success');
+            }
+
             setIsFormOpen(false);
+            setEditingId(null);
             setFormData({
                 title: '',
                 content: '',
-                type: 'INTERNAL',
-                targetAudience: 'ALL',
+                targetAudience: 'PUBLIC',
                 targetClassId: '',
                 targetStudentId: '',
                 expiresAt: ''
             });
-            showToast('Notice broadcasted successfully!', 'success');
         } catch (error) {
-            console.error('Failed to create notice:', error);
-            showToast('Failed to broadcast notice. Please try again.', 'error');
+            console.error('Failed to handle notice submission:', error);
+            showToast('Action failed. Please try again.', 'error');
         }
     };
 
-    const filteredStudents = formData.targetClassId 
+    const filteredStudents = formData.targetClassId
         ? students.filter(s => s.classId === formData.targetClassId)
         : students;
 
@@ -173,10 +181,10 @@ const ManageNotices = () => {
     return (
         <div className="manage-section fade-in">
             {/* Header Section */}
-            <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                 marginBottom: '40px',
                 background: 'var(--bg-card)',
                 padding: '24px',
@@ -185,14 +193,14 @@ const ManageNotices = () => {
                 border: '1px solid var(--border-soft)'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ 
-                        width: '48px', 
-                        height: '48px', 
-                        borderRadius: '12px', 
-                        background: 'var(--primary-soft)', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center' 
+                    <div style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '12px',
+                        background: 'var(--primary-soft)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
                     }}>
                         <Megaphone size={24} color="var(--primary-bold)" />
                     </div>
@@ -202,9 +210,20 @@ const ManageNotices = () => {
                     </div>
                 </div>
                 {!isFormOpen && (
-                    <button 
-                        className="btn-primary" 
-                        onClick={() => setIsFormOpen(true)}
+                    <button
+                        className="btn-primary"
+                        onClick={() => {
+                            setEditingId(null);
+                            setFormData({
+                                title: '',
+                                content: '',
+                                targetAudience: 'PUBLIC',
+                                targetClassId: '',
+                                targetStudentId: '',
+                                expiresAt: ''
+                            });
+                            setIsFormOpen(true);
+                        }}
                         style={{ padding: '12px 24px', gap: '10px' }}
                     >
                         <Plus size={18} /> New Announcement
@@ -214,18 +233,17 @@ const ManageNotices = () => {
 
             {/* Creation Form Section */}
             {isFormOpen && (
-                <div className="card" style={{ 
+                <div className="card" style={{
                     animation: 'fadeIn 0.3s ease-out',
                     background: 'var(--glass-bg)',
                     backdropFilter: 'var(--glass-blur)',
                     border: '1px solid var(--glass-border)',
                     boxShadow: 'var(--shadow-premium)',
                     position: 'relative',
-                    // overflow: 'hidden'
                 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-                        <h3 style={{ margin: 0 }}>Create New Announcement</h3>
-                        <button 
+                        <h3 style={{ margin: 0 }}>{editingId ? 'Edit Announcement' : 'Create New Announcement'}</h3>
+                        <button
                             onClick={() => setIsFormOpen(false)}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
                         >
@@ -236,41 +254,40 @@ const ManageNotices = () => {
                     <form onSubmit={handleSubmit} className="form-grid">
                         <div className="form-group" style={{ gridColumn: 'span 2' }}>
                             <label>Notice Title</label>
-                            <input 
-                                type="text" 
-                                required 
+                            <input
+                                type="text"
+                                required
                                 value={formData.title}
-                                onChange={e => setFormData({...formData, title: e.target.value})}
+                                onChange={e => setFormData({ ...formData, title: e.target.value })}
                                 placeholder="E.g., Special Holiday Announcement"
                             />
                         </div>
 
                         <div className="form-group" style={{ gridColumn: 'span 2' }}>
                             <label>Announcement Details</label>
-                            <textarea 
-                                required 
+                            <textarea
+                                required
                                 rows={4}
                                 value={formData.content}
-                                onChange={e => setFormData({...formData, content: e.target.value})}
+                                onChange={e => setFormData({ ...formData, content: e.target.value })}
                                 placeholder="Provide the detailed content of the notice..."
                                 style={{ minHeight: '120px' }}
                             />
                         </div>
 
-                        {/* Visibility Type Removed - All notices are INTERNAL */}
-
                         <div className="form-group">
-                            <CustomSelect 
+                            <CustomSelect
                                 label="Target Audience"
                                 value={formData.targetAudience}
                                 onChange={val => setFormData({
-                                    ...formData, 
+                                    ...formData,
                                     targetAudience: val as 'ALL' | 'TEACHER' | 'STUDENT',
                                     targetClassId: '',
                                     targetStudentId: ''
                                 })}
                                 options={[
-                                    { value: 'ALL', label: 'Everyone' },
+                                    { value: 'PUBLIC', label: 'Main Website (Public)' },
+                                    { value: 'ALL', label: 'Internal Academy-wide' },
                                     { value: 'TEACHER', label: 'Teaching Staff' },
                                     { value: 'STUDENT', label: 'Students' }
                                 ]}
@@ -281,10 +298,10 @@ const ManageNotices = () => {
                         {formData.targetAudience === 'STUDENT' && (
                             <>
                                 <div className="form-group">
-                                    <CustomSelect 
+                                    <CustomSelect
                                         label="Filter by Class (Optional)"
                                         value={formData.targetClassId}
-                                        onChange={val => setFormData({...formData, targetClassId: val, targetStudentId: ''})}
+                                        onChange={val => setFormData({ ...formData, targetClassId: val, targetStudentId: '' })}
                                         options={[
                                             { value: '', label: 'All Classes' },
                                             ...classes.map(c => ({ value: c.id, label: c.name }))
@@ -294,10 +311,10 @@ const ManageNotices = () => {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <CustomSelect 
+                                    <CustomSelect
                                         label="Individual Student (Optional)"
                                         value={formData.targetStudentId}
-                                        onChange={val => setFormData({...formData, targetStudentId: val})}
+                                        onChange={val => setFormData({ ...formData, targetStudentId: val })}
                                         options={[
                                             { value: '', label: 'All Students in Class' },
                                             ...filteredStudents.map(s => ({ value: s.id, label: s.name }))
@@ -313,10 +330,10 @@ const ManageNotices = () => {
                         <div className="form-group" style={{ gridColumn: 'span 2' }}>
                             <label>Auto-Expiration Date & Time (Optional)</label>
                             <div style={{ position: 'relative' }}>
-                                <input 
-                                    type="datetime-local" 
+                                <input
+                                    type="datetime-local"
                                     value={formData.expiresAt}
-                                    onChange={e => setFormData({...formData, expiresAt: e.target.value})}
+                                    onChange={e => setFormData({ ...formData, expiresAt: e.target.value })}
                                     style={{ paddingLeft: '40px' }}
                                 />
                                 <Calendar size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary-bold)' }} />
@@ -325,16 +342,19 @@ const ManageNotices = () => {
                         </div>
 
                         <div style={{ gridColumn: 'span 2', display: 'flex', gap: '16px', marginTop: '16px', justifyContent: 'flex-end' }}>
-                            <button 
-                                type="button" 
-                                className="btn-danger" 
+                            <button
+                                type="button"
+                                className="btn-danger"
                                 style={{ background: 'var(--bg-main)', border: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}
-                                onClick={() => setIsFormOpen(false)}
+                                onClick={() => {
+                                    setIsFormOpen(false);
+                                    setEditingId(null);
+                                }}
                             >
                                 <X size={16} /> Discard Draft
                             </button>
-                            <button type="submit" className="btn-primary" style={{ minWidth: '180px' }}>
-                                <Send size={16} /> Broadcast Notice
+                            <button type="submit" className="btn-primary" style={{ minWidth: '200px' }}>
+                                <Send size={16} /> {editingId ? 'Update Announcement' : 'Broadcast Notice'}
                             </button>
                         </div>
                     </form>
@@ -378,82 +398,85 @@ const ManageNotices = () => {
                                                 <Calendar size={14} />
                                                 {new Date(notice.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                                             </div>
+                                            {((notice as any)?.expiresAt || (notice as any)?.expiresat) && (
+                                                <div style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '700' }}>
+                                                    <Clock size={12} />
+                                                    Expires: {new Date((notice as any).expiresAt || (notice as any).expiresat).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} • {new Date((notice as any).expiresAt || (notice as any).expiresat).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                                </div>
+                                            )}
                                         </td>
                                         <td>
                                             <div style={{ fontWeight: '700', fontSize: '1rem', color: 'var(--text-main)', marginBottom: '4px' }}>{notice.title}</div>
-                                            <span style={{ 
-                                                display: 'inline-flex', 
-                                                alignItems: 'center', 
-                                                gap: '6px', 
-                                                fontSize: '0.7rem', 
+                                            <span style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                fontSize: '0.7rem',
                                                 fontWeight: '700',
                                                 padding: '2px 8px',
                                                 borderRadius: '20px',
-                                                background: '#fef3c7',
-                                                color: '#b45309'
+                                                background: notice.type === 'PUBLIC' ? '#dcfce7' : '#fef3c7',
+                                                color: notice.type === 'PUBLIC' ? '#166534' : '#b45309'
                                             }}>
                                                 <Lock size={10} />
-                                                INTERNAL NETWORK
+                                                {notice.type === 'PUBLIC' ? 'PUBLIC BROADCAST' : 'INTERNAL NETWORK'}
                                             </span>
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ 
-                                                    width: '32px', 
-                                                    height: '32px', 
-                                                    borderRadius: '8px', 
-                                                    background: 'var(--bg-main)', 
-                                                    display: 'flex', 
-                                                    alignItems: 'center', 
+                                                <div style={{
+                                                    width: '32px',
+                                                    height: '32px',
+                                                    borderRadius: '8px',
+                                                    background: 'var(--bg-main)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
                                                     justifyContent: 'center',
                                                     color: 'var(--primary-bold)'
                                                 }}>
-                                                    {notice.targetAudience === 'ALL' && <UsersIcon size={16}/>}
-                                                    {notice.targetAudience === 'TEACHER' && <GraduationCap size={16}/>}
-                                                    {notice.targetAudience === 'STUDENT' && <User size={16}/>}
+                                                    {notice.type === 'PUBLIC' && <Megaphone size={16} />}
+                                                    {notice.type !== 'PUBLIC' && notice.targetAudience === 'ALL' && <UsersIcon size={16} />}
+                                                    {notice.targetAudience === 'TEACHER' && <GraduationCap size={16} />}
+                                                    {notice.targetAudience === 'STUDENT' && <User size={16} />}
                                                 </div>
                                                 <div>
                                                     <div style={{ fontSize: '0.9rem', fontWeight: '600' }}>
-                                                        {notice.targetAudience === 'ALL' && 'Academy-wide'}
+                                                        {notice.type === 'PUBLIC' && 'Main Landing Page'}
+                                                        {notice.type !== 'PUBLIC' && notice.targetAudience === 'ALL' && 'Academy-wide'}
                                                         {notice.targetAudience === 'TEACHER' && 'Faculty Members'}
                                                         {notice.targetAudience === 'STUDENT' && 'Students Portfolio'}
                                                     </div>
                                                     {notice.targetAudience === 'STUDENT' && (
                                                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                            {notice.targetClassId 
-                                                                ? `${classes.find(c => c.id === notice.targetClassId)?.name || 'Class'}` 
+                                                            {notice.targetClassId
+                                                                ? `${classes.find(c => c.id === notice.targetClassId)?.name || 'Class'}`
                                                                 : 'All Classes'}
                                                             {notice.targetStudentId && ` • Individual Alert`}
-                                                        </div>
-                                                    )}
-                                                    {notice.expiresAt && (
-                                                        <div style={{ 
-                                                            fontSize: '0.7rem', 
-                                                            marginTop: '4px',
-                                                            color: new Date(notice.expiresAt) < new Date() ? 'var(--danger)' : 'var(--success)',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '4px',
-                                                            fontWeight: '700'
-                                                        }}>
-                                                            <Calendar size={10} />
-                                                            {new Date(notice.expiresAt) < new Date() 
-                                                                ? `Expired: ${new Date(notice.expiresAt).toLocaleString()}` 
-                                                                : `Expires: ${new Date(notice.expiresAt).toLocaleString()}`}
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
                                         </td>
+
                                         <td style={{ textAlign: 'right', paddingRight: '32px' }}>
-                                            <button 
-                                                className="btn-danger btn-sm" 
-                                                onClick={() => setDeleteModal({ isOpen: true, id: notice.id })}
-                                                style={{ padding: '8px', borderRadius: '8px' }}
-                                                title="Remove Announcement"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                                <button
+                                                    className="btn-primary"
+                                                    onClick={() => handleEdit(notice)}
+                                                    style={{ padding: '8px', borderRadius: '8px', background: 'var(--primary-soft)', color: 'var(--primary-bold)', border: 'none' }}
+                                                    title="Edit Announcement"
+                                                >
+                                                    <Edit size={16} />
+                                                </button>
+                                                <button
+                                                    className="btn-danger"
+                                                    onClick={() => setDeleteModal({ isOpen: true, id: notice.id })}
+                                                    style={{ padding: '8px', borderRadius: '8px', background: 'var(--danger-soft)', color: 'var(--danger)', border: 'none' }}
+                                                    title="Remove Announcement"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -463,7 +486,7 @@ const ManageNotices = () => {
                 </div>
             </div>
 
-            <ConfirmModal 
+            <ConfirmModal
                 isOpen={deleteModal.isOpen}
                 onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
                 onConfirm={handleDeleteNotice}

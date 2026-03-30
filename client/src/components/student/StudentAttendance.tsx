@@ -128,7 +128,7 @@ const StudentAttendance = () => {
                         Attendance for {monthName} {currentYear}
                     </h3>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-main)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border-soft)' }}>
-                        <button 
+                        <button
                             onClick={handlePrevMonth}
                             className="btn-view-details btn-sm"
                             style={{ padding: '6px', minWidth: 'auto' }}
@@ -139,7 +139,7 @@ const StudentAttendance = () => {
                         <span style={{ fontWeight: '700', fontSize: '0.9rem', padding: '0 8px', minWidth: '120px', textAlign: 'center' }}>
                             {monthName} {currentYear}
                         </span>
-                        <button 
+                        <button
                             onClick={handleNextMonth}
                             className="btn-view-details btn-sm"
                             style={{ padding: '6px', minWidth: 'auto' }}
@@ -166,16 +166,16 @@ const StudentAttendance = () => {
                                 const todayStr = new Date().toLocaleDateString('en-CA');
                                 const isToday = dateStr === todayStr;
                                 const isFuture = dateStr > todayStr;
-                                
+
                                 const record = attendanceData.records.find((r: any) => {
                                     const rDate = new Date(r.date).toLocaleDateString('en-CA');
                                     return rDate === dateStr;
                                 });
 
                                 return (
-                                    <tr 
+                                    <tr
                                         key={dateStr}
-                                        style={{ 
+                                        style={{
                                             background: isToday ? 'rgba(var(--primary-rgb), 0.1)' : 'transparent',
                                             opacity: isToday ? 1 : 0.7,
                                             borderLeft: isToday ? '4px solid var(--primary-bold)' : 'none'
@@ -188,35 +188,35 @@ const StudentAttendance = () => {
                                             {day.toLocaleDateString(undefined, { weekday: 'long' })}
                                         </td>
                                         <td style={{ textAlign: 'center' }}>
-                        {isLoading ? (
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Loading...</span>
-                        ) : (
-                            <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                {record?.status === 'PRESENT' && (
-                                    <span className="badge present" style={{ minWidth: '100px', justifyContent: 'center', gap: '6px' }}>
-                                        <CheckCircle2 size={12} /> PRESENT
-                                    </span>
-                                )}
-                                {record?.status === 'ABSENT' && (
-                                    <span className="badge absent" style={{ minWidth: '100px', justifyContent: 'center', gap: '6px' }}>
-                                        <XCircle size={12} /> ABSENT
-                                    </span>
-                                )}
-                                {!record && (
-                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                        {isToday ? (
-                                            <span className="badge present" style={{ minWidth: '100px', justifyContent: 'center', gap: '6px', opacity: 0.8 }}>
-                                                <CheckCircle2 size={12} /> PRESENT
-                                            </span>
-                                        ) : (
-                                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                                {isFuture ? 'Upcoming' : '—'}
-                                            </span>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                                            {isLoading ? (
+                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Loading...</span>
+                                            ) : (
+                                                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                                    {record?.status === 'PRESENT' && (
+                                                        <span className="badge present" style={{ minWidth: '100px', justifyContent: 'center', gap: '6px' }}>
+                                                            <CheckCircle2 size={12} /> PRESENT
+                                                        </span>
+                                                    )}
+                                                    {record?.status === 'ABSENT' && (
+                                                        <span className="badge absent" style={{ minWidth: '100px', justifyContent: 'center', gap: '6px' }}>
+                                                            <XCircle size={12} /> ABSENT
+                                                        </span>
+                                                    )}
+                                                    {!record && (
+                                                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                                            {isToday ? (
+                                                                <span className="badge present" style={{ minWidth: '100px', justifyContent: 'center', gap: '6px', opacity: 0.8 }}>
+                                                                    <CheckCircle2 size={12} /> PRESENT
+                                                                </span>
+                                                            ) : (
+                                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                                                    {isFuture ? 'Upcoming' : '—'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </td>
                                         <td>
                                             {record?.subject ? (

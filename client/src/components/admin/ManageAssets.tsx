@@ -1,54 +1,78 @@
 /**
  * Unified Asset Management (CMS)
  * 
- * A centralized interface for managing all public-facing visual content:
- * - Hero Banner: The top-most visual on the landing page.
- * - Festival Image: The middle section for seasonal announcements.
- * - School Gallery: A collection of academic moments and activities.
+ * A centralized interface for managing all public-facing content:
+ * - Hero & Festival Banners
+ * - Class Toppers (Academic Excellence)
+ * - School Resources (Downloadable files)
+ * - School Gallery & Alumni Memories
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import ConfirmModal from '../common/ConfirmModal';
 import { 
     Image as ImageIcon, 
-    Plus, 
     Trash2, 
-    List, 
     Monitor, 
     Star,
-    Sparkles
+    Trophy,
+    FileText,
+    Users,
+    Upload,
+    Edit,
+    X
 } from 'lucide-react';
+
+type TabType = 'hero' | 'festivals' | 'toppers' | 'resources' | 'gallery' | 'alumni';
 
 const ManageAssets = () => {
     const { showToast } = useToast();
-    const [activeTab, setActiveTab] = useState<'hero' | 'festival' | 'gallery'>('hero');
-    
-    // Banner states
-    const [heroBanner, setHeroBanner] = useState('');
-    const [festivalBanner, setFestivalBanner] = useState('');
-    const [bannerFile, setBannerFile] = useState<File | null>(null);
-    const [isUploading, setIsUploading] = useState(false);
-    const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: '' });
-    const [previewUrl, setPreviewUrl] = useState('');
+    const [activeTab, setActiveTab] = useState<TabType>('hero');
+    const [resetKey, setResetKey] = useState(0); // Add a key to force re-mounting inputs
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Gallery states
+    
+    // Common states
+    const [isUploading, setIsUploading] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: '', type: '' as TabType });
+    const [previewUrl, setPreviewUrl] = useState('');
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+    // Data states
+    const [heroBanner, setHeroBanner] = useState('');
+    const [festivalBanners, setFestivalBanners] = useState([]);
+    const [toppers, setToppers] = useState([]);
+    const [resources, setResources] = useState([]);
     const [galleryImages, setGalleryImages] = useState([]);
-    const [galleryForm, setGalleryForm] = useState({ title: '', description: '' });
-    const [galleryFile, setGalleryFile] = useState<File | null>(null);
+    const [alumniPhotos, setAlumniPhotos] = useState([]);
+
+    // Form states
+    const [topperForm, setTopperForm] = useState({ name: '', class: '', rank: '', gender: 'boy', session: '2025-26' });
+    const [resourceForm, setResourceForm] = useState({ title: '', category: 'General' });
+    const [alumniForm, setAlumniForm] = useState({ batch: '', description: '' });
+    const [festivalForm, setFestivalForm] = useState({ title: '' });
+    const [galleryForm, setGalleryForm] = useState({ title: '' });
 
     const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || '';
 
     const fetchData = async () => {
         try {
-            const [heroRes, festRes, galleryRes] = await Promise.all([
+            const [heroRes, festRes, toppersRes, resRes, galleryRes, alumniRes] = await Promise.all([
                 api.get('/system/hero-banner'),
-                api.get('/system/festival-banner'),
-                api.get('/gallery')
+                api.get('/system/festival-banner/all'),
+                api.get('/toppers'),
+                api.get('/resources'),
+                api.get('/gallery'),
+                api.get('/alumni')
             ]);
             setHeroBanner(heroRes.data.url);
-            setFestivalBanner(festRes.data.url);
-            setGalleryImages(galleryRes.data);
+            setFestivalBanners(festRes.data.banners || []);
+            setToppers(toppersRes.data.students || []);
+            setResources(resRes.data || []);
+            setGalleryImages(galleryRes.data || []);
+            setAlumniPhotos(alumniRes.data || []);
         } catch (error) {
             console.error('Failed to fetch assets:', error);
         }
@@ -58,257 +82,333 @@ const ManageAssets = () => {
         fetchData();
     }, []);
 
-    const handleBannerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFile = e.target.files?.[0];
-        if (selectedFile) {
-            setBannerFile(selectedFile);
-            setPreviewUrl(URL.createObjectURL(selectedFile));
+    const resetForm = () => {
+        setSelectedFile(null);
+        setPreviewUrl('');
+        setEditingId(null);
+        setTopperForm({ name: '', class: '', rank: '', gender: 'boy', session: '2025-26' });
+        setResourceForm({ title: '', category: 'General' });
+        setAlumniForm({ batch: '', description: '' });
+        setFestivalForm({ title: '' });
+        setGalleryForm({ title: '' });
+        setResetKey(prev => prev + 1);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
         }
     };
 
-    const handleBannerUpload = async (type: 'hero' | 'festival') => {
-        if (!bannerFile) return;
-        setIsUploading(true);
-        const formData = new FormData();
-        formData.append('banner', bannerFile);
+    // Cleanup blob URLs to prevent memory leaks
+    useEffect(() => {
+        return () => {
+            if (previewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(previewUrl);
+            }
+        };
+    }, [previewUrl]);
 
-        try {
-            const endpoint = type === 'hero' ? '/system/hero-banner' : '/system/festival-banner';
-            const res = await api.post(endpoint, formData);
-            
-            if (type === 'hero') setHeroBanner(res.data.url);
-            else setFestivalBanner(res.data.url);
-            
-            setBannerFile(null);
-            setPreviewUrl('');
-            showToast(`${type === 'hero' ? 'Hero' : 'Festival'} banner updated!`, 'success');
-        } catch (error: any) {
-            console.error('FULL UPLOAD ERROR:', error);
-            const status = error.response?.status;
-            const code = error.code;
-            const serverMsg = error.response?.data?.message;
-            
-            let msg = 'Upload failed.';
-            if (code === 'ECONNABORTED') msg = 'Upload timed out (too slow).';
-            else if (status === 413) msg = 'File too large for server (413).';
-            else if (status) msg = `Server Error (${status}): ${serverMsg || 'Unknown'}`;
-            else if (code) msg = `Network Error: ${code}`;
-
-            showToast(msg, 'error');
-        } finally {
-            setIsUploading(false);
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setSelectedFile(file);
+            setPreviewUrl(URL.createObjectURL(file));
         }
     };
 
-    const handleGalleryUpload = async (e: React.FormEvent) => {
+    const handleEdit = (item: any) => {
+        setEditingId(item.id);
+        setPreviewUrl(''); // Clear new file preview
+        
+        switch (activeTab) {
+            case 'festivals':
+                setFestivalForm({ title: item.title });
+                setPreviewUrl(`${baseUrl}${item.imageUrl}`);
+                break;
+            case 'toppers':
+                setTopperForm({ name: item.name, class: item.class, rank: item.rank, gender: item.gender, session: item.session });
+                setPreviewUrl(`${baseUrl}${item.photo}`);
+                break;
+            case 'resources':
+                setResourceForm({ title: item.title, category: item.category });
+                break;
+            case 'gallery':
+                setGalleryForm({ title: item.title });
+                setPreviewUrl(`${baseUrl}${item.imageUrl}`);
+                break;
+            case 'alumni':
+                setAlumniForm({ batch: item.batch, description: item.description || '' });
+                setPreviewUrl(`${baseUrl}${item.imageUrl}`);
+                break;
+        }
+    };
+
+    const handleUpload = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!galleryFile) {
-            showToast('Select an image.', 'warning');
+        if (!selectedFile && !editingId && activeTab !== 'hero') {
+            showToast('Please select a file to upload.', 'warning');
             return;
         }
 
+        setIsUploading(true);
         const formData = new FormData();
-        formData.append('title', galleryForm.title);
-        formData.append('description', galleryForm.description);
-        formData.append('image', galleryFile);
+        
+        // Add file if selected
+        if (selectedFile) {
+            const fieldName = activeTab === 'resources' ? 'file' : 
+                            (activeTab === 'hero' || activeTab === 'festivals' ? 'banner' : 
+                            (activeTab === 'toppers' ? 'photo' : 'image'));
+            formData.append(fieldName, selectedFile);
+        }
+        
+        // Add specific form data
+        if (activeTab === 'toppers') {
+            Object.entries(topperForm).forEach(([k, v]) => formData.append(k, v));
+        } else if (activeTab === 'resources') {
+            Object.entries(resourceForm).forEach(([k, v]) => formData.append(k, v));
+        } else if (activeTab === 'alumni') {
+            Object.entries(alumniForm).forEach(([k, v]) => formData.append(k, v));
+        } else if (activeTab === 'festivals') {
+            formData.append('title', festivalForm.title);
+        } else if (activeTab === 'gallery') {
+            formData.append('title', galleryForm.title);
+        }
 
         try {
-            await api.post('/gallery', formData);
-            setGalleryForm({ title: '', description: '' });
-            setGalleryFile(null);
+            let endpoint = '';
+            switch (activeTab) {
+                case 'hero': endpoint = '/system/hero-banner'; break;
+                case 'festivals': endpoint = editingId ? `/system/festival-banner/${editingId}` : '/system/festival-banner/add'; break;
+                case 'toppers': endpoint = editingId ? `/toppers/${editingId}` : '/toppers'; break; 
+                case 'resources': endpoint = editingId ? `/resources/${editingId}` : '/resources'; break;
+                case 'gallery': endpoint = editingId ? `/gallery/${editingId}` : '/gallery'; break;
+                case 'alumni': endpoint = editingId ? `/alumni/${editingId}` : '/alumni'; break;
+            }
+
+            if (editingId) {
+                await api.patch(endpoint, formData);
+                showToast('Asset updated successfully!', 'success');
+            } else {
+                await api.post(endpoint, formData);
+                showToast('Asset published successfully!', 'success');
+            }
+            
+            resetForm();
             fetchData();
-            showToast('Gallery image added!', 'success');
         } catch (error: any) {
-            console.error('GALLERY UPLOAD ERROR:', error);
-            const status = error.response?.status;
-            const code = error.code;
-            const serverMsg = error.response?.data?.message;
-
-            let msg = 'Gallery upload failed.';
-            if (code === 'ECONNABORTED') msg = 'Gallery upload timed out.';
-            else if (status === 413) msg = 'Image too large (413).';
-            else if (status) msg = `Server Error (${status}): ${serverMsg || 'Unknown'}`;
-            else if (code) msg = `Network Error: ${code}`;
-
-            showToast(msg, 'error');
+            showToast(error.response?.data?.message || 'Action failed.', 'error');
+        } finally {
+            setIsUploading(false);
         }
     };
 
     const handleDelete = async () => {
         if (!deleteModal.id) return;
         try {
-            await api.delete(`/gallery/${deleteModal.id}`); // Changed from /assets to /gallery based on existing code
-            setGalleryImages(galleryImages.filter((img: any) => img.id !== deleteModal.id));
-            showToast('Image removed.', 'success');
-            setDeleteModal({ isOpen: false, id: '' });
+            let endpoint = '';
+            switch (deleteModal.type) {
+                case 'festivals': endpoint = `/system/festival-banner/${deleteModal.id}`; break;
+                case 'toppers': endpoint = `/toppers/${deleteModal.id}`; break;
+                case 'resources': endpoint = `/resources/${deleteModal.id}`; break;
+                case 'gallery': endpoint = `/gallery/${deleteModal.id}`; break;
+                case 'alumni': endpoint = `/alumni/${deleteModal.id}`; break;
+            }
+            await api.delete(endpoint);
+            showToast('Item removed.', 'success');
+            setDeleteModal({ isOpen: false, id: '', type: '' as TabType });
+            fetchData();
         } catch (error) {
-            console.error('Failed to delete asset:', error);
             showToast('Delete failed.', 'error');
         }
     };
 
     return (
         <div className="manage-section">
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '32px' }}>
-                <button 
-                    onClick={() => { setActiveTab('hero'); setBannerFile(null); setPreviewUrl(''); }}
-                    className={`btn-tab ${activeTab === 'hero' ? 'active' : ''}`}
-                    style={{ 
-                        flex: 1, padding: '16px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                        background: activeTab === 'hero' ? 'var(--primary-bold)' : 'var(--bg-card)',
-                        color: activeTab === 'hero' ? 'white' : 'var(--text-main)',
-                        border: '1px solid var(--border-soft)', boxShadow: activeTab === 'hero' ? 'var(--shadow-lg)' : 'none', fontWeight: '700'
-                    }}
-                >
-                    <Monitor size={18} /> Main Banner
-                </button>
-                <button 
-                    onClick={() => { setActiveTab('festival'); setBannerFile(null); setPreviewUrl(''); }}
-                    className={`btn-tab ${activeTab === 'festival' ? 'active' : ''}`}
-                    style={{ 
-                        flex: 1, padding: '16px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                        background: activeTab === 'festival' ? 'var(--primary-bold)' : 'var(--bg-card)',
-                        color: activeTab === 'festival' ? 'white' : 'var(--text-main)',
-                        border: '1px solid var(--border-soft)', boxShadow: activeTab === 'festival' ? 'var(--shadow-lg)' : 'none', fontWeight: '700'
-                    }}
-                >
-                    <Star size={18} /> Festival Photo
-                </button>
-                <button 
-                    onClick={() => setActiveTab('gallery')}
-                    className={`btn-tab ${activeTab === 'gallery' ? 'active' : ''}`}
-                    style={{ 
-                        flex: 1, padding: '16px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                        background: activeTab === 'gallery' ? 'var(--primary-bold)' : 'var(--bg-card)',
-                        color: activeTab === 'gallery' ? 'white' : 'var(--text-main)',
-                        border: '1px solid var(--border-soft)', boxShadow: activeTab === 'gallery' ? 'var(--shadow-lg)' : 'none', fontWeight: '700'
-                    }}
-                >
-                    <ImageIcon size={18} /> School Gallery
-                </button>
+            <div className="tab-navigation" style={{ display: 'flex', gap: '8px', marginBottom: '32px', overflowX: 'auto', paddingBottom: '8px' }}>
+                {[
+                    { id: 'hero', icon: <Monitor size={16} />, label: 'Hero' },
+                    { id: 'festivals', icon: <Star size={16} />, label: 'Festivals' },
+                    { id: 'toppers', icon: <Trophy size={16} />, label: 'Toppers' },
+                    { id: 'resources', icon: <FileText size={16} />, label: 'Resources' },
+                    { id: 'gallery', icon: <ImageIcon size={16} />, label: 'Gallery' },
+                    { id: 'alumni', icon: <Users size={16} />, label: 'Alumni' }
+                ].map((tab) => (
+                    <button 
+                        key={tab.id}
+                        onClick={() => { setActiveTab(tab.id as TabType); resetForm(); }}
+                        className={`btn-tab ${activeTab === tab.id ? 'active' : ''}`}
+                        style={{ 
+                            padding: '12px 20px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px',
+                            background: activeTab === tab.id ? 'var(--primary-bold)' : 'var(--bg-card)',
+                            color: activeTab === tab.id ? 'white' : 'var(--text-main)',
+                            border: '1px solid var(--border-soft)', fontWeight: '700', whiteSpace: 'nowrap'
+                        }}
+                    >
+                        {tab.icon} {tab.label}
+                    </button>
+                ))}
             </div>
 
-            {(activeTab === 'hero' || activeTab === 'festival') && (
-                <div className="card" style={{ animation: 'fadeIn 0.3s ease-out' }}>
-                    <h3>
-                        {activeTab === 'hero' ? <Monitor size={20} color="var(--primary-bold)" /> : <Sparkles size={20} color="var(--primary-bold)" />}
-                        {activeTab === 'hero' ? 'Manage Main Page Banner' : 'Manage Festival Photo'}
-                    </h3>
-                    <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>
-                        {activeTab === 'hero' 
-                            ? 'The hero banner is the first impression visitors get. Use a high-quality wide asset.' 
-                            : 'This image appears in the middle section of the landing page for special occasions.'}
-                    </p>
+            <div className="card-container" style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                <div className="card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3 style={{ textTransform: 'capitalize' }}>{editingId ? 'Edit' : 'Manage'} {activeTab} Content</h3>
+                        {editingId && (
+                            <button onClick={resetForm} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}>
+                                <X size={14} /> Cancel Edit
+                            </button>
+                        )}
+                    </div>
+                    <form onSubmit={handleUpload} className="form-grid" style={{ marginTop: '20px' }}>
+                        
+                        {/* Tab Specific Fields */}
+                        {activeTab === 'festivals' && (
+                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                <label>Festival Title</label>
+                                <input type="text" value={festivalForm.title} onChange={e => setFestivalForm({title: e.target.value})} placeholder="e.g., Happy Eid-ul-Fitr" required />
+                            </div>
+                        )}
 
-                    <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '40px' }}>
-                        <div className="form-group">
-                            <label>Currently Live</label>
-                            <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-soft)', background: 'var(--bg-main)' }}>
-                                <img 
-                                    src={(activeTab === 'hero' ? heroBanner : festivalBanner).startsWith('/') ? `${baseUrl}${activeTab === 'hero' ? heroBanner : festivalBanner}` : (activeTab === 'hero' ? heroBanner : festivalBanner)} 
-                                    alt="Live" 
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        {activeTab === 'toppers' && (
+                            <>
+                                <div className="form-group">
+                                    <label>Student Name</label>
+                                    <input type="text" value={topperForm.name} onChange={e => setTopperForm({...topperForm, name: e.target.value})} required />
+                                </div>
+                                <div className="form-group">
+                                    <label>Class</label>
+                                    <input type="text" value={topperForm.class} onChange={e => setTopperForm({...topperForm, class: e.target.value})} required />
+                                </div>
+                                <div className="form-group">
+                                    <label>Rank (e.g. 1st)</label>
+                                    <input type="text" value={topperForm.rank} onChange={e => setTopperForm({...topperForm, rank: e.target.value})} required />
+                                </div>
+                                <div className="form-group">
+                                    <label>Academic Session</label>
+                                    <input type="text" value={topperForm.session} onChange={e => setTopperForm({...topperForm, session: e.target.value})} required />
+                                </div>
+                            </>
+                        )}
+
+                        {activeTab === 'resources' && (
+                            <>
+                                <div className="form-group">
+                                    <label>Resource Title</label>
+                                    <input type="text" value={resourceForm.title} onChange={e => setResourceForm({...resourceForm, title: e.target.value})} required />
+                                </div>
+                                <div className="form-group">
+                                    <label>Category</label>
+                                    <input type="text" value={resourceForm.category} onChange={e => setResourceForm({...resourceForm, category: e.target.value})} placeholder="e.g., Admission, Exam" />
+                                </div>
+                            </>
+                        )}
+
+                        {activeTab === 'alumni' && (
+                            <>
+                                <div className="form-group">
+                                    <label>Batch (Year)</label>
+                                    <input type="text" value={alumniForm.batch} onChange={e => setAlumniForm({...alumniForm, batch: e.target.value})} placeholder="e.g. 2024" required />
+                                </div>
+                                <div className="form-group">
+                                    <label>Description (Optional)</label>
+                                    <input type="text" value={alumniForm.description} onChange={e => setAlumniForm({...alumniForm, description: e.target.value})} />
+                                </div>
+                            </>
+                        )}
+
+                        {activeTab === 'gallery' && (
+                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                <label>Moment Title</label>
+                                <input type="text" value={galleryForm.title} onChange={e => setGalleryForm({title: e.target.value})} placeholder="Annual Sports 2026" required />
+                             </div>
+                        )}
+
+                        {/* Common File Upload */}
+                        <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                            <label>{activeTab === 'resources' ? (editingId ? 'Replace File (Optional)' : 'Select File (PDF/Doc)') : (editingId ? 'Replace Image (Optional)' : 'Select Image')}</label>
+                            <div 
+                                onClick={() => fileInputRef.current?.click()}
+                                style={{ 
+                                    position: 'relative', width: '100%', aspectRatio: activeTab === 'resources' ? 'auto' : '16/9', 
+                                    minHeight: '100px', border: '2px dashed var(--primary-bold)', borderRadius: '12px', 
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--primary-soft)', 
+                                    overflow: 'hidden', cursor: 'pointer' 
+                                }}
+                            >
+                                {(previewUrl || (activeTab === 'hero' && heroBanner)) && activeTab !== 'resources' ? (
+                                    <img 
+                                        src={previewUrl ? previewUrl : (activeTab === 'hero' && heroBanner ? `${baseUrl}${heroBanner}` : '')} 
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} 
+                                        alt="Current or preview"
+                                    />
+                                ) : (
+                                    <div style={{ textAlign: 'center', pointerEvents: 'none' }}>
+                                        {activeTab === 'resources' ? <Upload size={30} /> : <ImageIcon size={30} />}
+                                        <p style={{ margin: '8px 0 0', fontSize: '0.8rem' }}>{selectedFile ? selectedFile.name : 'Click to Browse'}</p>
+                                    </div>
+                                )}
+                                <input 
+                                    key={resetKey}
+                                    ref={fileInputRef}
+                                    type="file" 
+                                    onChange={handleFileChange} 
+                                    style={{ display: 'none' }} 
                                 />
                             </div>
                         </div>
 
-                        <div className="form-group">
-                            <label>Upload New</label>
-                            <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', marginBottom: '16px' }}>
-                                <input type="file" accept="image/*" onChange={handleBannerFileChange} style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer', zIndex: 10 }} />
-                                <div style={{ width: '100%', height: '100%', border: '2px dashed var(--primary-bold)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--primary-soft)', overflow: 'hidden' }}>
-                                    {previewUrl ? <img src={previewUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <ImageIcon size={32} color="var(--primary-bold)" />}
-                                </div>
-                            </div>
-                            <button className="btn-primary" disabled={!bannerFile || isUploading} onClick={() => handleBannerUpload(activeTab)} style={{ width: '100%', height: '48px' }}>
-                                {isUploading ? 'Processing...' : 'Deploy to Website'}
-                            </button>
-                        </div>
-                    </div>
+                        <button className="btn-primary" type="submit" disabled={isUploading} style={{ gridColumn: 'span 2', height: '48px' }}>
+                            {isUploading ? 'Processing...' : (editingId ? 'Update & Save' : 'Save & Publish')}
+                        </button>
+                    </form>
                 </div>
-            )}
 
-            {activeTab === 'gallery' && (
-                <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
-                    <div className="card" style={{ background: 'var(--glass-bg)', backdropFilter: 'var(--glass-blur)', border: '1px solid var(--glass-border)' }}>
-                        <h3 style={{ marginBottom: '24px' }}><Plus size={20} color="var(--primary-bold)" /> Add New Moment to Gallery</h3>
-                        <form onSubmit={handleGalleryUpload} className="form-grid" style={{ gridTemplateColumns: '1.2fr 1fr', gap: '32px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                <div className="form-group">
-                                    <label>Event Title</label>
-                                    <input type="text" placeholder="e.g., Annual Sports Day 2026" value={galleryForm.title} onChange={e => setGalleryForm({...galleryForm, title: e.target.value})} required style={{ height: '48px' }} />
-                                </div>
-                                <div className="form-group">
-                                    <label>Description (Optional)</label>
-                                    <textarea placeholder="Tell the story behind this photo..." value={galleryForm.description} onChange={e => setGalleryForm({...galleryForm, description: e.target.value})} style={{ minHeight: '100px', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', resize: 'vertical' }} />
-                                </div>
-                            </div>
-
-                            <div className="form-group">
-                                <label>Selection Photo</label>
-                                <div style={{ position: 'relative', width: '100%', aspectRatio: '4/3', marginBottom: '16px' }}>
-                                    <input 
-                                        type="file" 
-                                        accept="image/*" 
-                                        onChange={e => {
-                                            const file = e.target.files?.[0] || null;
-                                            setGalleryFile(file);
-                                            if (file) setPreviewUrl(URL.createObjectURL(file));
-                                            else setPreviewUrl('');
-                                        }} 
-                                        style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer', zIndex: 10 }} 
-                                    />
-                                    <div style={{ 
-                                        width: '100%', 
-                                        height: '100%', 
-                                        border: '2px dashed var(--primary-bold)', 
-                                        borderRadius: '12px', 
-                                        display: 'flex', 
-                                        flexDirection: 'column',
-                                        alignItems: 'center', 
-                                        justifyContent: 'center', 
-                                        background: 'var(--primary-soft)', 
-                                        overflow: 'hidden',
-                                        transition: 'all 0.2s ease'
-                                    }}>
-                                        {previewUrl && galleryFile ? (
-                                            <img src={previewUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                        ) : (
-                                            <>
-                                                <ImageIcon size={40} color="var(--primary-bold)" style={{ marginBottom: '12px', opacity: 0.7 }} />
-                                                <span style={{ fontSize: '0.9rem', color: 'var(--primary-bold)', fontWeight: 700 }}>Click or Drag Photo</span>
-                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>PNG, JPG, WebP up to 5MB</span>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                                <button type="submit" className="btn-primary" style={{ width: '100%', height: '48px', fontSize: '1rem', fontWeight: 800 }}>
-                                    <ImageIcon size={20} /> Publish to Gallery
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-
+                {/* List Views */}
+                {activeTab !== 'hero' && (
                     <div className="card" style={{ marginTop: '24px' }}>
-                        <h3><List size={20} color="var(--primary-bold)" /> Active Gallery</h3>
+                        <h3>Active {activeTab}</h3>
                         <div className="table-responsive">
                             <table className="data-table">
                                 <thead>
                                     <tr>
-                                        <th>Preview</th>
-                                        <th>Title</th>
-                                        <th style={{ textAlign: 'right' }}>Action</th>
+                                        {activeTab === 'resources' ? (
+                                            <><th>Title</th><th>Category</th></>
+                                        ) : (
+                                            <><th>Preview</th><th>Detail</th></>
+                                        )}
+                                        <th style={{ textAlign: 'right' }}>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {galleryImages.map((img: any) => (
-                                        <tr key={img.id}>
-                                            <td>
-                                                <img src={`${baseUrl}${img.imageUrl}`} style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
-                                            </td>
-                                            <td>{img.title}</td>
+                                    {(activeTab === 'festivals' ? festivalBanners : 
+                                      activeTab === 'toppers' ? toppers :
+                                      activeTab === 'resources' ? resources :
+                                      activeTab === 'gallery' ? galleryImages :
+                                      activeTab === 'alumni' ? alumniPhotos : []).map((item: any) => (
+                                        <tr key={item.id}>
+                                            {activeTab === 'resources' ? (
+                                                <>
+                                                    <td style={{ fontWeight: 700 }}>{item.title}</td>
+                                                    <td>{item.category}</td>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <td>
+                                                        <img 
+                                                            src={`${baseUrl}${item.imageUrl || item.photo}`} 
+                                                            style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} 
+                                                            alt="Preview"
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ fontWeight: 700 }}>{item.title || item.name || `Batch ${item.batch}`}</div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{item.class || item.description || ''}</div>
+                                                    </td>
+                                                </>
+                                            )}
                                             <td style={{ textAlign: 'right' }}>
-                                                <button onClick={() => setDeleteModal({ isOpen: true, id: img.id })} className="btn-danger btn-sm"><Trash2 size={14} /></button>
+                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                    <button onClick={() => handleEdit(item)} className="btn-primary btn-sm" style={{ background: 'var(--primary-soft)', color: 'var(--primary-bold)', border: 'none' }}><Edit size={14} /></button>
+                                                    <button onClick={() => setDeleteModal({ isOpen: true, id: item.id, type: activeTab })} className="btn-danger btn-sm" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: 'none' }}><Trash2 size={14} /></button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -316,16 +416,17 @@ const ManageAssets = () => {
                             </table>
                         </div>
                     </div>
-                </div>
-            )}
-        <ConfirmModal 
-            isOpen={deleteModal.isOpen}
-            onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
-            onConfirm={handleDelete}
-            title="Remove Asset"
-            message="Are you sure you want to delete this photo from the gallery? This action is permanent."
-        />
-    </div>
+                )}
+            </div>
+
+            <ConfirmModal 
+                isOpen={deleteModal.isOpen}
+                onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
+                onConfirm={handleDelete}
+                title="Remove Item"
+                message="Are you sure you want to delete this content? This action is permanent."
+            />
+        </div>
     );
 };
 

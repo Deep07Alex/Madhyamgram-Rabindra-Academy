@@ -20,6 +20,9 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import noticeRoutes from './routes/noticeRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
+import topperRoutes from './routes/topperRoutes.js';
+import resourceRoutes from './routes/resourceRoutes.js';
+import alumniRoutes from './routes/alumniRoutes.js';
 import { db } from './lib/db.js';
 import { initDb } from './lib/initDb.js';
 import { initCronJobs } from './lib/cron.js';
@@ -148,6 +151,9 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notices', noticeRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/system', systemRoutes);
+app.use('/api/toppers', topperRoutes);
+app.use('/api/resources', resourceRoutes);
+app.use('/api/alumni', alumniRoutes);
 
 // SSE
 app.get('/api/events', (req, res) => {

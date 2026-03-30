@@ -133,6 +133,6 @@ export const sendToClass = (classId: string, event: SSEEventType, data: Record<s
     clients.forEach(c => {
         try {
             c.res.write(payload);
-        } catch (err) {}
+        } catch (err) { }
     });
 };

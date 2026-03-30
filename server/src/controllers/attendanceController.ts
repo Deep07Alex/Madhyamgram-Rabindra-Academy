@@ -63,7 +63,7 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
         broadcast('attendance:updated', { studentId, date: attendanceDateStr });
         sendToUser(studentId, 'attendance:updated', { date: attendanceDateStr });
         sendToRole('ADMIN', 'attendance:updated', { studentId, date: attendanceDateStr });
-        
+
         res.status(200).json(attendanceRes.rows[0]);
     } catch (error) {
         console.error('Error marking student attendance:', error);
@@ -79,7 +79,7 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
 export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
     const { studentId, studentIds, classId, startDate, endDate } = req.query;
     const targetStudentId = studentId || (req.user?.role === 'STUDENT' ? req.user.id : null);
-    
+
     // Normalize studentIds if it's a string or array
     let targetStudentIds: string[] | null = null;
     if (studentIds) {
@@ -100,7 +100,7 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
             ORDER BY session_date DESC
         `);
         const sessionDates = allSessionsRes.rows.map(r => new Date(r.session_date).toLocaleDateString('en-CA'));
-        
+
         // 2. Add today's date if not already in session dates (Virtual Presence for Today)
         const todayStr = new Date().toLocaleDateString('en-CA');
         if (!sessionDates.includes(todayStr)) {
@@ -141,7 +141,7 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
 
         const attendanceRes = await db.query(query, params);
         const realRecords = attendanceRes.rows;
-        
+
         // 3. Merge real records with virtual PRESENT records for all sessions (for single student history)
         if (!targetStudentId && (!targetStudentIds || targetStudentIds.length === 0)) {
             return res.json({
@@ -176,7 +176,7 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
                 isVirtual: true // Flag for debugging if needed
             };
         }).filter(Boolean);
-        
+
         res.json({
             records: finalRecords,
             totalSessions
@@ -227,11 +227,11 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
                  WHERE id = $6
                  RETURNING *`,
                 [
-                    status || null, 
-                    status === 'ABSENT' ? reason : null, 
-                    arrivalTime || null, 
-                    departureTime || null, 
-                    earlyLeaveReason || null, 
+                    status || null,
+                    status === 'ABSENT' ? reason : null,
+                    arrivalTime || null,
+                    departureTime || null,
+                    earlyLeaveReason || null,
                     existingCheck.rows[0].id
                 ]
             );
@@ -243,13 +243,13 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                  RETURNING *`,
                 [
-                    id, 
-                    attendanceDateStr, 
-                    status || 'PRESENT', 
-                    status === 'ABSENT' ? reason : null, 
-                    arrivalTime || null, 
-                    departureTime || null, 
-                    earlyLeaveReason || null, 
+                    id,
+                    attendanceDateStr,
+                    status || 'PRESENT',
+                    status === 'ABSENT' ? reason : null,
+                    arrivalTime || null,
+                    departureTime || null,
+                    earlyLeaveReason || null,
                     targetTeacherId
                 ]
             );
@@ -258,7 +258,7 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
         broadcast('attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr });
         sendToUser(targetTeacherId, 'attendance:updated', { date: attendanceDateStr });
         sendToRole('ADMIN', 'attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr });
-        
+
         res.status(200).json(attendanceRes.rows[0]);
     } catch (error) {
         console.error('Error marking teacher attendance:', error);
@@ -289,7 +289,7 @@ export const updateStudentAttendance = async (req: AuthRequest, res: Response) =
         }
 
         const record = result.rows[0];
-        
+
         // Broadcast updates asynchronously so they don't block the response or cause 500s
         try {
             const sid = record.studentId || record.studentid;
@@ -328,7 +328,7 @@ export const updateTeacherAttendance = async (req: AuthRequest, res: Response) =
 
     try {
         console.log(`Admin updating teacher attendance ${id}:`, req.body);
-        
+
         const result = await db.query(
             `UPDATE "TeacherAttendance" 
              SET status = CAST($1 AS "AttendanceStatus"), 
@@ -347,10 +347,10 @@ export const updateTeacherAttendance = async (req: AuthRequest, res: Response) =
              WHERE id = $5 
              RETURNING *`,
             [
-                status, 
-                reason || null, 
-                arrivalTime || null, 
-                departureTime || null, 
+                status,
+                reason || null,
+                arrivalTime || null,
+                departureTime || null,
                 id,
                 reasonProvided,
                 arrivalProvided,

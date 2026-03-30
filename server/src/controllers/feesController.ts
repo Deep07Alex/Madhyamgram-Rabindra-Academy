@@ -62,24 +62,47 @@ export const recordMonthlyFee = async (req: Request, res: Response) => {
             );
         }
 
-        // CREATE AUTO-NOTICE FOR STUDENT (Valid for 24 HOURS)
+        // CREATE OR UPDATE AUTO-NOTICE FOR STUDENT (Valid for 24 HOURS)
         try {
             const expiresAt = new Date();
             expiresAt.setHours(expiresAt.getHours() + 24);
+            const noticeTitle = `Fee Record: ${month} ${year}`;
 
-            await db.query(
-                `INSERT INTO "Notice" 
-                    (id, title, content, type, "targetAudience", "targetStudentId", "expiresAt")
-                 VALUES (gen_random_uuid(), $1, $2, 'INTERNAL', 'STUDENT', $3, $4)`,
-                [
-                    `Fee Record: ${month} ${year}`,
-                    `Your fees for ${month} ${year} has been updated/cleared successfully. Total paid: ₹${total.toFixed(2)}.`,
-                    stuUUID,
-                    expiresAt
-                ]
+            // Check if a notice already exists for this fee entry
+            const existingNotice = await db.query(
+                `SELECT id FROM "Notice" 
+                 WHERE "targetStudentId" = $1 AND title = $2 AND type = 'INTERNAL' LIMIT 1`,
+                [stuUUID, noticeTitle]
             );
+
+            if (existingNotice.rows.length > 0) {
+                // Update existing notice
+                await db.query(
+                    `UPDATE "Notice" 
+                     SET content = $1, "expiresAt" = $2, "createdAt" = CURRENT_TIMESTAMP
+                     WHERE id = $3`,
+                    [
+                        `Your fees for ${month} ${year} has been updated/cleared successfully. Total paid: ₹${total.toFixed(2)}.`,
+                        expiresAt,
+                        existingNotice.rows[0].id
+                    ]
+                );
+            } else {
+                // Insert new notice
+                await db.query(
+                    `INSERT INTO "Notice" 
+                        (id, title, content, type, "targetAudience", "targetStudentId", "expiresAt")
+                     VALUES (gen_random_uuid(), $1, $2, 'INTERNAL', 'STUDENT', $3, $4)`,
+                    [
+                        noticeTitle,
+                        `Your fees for ${month} ${year} has been updated/cleared successfully. Total paid: ₹${total.toFixed(2)}.`,
+                        stuUUID,
+                        expiresAt
+                    ]
+                );
+            }
         } catch (noticeErr) {
-            console.error('Failed to create auto-notice for fee payment:', noticeErr);
+            console.error('Failed to update/create auto-notice for fee payment:', noticeErr);
         }
 
         res.status(201).json(result.rows[0]);
@@ -226,24 +249,47 @@ export const recordAdmissionFee = async (req: Request, res: Response) => {
             );
         }
 
-        // CREATE AUTO-NOTICE FOR STUDENT (Valid for 24 HOURS)
+        // CREATE OR UPDATE AUTO-NOTICE FOR STUDENT (Valid for 24 HOURS)
         try {
             const expiresAt = new Date();
             expiresAt.setHours(expiresAt.getHours() + 24);
+            const noticeTitle = `Admission Fee Update`;
 
-            await db.query(
-                `INSERT INTO "Notice" 
-                    (id, title, content, type, "targetAudience", "targetStudentId", "expiresAt")
-                 VALUES (gen_random_uuid(), $1, $2, 'INTERNAL', 'STUDENT', $3, $4)`,
-                [
-                    `Admission Fee Update`,
-                    `Your admission fee record has been updated on ${date}. Paid: ₹${paid.toFixed(2)}, Remaining Due: ₹${due.toFixed(2)}.`,
-                    stuUUID,
-                    expiresAt
-                ]
+            // Check if a notice already exists
+            const existingNotice = await db.query(
+                `SELECT id FROM "Notice" 
+                 WHERE "targetStudentId" = $1 AND title = $2 AND type = 'INTERNAL' LIMIT 1`,
+                [stuUUID, noticeTitle]
             );
+
+            if (existingNotice.rows.length > 0) {
+                // Update
+                await db.query(
+                    `UPDATE "Notice" 
+                     SET content = $1, "expiresAt" = $2, "createdAt" = CURRENT_TIMESTAMP
+                     WHERE id = $3`,
+                    [
+                        `Your admission fee record has been updated on ${date}. Paid: ₹${paid.toFixed(2)}, Remaining Due: ₹${due.toFixed(2)}.`,
+                        expiresAt,
+                        existingNotice.rows[0].id
+                    ]
+                );
+            } else {
+                // Insert
+                await db.query(
+                    `INSERT INTO "Notice" 
+                        (id, title, content, type, "targetAudience", "targetStudentId", "expiresAt")
+                     VALUES (gen_random_uuid(), $1, $2, 'INTERNAL', 'STUDENT', $3, $4)`,
+                    [
+                        noticeTitle,
+                        `Your admission fee record has been updated on ${date}. Paid: ₹${paid.toFixed(2)}, Remaining Due: ₹${due.toFixed(2)}.`,
+                        stuUUID,
+                        expiresAt
+                    ]
+                );
+            }
         } catch (noticeErr) {
-            console.error('Failed to create admission notice:', noticeErr);
+            console.error('Failed to update/create admission notice:', noticeErr);
         }
 
         res.status(201).json(result.rows[0]);

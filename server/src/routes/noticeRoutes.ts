@@ -5,7 +5,7 @@
  * Supports public access for landing page visibility.
  */
 import express from 'express';
-import { createNotice, getNotices, deleteNotice } from '../controllers/noticeController.js';
+import { createNotice, getNotices, deleteNotice, updateNotice } from '../controllers/noticeController.js';
 import { authenticate, authorize, optionalAuthenticate } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -16,6 +16,7 @@ router.get('/', optionalAuthenticate, getNotices);
 // For authenticated users, `req.user` will be populated, yielding appropriate notices.
 
 router.post('/', authenticate, authorize(['ADMIN']), createNotice);
+router.patch('/:id', authenticate, authorize(['ADMIN']), updateNotice);
 router.delete('/:id', authenticate, authorize(['ADMIN']), deleteNotice);
 
 export default router;

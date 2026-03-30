@@ -47,6 +47,31 @@ export const getGalleryImages = async (req: Request, res: Response) => {
 };
 
 /**
+ * Updates a gallery image's metadata or file.
+ */
+export const updateGalleryImage = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { title, description } = req.body;
+
+        const currentResult = await db.query('SELECT "imageUrl" FROM "Gallery" WHERE id = $1', [id]);
+        if (currentResult.rowCount === 0) return res.status(404).json({ message: 'Gallery image not found' });
+        
+        const imageUrl = req.file ? `/uploads/${req.file.filename}` : currentResult.rows[0].imageUrl;
+
+        const updateRes = await db.query(
+            `UPDATE "Gallery" SET title = $1, description = $2, "imageUrl" = $3 WHERE id = $4 RETURNING *`,
+            [title, description || null, imageUrl, id]
+        );
+
+        res.json(updateRes.rows[0]);
+    } catch (error) {
+        console.error('Error updating gallery:', error);
+        res.status(500).json({ message: 'Error updating gallery' });
+    }
+};
+
+/**
  * Deletes an image from the gallery database.
  */
 export const deleteGalleryImage = async (req: Request, res: Response) => {

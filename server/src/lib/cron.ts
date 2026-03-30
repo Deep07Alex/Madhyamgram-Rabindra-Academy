@@ -16,7 +16,7 @@ export const initCronJobs = () => {
     // Runs at 00:00 every day
     cron.schedule('0 0 0 * * *', async () => {
         console.log('Running Midnight Auto-Attendance Job...');
-        
+
         try {
             // Check system configuration
             const configRes = await db.query('SELECT value FROM "SystemConfig" WHERE key = $1', ['attendance_override']);
@@ -59,7 +59,7 @@ export const initCronJobs = () => {
             console.log('Cleaning up student/teacher attendance records older than 30 days...');
             const cleanupStudent = await db.query(`DELETE FROM "Attendance" WHERE date < (CURRENT_DATE - INTERVAL '30 days')`);
             const cleanupTeacher = await db.query(`DELETE FROM "TeacherAttendance" WHERE date < (CURRENT_DATE - INTERVAL '30 days')`);
-            
+
             console.log(`Cleanup complete. Deleted ${cleanupStudent.rowCount} student and ${cleanupTeacher.rowCount} teacher records.`);
             console.log('Midnight Auto-Attendance Job COMPLETED.');
         } catch (error) {
