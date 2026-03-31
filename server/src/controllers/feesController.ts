@@ -412,3 +412,42 @@ export const searchStudents = async (req: Request, res: Response) => {
         res.status(500).json({ message: 'Search failed' });
     }
 };
+/** Student retrieves their own fee records for the Accounts page */
+export const getMyFees = async (req: any, res: Response) => {
+    const { id: studentId } = req.user;
+
+    try {
+        // 1. Get student info and their class's monthly fee
+        const stuRes = await db.query(
+            `SELECT s.id, s.name, s."studentId", c.name AS "className", c."monthlyFee"
+             FROM "Student" s
+             JOIN "Class" c ON c.id = s."classId"
+             WHERE s.id = $1`,
+            [studentId]
+        );
+
+        if (stuRes.rows.length === 0) return res.status(404).json({ message: 'Student not found' });
+        const student = stuRes.rows[0];
+
+        // 2. Get all monthly fee payments for this student
+        const monthlyFeesRes = await db.query(
+            `SELECT * FROM "MonthlyFee" WHERE "studentId" = $1 ORDER BY "academicYear" DESC, "month" ASC`,
+            [studentId]
+        );
+
+        // 3. Get admission fee record
+        const admissionFeeRes = await db.query(
+            `SELECT * FROM "AdmissionFee" WHERE "studentId" = $1 LIMIT 1`,
+            [studentId]
+        );
+
+        res.json({
+            student,
+            monthlyFees: monthlyFeesRes.rows,
+            admissionFee: admissionFeeRes.rows[0] || null
+        });
+    } catch (error) {
+        console.error('getMyFees error:', error);
+        res.status(500).json({ message: 'Failed to fetch account records' });
+    }
+};

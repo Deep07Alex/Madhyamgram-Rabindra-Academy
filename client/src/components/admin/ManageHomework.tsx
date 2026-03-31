@@ -30,7 +30,7 @@ import {
 import CustomSelect from '../common/CustomSelect';
 import ConfirmModal from '../common/ConfirmModal';
 import FileUploadPicker from '../shared/FileUploadPicker';
-import { MAIN_SUBJECTS, SUBJECTS_BY_CLASS } from '../../utils/constants';
+
 import { School, Type } from 'lucide-react';
 
 const ManageHomework = () => {
@@ -214,7 +214,7 @@ const ManageHomework = () => {
                         label="Subject Domain"
                         value={newHomework.subject}
                         onChange={val => setNewHomework({ ...newHomework, subject: val })}
-                        options={(SUBJECTS_BY_CLASS[classes.find((c: any) => c.id === newHomework.classId)?.name || ''] || MAIN_SUBJECTS).map(sub => ({ value: sub, label: sub }))}
+                        options={(classes.find((c: any) => c.id === newHomework.classId)?.subjects || []).map((sub:any) => ({ value: sub.name, label: sub.name }))}
                         icon={<GraduationCap size={16} />}
                     />
                     <div className="form-group" style={{ gridColumn: 'span 2' }}>

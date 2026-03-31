@@ -86,7 +86,8 @@ export const initDb = async () => {
             CREATE TABLE IF NOT EXISTS "Class" (
                 "id" TEXT PRIMARY KEY,
                 "name" TEXT UNIQUE NOT NULL,
-                "grade" INTEGER NOT NULL
+                "grade" INTEGER NOT NULL,
+                "monthlyFee" NUMERIC(10,2) NOT NULL DEFAULT 0
             );
 
             -- _ClassToTeacher (Implicit M:N join table)
@@ -198,6 +199,25 @@ export const initDb = async () => {
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            -- Subject Table
+            CREATE TABLE IF NOT EXISTS "Subject" (
+                "id" TEXT PRIMARY KEY,
+                "classId" TEXT NOT NULL REFERENCES "Class"("id") ON DELETE CASCADE,
+                "name" TEXT NOT NULL,
+                "fullMarks" INTEGER NOT NULL DEFAULT 100,
+                "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            -- Auto-populate Subject table from existing Result data
+            INSERT INTO "Subject" (id, "classId", name, "fullMarks")
+            SELECT gen_random_uuid()::text, s."classId", r."subject", CAST(MAX(r."totalMarks") AS INTEGER)
+            FROM "Result" r
+            JOIN "Student" s ON r."studentId" = s.id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM "Subject" sub WHERE sub."classId" = s."classId" AND sub.name = r."subject"
+            )
+            GROUP BY s."classId", r."subject";
+
             -- Notice Table
             CREATE TABLE IF NOT EXISTS "Notice" (
                 "id" TEXT PRIMARY KEY,
@@ -207,7 +227,7 @@ export const initDb = async () => {
                 "targetAudience" TEXT DEFAULT 'ALL' CHECK ("targetAudience" IN ('ALL', 'TEACHER', 'STUDENT')),
                 "targetClassId" TEXT REFERENCES "Class"("id") ON DELETE CASCADE,
                 "targetStudentId" TEXT REFERENCES "Student"("id") ON DELETE CASCADE,
-                "expiresAt" TIMESTAMP(3),
+                "expiresAt" TIMESTAMPTZ,
                 "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -242,6 +262,20 @@ export const initDb = async () => {
                 "value" TEXT NOT NULL,
                 "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+
+            -- Ensure Notice table has TIMESTAMPTZ for expiration handling
+            DO $$ BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Notice' AND column_name = 'expiresAt' AND data_type = 'timestamp without time zone') THEN
+                    ALTER TABLE "Notice" ALTER COLUMN "expiresAt" TYPE TIMESTAMPTZ;
+                END IF;
+            END $$;
+
+            -- Ensure Class table has monthlyFee column
+            DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Class' AND column_name = 'monthlyFee') THEN
+                    ALTER TABLE "Class" ADD COLUMN "monthlyFee" NUMERIC(10,2) NOT NULL DEFAULT 0;
+                END IF;
+            END $$;
 
             -- Default System Data
             INSERT INTO "SystemConfig" ("key", "value") VALUES ('attendance_override', 'AUTO') ON CONFLICT ("key") DO NOTHING;
@@ -355,7 +389,112 @@ export const initDb = async () => {
             CREATE INDEX IF NOT EXISTS "idx_notice_createdAt" ON "Notice"("createdAt");
         `);
 
-        console.log('Database finalized and ready.');
+        console.log('Database finalized and ready. Running predefined Subject seeding...');
+
+        // 5. Pre-fill Subject Table with Hardcoded Syllabus Mappings (Nursery to STD-IV)
+        const SUBJECTS_BY_CLASS: Record<string, string[]> = {
+            'Nursery': [
+                'Bengali Literature', 'English Literature', 'Mathematics', 'General Knowledge',
+                'Physical Education', 'Work Education', 'Bengali Handwriting', 'English Handwriting',
+                'Mathematics Oral', 'Bengali Rhymes', 'English Rhymes'
+            ],
+            'KG-I': [
+                'Bengali Literature', 'English Literature', 'Mathematics', 'General Knowledge',
+                'Computer Oral', 'Computer Practical', 'Physical Education', 'Work Education',
+                'Bengali Handwriting', 'English Handwriting', 'Mathematics Oral', 'Bengali Rhymes',
+                'English Rhymes'
+            ],
+            'KG-II A': [
+                'Bengali Literature', 'English Literature', 'Hindi', 'Mathematics', 'General Knowledge',
+                'Computer Written', 'Computer Practical', 'Physical Education', 'Work Education',
+                'Bengali Handwriting', 'English Handwriting', 'Spoken English', 'Project'
+            ],
+            'KG-II B': [
+                'Bengali Literature', 'English Literature', 'Hindi', 'Mathematics', 'General Knowledge',
+                'Computer Written', 'Computer Practical', 'Physical Education', 'Work Education',
+                'Bengali Handwriting', 'English Handwriting', 'Spoken English', 'Project'
+            ],
+            'STD-I': [
+                'Bengali Literature', 'English Literature', 'Hindi', 'Mathematics', 'HGS', 'General Knowledge',
+                'Computer Written', 'Computer Practical', 'Physical Education', 'Work Education',
+                'Spoken English', 'Project'
+            ],
+            'STD-II': [
+                'Bengali Literature', 'Bengali Language', 'English Literature', 'English Language', 'Hindi',
+                'Mathematics', 'Science', 'History', 'Geography', 'General Knowledge', 'Computer Written',
+                'Computer Practical', 'Physical Education', 'Work Education', 'Spoken English', 'Project'
+            ],
+            'STD-III': [
+                'Bengali Literature', 'Bengali Language', 'English Literature', 'English Language', 'Hindi',
+                'Mathematics', 'Science', 'History', 'Geography', 'General Knowledge', 'Computer Written',
+                'Computer Practical', 'Physical Education', 'Work Education', 'Spoken English', 'Project'
+            ],
+            'STD-IV': [
+                'Bengali Literature', 'Bengali Language', 'English Literature', 'English Language', 'Hindi',
+                'Mathematics', 'Science', 'History', 'Geography', 'General Knowledge', 'Computer Written',
+                'Computer Practical', 'Physical Education', 'Work Education', 'Spoken English', 'Project'
+            ]
+        };
+
+        const getFullMarks = (subject: string, className: string = ''): number => {
+            switch (subject.trim()) {
+                case 'Bengali Literature':
+                case 'Bengali Language':
+                case 'English Literature':
+                case 'English Language':
+                case 'Mathematics':
+                    return 50;
+                case 'Science':
+                case 'History':
+                case 'Geography':
+                case 'General Knowledge':
+                    return className === 'STD-IV' ? 50 : 25;
+                case 'Hindi':
+                case 'HGS':
+                case 'Physical Education':
+                case 'Work Education':
+                    return 25;
+                case 'Project':
+                    return (className === 'KG-II A' || className === 'KG-II B') ? 20 : 25;
+                case 'Computer Written':
+                    return 20;
+                case 'Computer Practical':
+                    return 10;
+                case 'Computer Oral':
+                    return 15;
+                case 'Spoken English':
+                    return 20;
+                case 'Bengali Handwriting':
+                case 'Bengali Handwraiting':
+                case 'English Handwriting':
+                    return className === 'KG-I' ? 10 : 15;
+                case 'Mathematics Oral':
+                case 'Bengali Rhymes':
+                case 'English Rhymes':
+                    return className === 'KG-I' ? 10 : 15;
+                default:
+                    return 50;
+            }
+        };
+
+        const classesRes = await db.query('SELECT id, name FROM "Class"');
+        for (const cls of classesRes.rows) {
+            const list = SUBJECTS_BY_CLASS[cls.name];
+            if (!list) continue;
+            
+            for (const sub of list) {
+                const fm = getFullMarks(sub, cls.name);
+                await db.query(`
+                    INSERT INTO "Subject" (id, "classId", name, "fullMarks")
+                    SELECT gen_random_uuid()::text, $1, $2, $3
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM "Subject" WHERE "classId" = $1 AND name = $2
+                    )
+                `, [cls.id, sub, fm]);
+            }
+        }
+        console.log('Subject seeding completed successfully.');
+
     } catch (error) {
         console.error('Critical Database initialization failure:', error);
     }

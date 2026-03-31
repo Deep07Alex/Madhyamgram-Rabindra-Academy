@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import useServerEvents from '../../hooks/useServerEvents';
-import { MAIN_SUBJECTS, SUBJECTS_BY_CLASS } from '../../utils/constants';
+
 import FileUploadPicker from '../shared/FileUploadPicker';
 import CustomSelect from '../common/CustomSelect';
 import ConfirmModal from '../common/ConfirmModal';
@@ -186,7 +186,7 @@ const TeacherHomework = () => {
                         label="Subject Domain"
                         value={newHomework.subject}
                         onChange={val => setNewHomework({ ...newHomework, subject: val })}
-                        options={(SUBJECTS_BY_CLASS[classes.find((c: any) => c.id === newHomework.classId)?.name || ''] || MAIN_SUBJECTS).map(sub => ({ value: sub, label: sub }))}
+                        options={(classes.find((c: any) => c.id === newHomework.classId)?.subjects || []).map((sub:any) => ({ value: sub.name, label: sub.name }))}
                         icon={<GraduationCap size={16} />}
                     />
                     <div className="form-group" style={{ gridColumn: 'span 2' }}>
@@ -645,7 +645,7 @@ const TeacherHomework = () => {
                                 label="Subject Domain"
                                 value={editHomework.subject}
                                 onChange={val => setEditHomework({ ...editHomework, subject: val })}
-                                options={(SUBJECTS_BY_CLASS[classes.find((c: any) => c.id === editHomework.classId)?.name || ''] || MAIN_SUBJECTS).map(sub => ({ value: sub, label: sub }))}
+                                options={(classes.find((c: any) => c.id === editHomework.classId)?.subjects || []).map((sub:any) => ({ value: sub.name, label: sub.name }))}
                                 icon={<GraduationCap size={16} />}
                             />
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>

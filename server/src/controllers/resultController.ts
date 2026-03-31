@@ -73,25 +73,54 @@ export const bulkUploadResults = async (req: Request, res: Response) => {
 
         // Determine if first row is "Full Marks" row
         let fullMarksRow = dataRows[0];
-        let startIndex = 0;
         const isFullMarksRow = String(fullMarksRow['Name'] || fullMarksRow['Roll']).includes('Full Marks');
         
-        if (isFullMarksRow) {
-            startIndex = 1;
-            console.log('Detected Full Marks row in Excel');
-        } else {
-            fullMarksRow = null;
+        if (!isFullMarksRow) {
+            return res.status(400).json({ message: 'Validation Failed: Could not find the required "Full Marks" row in the uploaded Excel template.' });
         }
+
+        const uploadedSubjects = Object.keys(dataRows[0]).filter(k => !ignoredColumns.includes(k));
+        
+        // Strict Validation: Compare with database configuration for this class
+        const classSubjectsRes = await db.query('SELECT name, "fullMarks" FROM "Subject" WHERE "classId" = $1', [classId]);
+        const classSubjects = classSubjectsRes.rows;
+        const configuredSubjectNames = classSubjects.map(s => s.name);
+
+        // 1. Check for unassigned subjects in Excel
+        for (const sub of uploadedSubjects) {
+            if (!configuredSubjectNames.includes(sub)) {
+                return res.status(400).json({ message: `Validation Failed: Subject "${sub}" found in Excel is NOT assigned to this class!` });
+            }
+        }
+
+        // 2. Check for missing assigned subjects in Excel
+        for (const sub of configuredSubjectNames) {
+            if (!uploadedSubjects.includes(sub)) {
+                return res.status(400).json({ message: `Validation Failed: Configured subject "${sub}" is MISSING from the Excel file!` });
+            }
+        }
+
+        // 3. Check if all Full Marks are exactly matching
+        for (const sub of uploadedSubjects) {
+            const uploadedMarks = parseFloat(fullMarksRow[sub]);
+            const configuredMarks = classSubjects.find(s => s.name === sub)?.fullMarks;
+            
+            if (uploadedMarks !== configuredMarks) {
+                return res.status(400).json({ 
+                    message: `Validation Failed: Full marks mismatch for "${sub}". Excel says ${uploadedMarks}, but system is configured for ${configuredMarks}. Please fix Excel or Admin configuration.` 
+                });
+            }
+        }
+
+        console.log('Strict Validation Passed: Excel exactly matches Class Configuration.');
 
         // Process in a single transaction for efficiency using Bulk INSERT
         const client = await db.connect();
         try {
             await client.query('BEGIN');
 
-            const classRes = await client.query('SELECT name FROM "Class" WHERE id = $1', [classId]);
-            const className = classRes.rows[0]?.name || '';
-
-            for (let i = startIndex; i < dataRows.length; i++) {
+            // Skip the full marks row which is at index 0
+            for (let i = 1; i < dataRows.length; i++) {
                 const row = dataRows[i];
                 const rawAdmissionNo = row['Admission No'] || row['Admission Regn. No.'] || row['Admission Register No'];
                 if (!rawAdmissionNo) continue;
@@ -104,18 +133,15 @@ export const bulkUploadResults = async (req: Request, res: Response) => {
                     continue;
                 }
 
-                for (const key of Object.keys(row)) {
-                    if (ignoredColumns.includes(key)) continue;
-
+                for (const key of uploadedSubjects) {
                     const marksValue = row[key];
                     if (marksValue === undefined || marksValue === null || marksValue === '') continue;
                     
                     const marks = parseFloat(marksValue);
                     if (isNaN(marks)) continue;
 
-                    // PERMANENT FIX: Overwrite the Excel Full Marks with the Official Rulebook
-                    // This ensures Unit-III is always individual marks (e.g., 50) and never cumulative (100)
-                    const totalMarks = getOfficialFullMarks(key, className);
+                    // Pull dynamic total marks directly from database matched class config
+                    const totalMarks = classSubjects.find(s => s.name === key)?.fullMarks || 100;
 
                     resultsToInsert.push({
                         id: crypto.randomUUID(),

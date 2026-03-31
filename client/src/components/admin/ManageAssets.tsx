@@ -11,10 +11,10 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import ConfirmModal from '../common/ConfirmModal';
-import { 
-    Image as ImageIcon, 
-    Trash2, 
-    Monitor, 
+import {
+    Image as ImageIcon,
+    Trash2,
+    Monitor,
     Star,
     Trophy,
     FileText,
@@ -32,7 +32,7 @@ const ManageAssets = () => {
     const [resetKey, setResetKey] = useState(0); // Add a key to force re-mounting inputs
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    
+
     // Common states
     const [isUploading, setIsUploading] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -117,7 +117,7 @@ const ManageAssets = () => {
     const handleEdit = (item: any) => {
         setEditingId(item.id);
         setPreviewUrl(''); // Clear new file preview
-        
+
         switch (activeTab) {
             case 'festivals':
                 setFestivalForm({ title: item.title });
@@ -150,15 +150,15 @@ const ManageAssets = () => {
 
         setIsUploading(true);
         const formData = new FormData();
-        
+
         // Add file if selected
         if (selectedFile) {
-            const fieldName = activeTab === 'resources' ? 'file' : 
-                            (activeTab === 'hero' || activeTab === 'festivals' ? 'banner' : 
-                            (activeTab === 'toppers' ? 'photo' : 'image'));
+            const fieldName = activeTab === 'resources' ? 'file' :
+                (activeTab === 'hero' || activeTab === 'festivals' ? 'banner' :
+                    (activeTab === 'toppers' ? 'photo' : 'image'));
             formData.append(fieldName, selectedFile);
         }
-        
+
         // Add specific form data
         if (activeTab === 'toppers') {
             Object.entries(topperForm).forEach(([k, v]) => formData.append(k, v));
@@ -177,7 +177,7 @@ const ManageAssets = () => {
             switch (activeTab) {
                 case 'hero': endpoint = '/system/hero-banner'; break;
                 case 'festivals': endpoint = editingId ? `/system/festival-banner/${editingId}` : '/system/festival-banner/add'; break;
-                case 'toppers': endpoint = editingId ? `/toppers/${editingId}` : '/toppers'; break; 
+                case 'toppers': endpoint = editingId ? `/toppers/${editingId}` : '/toppers'; break;
                 case 'resources': endpoint = editingId ? `/resources/${editingId}` : '/resources'; break;
                 case 'gallery': endpoint = editingId ? `/gallery/${editingId}` : '/gallery'; break;
                 case 'alumni': endpoint = editingId ? `/alumni/${editingId}` : '/alumni'; break;
@@ -190,7 +190,7 @@ const ManageAssets = () => {
                 await api.post(endpoint, formData);
                 showToast('Asset published successfully!', 'success');
             }
-            
+
             resetForm();
             fetchData();
         } catch (error: any) {
@@ -231,11 +231,11 @@ const ManageAssets = () => {
                     { id: 'gallery', icon: <ImageIcon size={16} />, label: 'Gallery' },
                     { id: 'alumni', icon: <Users size={16} />, label: 'Alumni' }
                 ].map((tab) => (
-                    <button 
+                    <button
                         key={tab.id}
                         onClick={() => { setActiveTab(tab.id as TabType); resetForm(); }}
                         className={`btn-tab ${activeTab === tab.id ? 'active' : ''}`}
-                        style={{ 
+                        style={{
                             padding: '12px 20px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px',
                             background: activeTab === tab.id ? 'var(--primary-bold)' : 'var(--bg-card)',
                             color: activeTab === tab.id ? 'white' : 'var(--text-main)',
@@ -258,12 +258,12 @@ const ManageAssets = () => {
                         )}
                     </div>
                     <form onSubmit={handleUpload} className="form-grid" style={{ marginTop: '20px' }}>
-                        
+
                         {/* Tab Specific Fields */}
                         {activeTab === 'festivals' && (
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                 <label>Festival Title</label>
-                                <input type="text" value={festivalForm.title} onChange={e => setFestivalForm({title: e.target.value})} placeholder="e.g., Happy Eid-ul-Fitr" required />
+                                <input type="text" value={festivalForm.title} onChange={e => setFestivalForm({ title: e.target.value })} placeholder="e.g., Rabindra Jayenti" required />
                             </div>
                         )}
 
@@ -271,19 +271,19 @@ const ManageAssets = () => {
                             <>
                                 <div className="form-group">
                                     <label>Student Name</label>
-                                    <input type="text" value={topperForm.name} onChange={e => setTopperForm({...topperForm, name: e.target.value})} required />
+                                    <input type="text" value={topperForm.name} onChange={e => setTopperForm({ ...topperForm, name: e.target.value })} required />
                                 </div>
                                 <div className="form-group">
                                     <label>Class</label>
-                                    <input type="text" value={topperForm.class} onChange={e => setTopperForm({...topperForm, class: e.target.value})} required />
+                                    <input type="text" value={topperForm.class} onChange={e => setTopperForm({ ...topperForm, class: e.target.value })} required />
                                 </div>
                                 <div className="form-group">
                                     <label>Rank (e.g. 1st)</label>
-                                    <input type="text" value={topperForm.rank} onChange={e => setTopperForm({...topperForm, rank: e.target.value})} required />
+                                    <input type="text" value={topperForm.rank} onChange={e => setTopperForm({ ...topperForm, rank: e.target.value })} required />
                                 </div>
                                 <div className="form-group">
                                     <label>Academic Session</label>
-                                    <input type="text" value={topperForm.session} onChange={e => setTopperForm({...topperForm, session: e.target.value})} required />
+                                    <input type="text" value={topperForm.session} onChange={e => setTopperForm({ ...topperForm, session: e.target.value })} required />
                                 </div>
                             </>
                         )}
@@ -292,11 +292,11 @@ const ManageAssets = () => {
                             <>
                                 <div className="form-group">
                                     <label>Resource Title</label>
-                                    <input type="text" value={resourceForm.title} onChange={e => setResourceForm({...resourceForm, title: e.target.value})} required />
+                                    <input type="text" value={resourceForm.title} onChange={e => setResourceForm({ ...resourceForm, title: e.target.value })} required />
                                 </div>
                                 <div className="form-group">
                                     <label>Category</label>
-                                    <input type="text" value={resourceForm.category} onChange={e => setResourceForm({...resourceForm, category: e.target.value})} placeholder="e.g., Admission, Exam" />
+                                    <input type="text" value={resourceForm.category} onChange={e => setResourceForm({ ...resourceForm, category: e.target.value })} placeholder="e.g., Admission, Exam" />
                                 </div>
                             </>
                         )}
@@ -305,38 +305,38 @@ const ManageAssets = () => {
                             <>
                                 <div className="form-group">
                                     <label>Batch (Year)</label>
-                                    <input type="text" value={alumniForm.batch} onChange={e => setAlumniForm({...alumniForm, batch: e.target.value})} placeholder="e.g. 2024" required />
+                                    <input type="text" value={alumniForm.batch} onChange={e => setAlumniForm({ ...alumniForm, batch: e.target.value })} placeholder="e.g. 2024" required />
                                 </div>
                                 <div className="form-group">
                                     <label>Description (Optional)</label>
-                                    <input type="text" value={alumniForm.description} onChange={e => setAlumniForm({...alumniForm, description: e.target.value})} />
+                                    <input type="text" value={alumniForm.description} onChange={e => setAlumniForm({ ...alumniForm, description: e.target.value })} />
                                 </div>
                             </>
                         )}
 
                         {activeTab === 'gallery' && (
-                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                 <label>Moment Title</label>
-                                <input type="text" value={galleryForm.title} onChange={e => setGalleryForm({title: e.target.value})} placeholder="Annual Sports 2026" required />
-                             </div>
+                                <input type="text" value={galleryForm.title} onChange={e => setGalleryForm({ title: e.target.value })} placeholder="Annual Sports 2026" required />
+                            </div>
                         )}
 
                         {/* Common File Upload */}
                         <div className="form-group" style={{ gridColumn: 'span 2' }}>
                             <label>{activeTab === 'resources' ? (editingId ? 'Replace File (Optional)' : 'Select File (PDF/Doc)') : (editingId ? 'Replace Image (Optional)' : 'Select Image')}</label>
-                            <div 
+                            <div
                                 onClick={() => fileInputRef.current?.click()}
-                                style={{ 
-                                    position: 'relative', width: '100%', aspectRatio: activeTab === 'resources' ? 'auto' : '16/9', 
-                                    minHeight: '100px', border: '2px dashed var(--primary-bold)', borderRadius: '12px', 
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--primary-soft)', 
-                                    overflow: 'hidden', cursor: 'pointer' 
+                                style={{
+                                    position: 'relative', width: '100%', aspectRatio: activeTab === 'resources' ? 'auto' : '16/9',
+                                    minHeight: '100px', border: '2px dashed var(--primary-bold)', borderRadius: '12px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--primary-soft)',
+                                    overflow: 'hidden', cursor: 'pointer'
                                 }}
                             >
                                 {(previewUrl || (activeTab === 'hero' && heroBanner)) && activeTab !== 'resources' ? (
-                                    <img 
-                                        src={previewUrl ? previewUrl : (activeTab === 'hero' && heroBanner ? `${baseUrl}${heroBanner}` : '')} 
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} 
+                                    <img
+                                        src={previewUrl ? previewUrl : (activeTab === 'hero' && heroBanner ? `${baseUrl}${heroBanner}` : '')}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
                                         alt="Current or preview"
                                     />
                                 ) : (
@@ -345,12 +345,12 @@ const ManageAssets = () => {
                                         <p style={{ margin: '8px 0 0', fontSize: '0.8rem' }}>{selectedFile ? selectedFile.name : 'Click to Browse'}</p>
                                     </div>
                                 )}
-                                <input 
+                                <input
                                     key={resetKey}
                                     ref={fileInputRef}
-                                    type="file" 
-                                    onChange={handleFileChange} 
-                                    style={{ display: 'none' }} 
+                                    type="file"
+                                    onChange={handleFileChange}
+                                    style={{ display: 'none' }}
                                 />
                             </div>
                         </div>
@@ -378,40 +378,40 @@ const ManageAssets = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {(activeTab === 'festivals' ? festivalBanners : 
-                                      activeTab === 'toppers' ? toppers :
-                                      activeTab === 'resources' ? resources :
-                                      activeTab === 'gallery' ? galleryImages :
-                                      activeTab === 'alumni' ? alumniPhotos : []).map((item: any) => (
-                                        <tr key={item.id}>
-                                            {activeTab === 'resources' ? (
-                                                <>
-                                                    <td style={{ fontWeight: 700 }}>{item.title}</td>
-                                                    <td>{item.category}</td>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <td>
-                                                        <img 
-                                                            src={`${baseUrl}${item.imageUrl || item.photo}`} 
-                                                            style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} 
-                                                            alt="Preview"
-                                                        />
-                                                    </td>
-                                                    <td>
-                                                        <div style={{ fontWeight: 700 }}>{item.title || item.name || `Batch ${item.batch}`}</div>
-                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{item.class || item.description || ''}</div>
-                                                    </td>
-                                                </>
-                                            )}
-                                            <td style={{ textAlign: 'right' }}>
-                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                                    <button onClick={() => handleEdit(item)} className="btn-primary btn-sm" style={{ background: 'var(--primary-soft)', color: 'var(--primary-bold)', border: 'none' }}><Edit size={14} /></button>
-                                                    <button onClick={() => setDeleteModal({ isOpen: true, id: item.id, type: activeTab })} className="btn-danger btn-sm" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: 'none' }}><Trash2 size={14} /></button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {(activeTab === 'festivals' ? festivalBanners :
+                                        activeTab === 'toppers' ? toppers :
+                                            activeTab === 'resources' ? resources :
+                                                activeTab === 'gallery' ? galleryImages :
+                                                    activeTab === 'alumni' ? alumniPhotos : []).map((item: any) => (
+                                                        <tr key={item.id}>
+                                                            {activeTab === 'resources' ? (
+                                                                <>
+                                                                    <td style={{ fontWeight: 700 }}>{item.title}</td>
+                                                                    <td>{item.category}</td>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <td>
+                                                                        <img
+                                                                            src={`${baseUrl}${item.imageUrl || item.photo}`}
+                                                                            style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '4px' }}
+                                                                            alt="Preview"
+                                                                        />
+                                                                    </td>
+                                                                    <td>
+                                                                        <div style={{ fontWeight: 700 }}>{item.title || item.name || `Batch ${item.batch}`}</div>
+                                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{item.class || item.description || ''}</div>
+                                                                    </td>
+                                                                </>
+                                                            )}
+                                                            <td style={{ textAlign: 'right' }}>
+                                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                                    <button onClick={() => handleEdit(item)} className="btn-primary btn-sm" style={{ background: 'var(--primary-soft)', color: 'var(--primary-bold)', border: 'none' }}><Edit size={14} /></button>
+                                                                    <button onClick={() => setDeleteModal({ isOpen: true, id: item.id, type: activeTab })} className="btn-danger btn-sm" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: 'none' }}><Trash2 size={14} /></button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
                                 </tbody>
                             </table>
                         </div>
@@ -419,7 +419,7 @@ const ManageAssets = () => {
                 )}
             </div>
 
-            <ConfirmModal 
+            <ConfirmModal
                 isOpen={deleteModal.isOpen}
                 onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
                 onConfirm={handleDelete}

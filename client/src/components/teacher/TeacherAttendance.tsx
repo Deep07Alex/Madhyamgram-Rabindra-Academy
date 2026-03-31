@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { isAttendanceOpen } from '../../utils/attendance';
 import { useToast } from '../../context/ToastContext';
-import { MAIN_SUBJECTS, SUBJECTS_BY_CLASS } from '../../utils/constants';
+
 import useServerEvents from '../../hooks/useServerEvents';
 import CustomSelect from '../common/CustomSelect';
 import {
@@ -339,7 +339,7 @@ const TeacherAttendance = () => {
                             label="Academic Subject"
                             value={markSubject}
                             onChange={val => setMarkSubject(val)}
-                            options={(SUBJECTS_BY_CLASS[classes.find((c: any) => c.id === markClass)?.name || ''] || MAIN_SUBJECTS).map(s => ({ value: s, label: s }))}
+                            options={(classes.find((c: any) => c.id === markClass)?.subjects || []).map((s:any) => ({ value: s.name, label: s.name }))}
                             icon={<GraduationCap size={16} />}
                             placeholder="Select Subject"
                         />

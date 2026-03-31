@@ -131,10 +131,17 @@ const ManageNotices = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const payload = { ...formData };
+            const payload: any = { ...formData };
             if (payload.targetAudience !== 'STUDENT') {
                 payload.targetClassId = '';
                 payload.targetStudentId = '';
+            }
+
+            // Fix timezone shift: Send proper ISO string for expiresAt
+            if (payload.expiresAt) {
+                payload.expiresAt = new Date(payload.expiresAt).toISOString();
+            } else {
+                payload.expiresAt = null;
             }
 
             if (editingId) {
@@ -407,6 +414,16 @@ const ManageNotices = () => {
                                         </td>
                                         <td>
                                             <div style={{ fontWeight: '700', fontSize: '1rem', color: 'var(--text-main)', marginBottom: '4px' }}>{notice.title}</div>
+                                            <div style={{ 
+                                                fontSize: '0.85rem', 
+                                                color: 'var(--text-muted)', 
+                                                marginBottom: '10px', 
+                                                lineHeight: '1.5',
+                                                whiteSpace: 'pre-wrap',
+                                                maxWidth: '450px' 
+                                            }}>
+                                                {notice.content}
+                                            </div>
                                             <span style={{
                                                 display: 'inline-flex',
                                                 alignItems: 'center',

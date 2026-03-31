@@ -14,11 +14,18 @@ import {
     lookupStudent,
     searchStudents,
     deleteMonthlyFee,
-    deleteAdmissionFee
+    deleteAdmissionFee,
+    getMyFees
 } from '../controllers/feesController.js';
 
 const router = Router();
-router.use(authenticate, authorize(['ADMIN']));
+router.use(authenticate);
+
+// Student retrieves their own data
+router.get('/my-account', authorize(['STUDENT']), getMyFees);
+
+// Admin-only operations
+router.use(authorize(['ADMIN']));
 
 // Student lookup (for auto-fill)
 router.get('/lookup/:studentId', lookupStudent);

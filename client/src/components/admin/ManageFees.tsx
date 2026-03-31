@@ -206,6 +206,7 @@ const StudentSelector = ({ onFound, resetTrigger }: { onFound: (s: any) => void,
                         placeholder="e.g. 15"
                         value={rollNumber}
                         onChange={e => setRollNumber(e.target.value)}
+                        onWheel={e => e.currentTarget.blur()}
                         disabled={!selectedClassId}
                         autoComplete="off"
                         style={{ width: '100%', height: '52px', fontSize: '1.2rem', fontWeight: 900, paddingLeft: '48px', border: '2px solid var(--primary-bold)' }}
@@ -453,17 +454,20 @@ const MonthlyFeeTab = () => {
                     <div className="form-group" style={{ margin: 0 }}>
                         <label>Fee (₹)</label>
                         <input type="number" min="0" placeholder="0" value={form.fee}
-                            onChange={e => setForm(f => ({ ...f, fee: e.target.value }))} />
+                            onChange={e => setForm(f => ({ ...f, fee: e.target.value }))}
+                            onWheel={e => e.currentTarget.blur()} />
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
                         <label>Fine (₹)</label>
                         <input type="number" min="0" placeholder="0" value={form.fine}
-                            onChange={e => setForm(f => ({ ...f, fine: e.target.value }))} />
+                            onChange={e => setForm(f => ({ ...f, fine: e.target.value }))}
+                            onWheel={e => e.currentTarget.blur()} />
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
                         <label>Others (₹)</label>
                         <input type="number" min="0" placeholder="0" value={form.others}
-                            onChange={e => setForm(f => ({ ...f, others: e.target.value }))} />
+                            onChange={e => setForm(f => ({ ...f, others: e.target.value }))}
+                            onWheel={e => e.currentTarget.blur()} />
                     </div>
                 </div>
 
@@ -735,12 +739,14 @@ const AdmissionFeeTab = () => {
                     <div className="form-group" style={{ margin: 0 }}>
                         <label>Total Admission Fee (₹)</label>
                         <input type="number" min="0" placeholder="0" value={form.totalAdmissionFee}
-                            onChange={e => setForm(f => ({ ...f, totalAdmissionFee: e.target.value }))} />
+                            onChange={e => setForm(f => ({ ...f, totalAdmissionFee: e.target.value }))}
+                            onWheel={e => e.currentTarget.blur()} />
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
                         <label>Amount Paid (₹)</label>
                         <input type="number" min="0" placeholder="0" value={form.amountPaid}
-                            onChange={e => setForm(f => ({ ...f, amountPaid: e.target.value }))} />
+                            onChange={e => setForm(f => ({ ...f, amountPaid: e.target.value }))}
+                            onWheel={e => e.currentTarget.blur()} />
                     </div>
                 </div>
 

@@ -15,6 +15,7 @@ import StudentAttendance from '../components/student/StudentAttendance';
 
 import StudentHomework from '../components/student/StudentHomework';
 import StudentResults from '../components/student/StudentResults';
+import StudentAccounts from '../components/student/StudentAccounts';
 import NoticeBoard from '../components/common/NoticeBoard';
 import LiveClock from '../components/common/LiveClock';
 import ThemeToggle from '../components/common/ThemeToggle';
@@ -27,6 +28,7 @@ import {
     CalendarCheck,
     BookOpenCheck,
     GraduationCap,
+    Banknote,
     LogOut,
     Menu,
     X,
@@ -193,6 +195,7 @@ const StudentDashboard = () => {
         { path: '/student/attendance', icon: <CalendarCheck size={20} />, label: 'My Attendance' },
         { path: '/student/homework', icon: <BookOpenCheck size={20} />, label: 'Class Tasks' },
         { path: '/student/results', icon: <GraduationCap size={20} />, label: 'My Academic Record' },
+        { path: '/student/accounts', icon: <Banknote size={20} />, label: 'Accounts' },
         { path: '/student/notices', icon: <BellRing size={20} />, label: 'Notices' },
     ];
 
@@ -288,6 +291,7 @@ const StudentDashboard = () => {
                         <Route path="attendance" element={<StudentAttendance />} />
                         <Route path="homework" element={<StudentHomework />} />
                         <Route path="results" element={<StudentResults />} />
+                        <Route path="accounts" element={<StudentAccounts />} />
                         <Route path="notices" element={<NoticeBoard />} />
                         <Route path="/" element={<Navigate to="/student/dashboard" />} />
                         <Route path="*" element={<Navigate to="/student/dashboard" />} />

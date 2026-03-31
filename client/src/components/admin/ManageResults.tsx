@@ -10,7 +10,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
-import { MAIN_SUBJECTS, EXAMINATION_TERMS, ACADEMIC_YEARS, SUBJECTS_BY_CLASS, getFullMarks } from '../../utils/constants';
+import { EXAMINATION_TERMS, ACADEMIC_YEARS, getFullMarks } from '../../utils/constants';
 import { FilePlus, List, Trash2, Download, Upload, FileSpreadsheet, Loader2, Search, X, Calendar, GraduationCap, School } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import * as XLSX from 'xlsx';
@@ -29,6 +29,7 @@ interface Student {
 interface SchoolClass {
     id: string;
     name: string;
+    subjects?: { id?: string, name: string, fullMarks: number | string }[];
 }
 
 const ManageResults = () => {
@@ -90,16 +91,20 @@ const ManageResults = () => {
         fetchData();
         // Update newResult totalMarks when term changes
         if (newResult.subject) {
-            const className = classes.find(c => c.id === selectedClassId)?.name;
-            setNewResult(prev => ({ ...prev, totalMarks: getFullMarks(prev.subject, className).toString() }));
+            const classObj = classes.find(c => c.id === selectedClassId);
+            const dynamicSubject = classObj?.subjects?.find((s:any) => s.name === newResult.subject);
+            const marks = dynamicSubject ? dynamicSubject.fullMarks : getFullMarks(newResult.subject, classObj?.name);
+            setNewResult(prev => ({ ...prev, totalMarks: marks.toString() }));
         }
     }, [selectedYear, selectedTerm, selectedClassId]);
 
     // Update totalMarks when subject changes in manual entry
     useEffect(() => {
         if (newResult.subject) {
-            const className = classes.find(c => c.id === selectedClassId)?.name;
-            setNewResult(prev => ({ ...prev, totalMarks: getFullMarks(prev.subject, className).toString() }));
+            const classObj = classes.find(c => c.id === selectedClassId);
+            const dynamicSubject = classObj?.subjects?.find((s:any) => s.name === newResult.subject);
+            const marks = dynamicSubject ? dynamicSubject.fullMarks : getFullMarks(newResult.subject, classObj?.name);
+            setNewResult(prev => ({ ...prev, totalMarks: marks.toString() }));
         }
     }, [newResult.subject, selectedTerm, selectedClassId]);
 
@@ -142,10 +147,16 @@ const ManageResults = () => {
         if (classStudents.length === 0) return showToast('No students found in this class', 'error');
 
         // Prepare Header rows (Subjects + Full Marks)
-        const subjectsList = SUBJECTS_BY_CLASS[selectedClass.name] || MAIN_SUBJECTS;
+        const subjectsList = selectedClass.subjects?.map((s:any) => s.name) || [];
+        if (subjectsList.length === 0) return showToast('No subjects are configured for this class! Assign subjects first.', 'error');
+
         const headers = ['Admission No', 'Roll', 'Name', ...subjectsList];
-        // FIX: Always use official full marks for the specific unit (don't sum I+II for Unit-III)
-        const fullMarksRow = ['', '', 'Full Marks', ...subjectsList.map(sub => getFullMarks(sub, selectedClass.name))];
+        
+        // Use dynamic fullMarks directly from database
+        const fullMarksRow = ['', '', 'Full Marks', ...subjectsList.map(subName => {
+            const sDef = selectedClass.subjects?.find((s:any) => s.name === subName);
+            return sDef ? sDef.fullMarks : getFullMarks(subName, selectedClass.name);
+        })];
         const data = classStudents.map(s => [s.studentId, s.rollNumber, s.name, ...subjectsList.map(() => '')]);
 
         const worksheet = XLSX.utils.aoa_to_sheet([headers, fullMarksRow, ...data]);
@@ -400,7 +411,7 @@ const ManageResults = () => {
                             label="Subject"
                             value={newResult.subject}
                             onChange={val => setNewResult({ ...newResult, subject: val })}
-                            options={(SUBJECTS_BY_CLASS[classes.find(c => c.id === selectedClassId)?.name || ''] || MAIN_SUBJECTS).map(sub => ({ value: sub, label: sub }))}
+                            options={(classes.find(c => c.id === selectedClassId)?.subjects || []).map((sub:any) => ({ value: sub.name, label: sub.name }))}
                             placeholder="Choose Subject..."
                         />
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>

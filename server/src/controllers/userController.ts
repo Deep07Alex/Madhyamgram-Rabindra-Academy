@@ -138,7 +138,13 @@ export const getClasses = async (req: AuthRequest, res: Response) => {
             (SELECT json_agg(row_to_json(t.*)) 
              FROM "Teacher" t 
              JOIN "_ClassToTeacher" ct ON ct."B" = t.id 
-             WHERE ct."A" = c.id) as teachers
+             WHERE ct."A" = c.id) as teachers,
+            (SELECT json_agg(row_to_json(sub.*))
+             FROM (
+                 SELECT * FROM "Subject" sb 
+                 WHERE sb."classId" = c.id 
+                 ORDER BY sb."name" ASC
+             ) sub) as subjects
             FROM "Class" c
             ORDER BY c.grade ASC, c.name ASC
         `;
@@ -147,7 +153,8 @@ export const getClasses = async (req: AuthRequest, res: Response) => {
         const formatted = classesRes.rows.map(c => ({
             ...c,
             _count: { students: parseInt(c._count_students, 10) },
-            teachers: c.teachers || []
+            teachers: c.teachers || [],
+            subjects: c.subjects || []
         }));
         res.json(formatted);
     } catch (error) {
@@ -195,17 +202,104 @@ export const removeTeacherFromClass = async (req: Request, res: Response) => {
  * Creates a new class/grade.
  */
 export const createClass = async (req: Request, res: Response) => {
-    const { name, grade } = req.body;
+    const { name, grade, monthlyFee, subjects } = req.body;
+    const client = await db.connect();
     try {
+        await client.query('BEGIN');
         const id = crypto.randomUUID();
-        const newClassRes = await db.query(
-            `INSERT INTO "Class" (id, name, grade) VALUES ($1, $2, $3) RETURNING *`,
-            [id, name, parseInt(grade as string)]
+        const newClassRes = await client.query(
+            `INSERT INTO "Class" (id, name, grade, "monthlyFee") VALUES ($1, $2, $3, $4) RETURNING *`,
+            [id, name, parseInt(grade as string), parseFloat(monthlyFee as string) || 0]
         );
+        
+        // Add subjects if provided
+        if (subjects && Array.isArray(subjects)) {
+            for (const s of subjects) {
+                if (!s.name) continue;
+                await client.query(
+                    `INSERT INTO "Subject" (id, "classId", name, "fullMarks") VALUES ($1, $2, $3, $4)`,
+                    [crypto.randomUUID(), id, s.name, parseInt(s.fullMarks) || 100]
+                );
+            }
+        }
+        
+        await client.query('COMMIT');
         broadcast('class:updated', { id });
         res.status(201).json(newClassRes.rows[0]);
     } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Create class error:', error);
         res.status(500).json({ message: 'Error creating class' });
+    } finally {
+        client.release();
+    }
+};
+
+// Update a class
+export const updateClass = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { name, grade, monthlyFee, subjects } = req.body;
+    const client = await db.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await client.query(
+            `UPDATE "Class" SET name = $1, grade = $2, "monthlyFee" = $3 WHERE id = $4 RETURNING *`,
+            [name, parseInt(grade as string), parseFloat(monthlyFee as string) || 0, id]
+        );
+        if (result.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Class not found' });
+        }
+        
+        // Sync subjects: update existing, insert new, delete removed, and cascade name changes
+        if (subjects && Array.isArray(subjects)) {
+            const existingRes = await client.query(`SELECT id, name FROM "Subject" WHERE "classId" = $1`, [id]);
+            const existingSubjects = existingRes.rows;
+            
+            for (const s of subjects) {
+                if (!s.name) continue;
+                if (s.id) {
+                    const oldSub = existingSubjects.find(x => x.id === s.id);
+                    if (oldSub && oldSub.name !== s.name) {
+                        // Cascade rename for safety. We only do this if the name string actually changed.
+                        // (Use ON CONFLICT DO NOTHING or just simple updates since these tables reference string subjects)
+                        await client.query(`UPDATE "Result" SET subject = $1 WHERE "classId" = $2 AND subject = $3`, [s.name, id, oldSub.name]).catch(() => {});
+                        await client.query(`UPDATE "Homework" SET subject = $1 WHERE "classId" = $2 AND subject = $3`, [s.name, id, oldSub.name]).catch(() => {});
+                        await client.query(`UPDATE "Attendance" SET subject = $1 WHERE "classId" = $2 AND subject = $3`, [s.name, id, oldSub.name]).catch(() => {});
+                    }
+                    await client.query(
+                        `UPDATE "Subject" SET name = $1, "fullMarks" = $2 WHERE id = $3 AND "classId" = $4`,
+                        [s.name, parseInt(s.fullMarks) || 100, s.id, id]
+                    );
+                } else {
+                    await client.query(
+                        `INSERT INTO "Subject" (id, "classId", name, "fullMarks") VALUES ($1, $2, $3, $4)`,
+                        [crypto.randomUUID(), id, s.name, parseInt(s.fullMarks) || 100]
+                    );
+                }
+            }
+            
+            // Delete removed subjects
+            const incomingIds = subjects.filter(s => s.id).map(s => s.id);
+            const toDelete = existingSubjects.filter(ex => !incomingIds.includes(ex.id));
+            if (toDelete.length > 0) {
+                const deleteIds = toDelete.map(x => x.id);
+                await client.query(`DELETE FROM "Subject" WHERE id = ANY($1)`, [deleteIds]);
+            }
+        } else if (subjects !== undefined) {
+             // If subjects was explicitly passed as empty array from frontend
+             await client.query(`DELETE FROM "Subject" WHERE "classId" = $1`, [id]);
+        }
+        
+        await client.query('COMMIT');
+        broadcast('class:updated', { id });
+        res.json(result.rows[0]);
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Update class error:', error);
+        res.status(500).json({ message: 'Error updating class' });
+    } finally {
+        client.release();
     }
 };
 
