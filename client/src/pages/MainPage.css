@@ -84,28 +84,40 @@
     background: none;
     border: none;
     color: var(--primary-rich);
-    font-size: 1.5rem;
+    font-size: 1.8rem;
     cursor: pointer;
+    z-index: 1001; /* Above mobile menu */
   }
 
   .landing-nav-menu {
-    display: none;
+    display: flex;
     flex-direction: column;
-    background-color: var(--primary);
-    position: absolute;
-    top: 100%;
-    right: 0;
-    width: 200px;
-    padding: 1rem;
-    box-shadow: -4px 4px 10px rgba(0, 0, 0, 0.1);
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(var(--primary-rgb, 180, 83, 9), 0.9);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    position: fixed;
+    top: 0;
+    right: -100%; /* Hidden by default */
+    width: 85%;
+    height: 100vh;
+    padding: 2rem;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.2);
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+    will-change: right;
   }
 
   .landing-nav-menu.open {
-    display: flex;
+    right: 0;
   }
 
   .landing-nav-menu a {
-    margin: 0.5rem 0;
+    font-size: 1.5rem;
+    margin: 1.5rem 0;
+    font-weight: 800;
+    color: white !important;
   }
 }
 
@@ -262,8 +274,12 @@
 }
 
 @media (max-width: 768px) {
+  .hero img {
+     height: 400px;
+  }
+
   .hero-content h1 {
-    font-size: 2rem;
+    font-size: 2.2rem;
   }
 
   .hero-mission-top {
@@ -281,12 +297,28 @@
   }
 
   .nav-logo-img {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
   }
 
   .landing-navbar .logo {
     font-size: 1.1rem;
+  }
+  
+  .logo-text-wrapper .nav-tagline {
+    font-size: 0.55rem;
+    letter-spacing: 0.08em;
+  }
+}
+
+@media (max-width: 450px) {
+  .logo-text-wrapper .nav-info-row,
+  .logo-text-wrapper .nav-tagline {
+    display: none;
+  }
+  
+  .landing-navbar .logo {
+    font-size: 1rem;
   }
 }
 
@@ -297,6 +329,8 @@
   border-radius: var(--radius-lg);
   background: var(--bg-card);
   box-shadow: var(--shadow-sm);
+  transform: translateZ(0); /* Force GPU acceleration */
+  will-change: transform;
 }
 
 .landing-section h2 {

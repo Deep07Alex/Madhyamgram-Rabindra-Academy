@@ -79,7 +79,7 @@ const useServerEvents = (handlers: EventHandlers) => {
                 socket.emit('leave_room', `class:${user.classId}`);
             }
         };
-    }, [user]);
+    }, [user, JSON.stringify(Object.keys(handlers))]);
 };
 
 export default useServerEvents;

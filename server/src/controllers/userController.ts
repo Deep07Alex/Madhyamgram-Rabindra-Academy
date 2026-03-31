@@ -437,6 +437,25 @@ export const enrollStudent = async (req: Request, res: Response) => {
         ]);
 
         broadcast('user:created', { id, role: 'STUDENT' });
+
+        // AUTOMATIC PRESENT MARKING FOR TODAY
+        // Ensures new students have their "Today" attendance saved immediately
+        try {
+            const todayDate = new Date().toLocaleDateString('en-CA');
+            // Get any marker ID (Admins are stored in Admin table)
+            const staffCheck = await db.query('SELECT id FROM "Admin" UNION SELECT id FROM "Teacher" LIMIT 1');
+            if (staffCheck.rows.length > 0) {
+                await db.query(
+                    `INSERT INTO "Attendance" (id, date, status, "studentId", "teacherId", "classId", subject) 
+                     VALUES ($1, $2, 'PRESENT', $3, $4, $5, 'FULL DAY SESSION') 
+                     ON CONFLICT DO NOTHING`,
+                    [crypto.randomUUID(), todayDate, id, staffCheck.rows[0].id, classId]
+                );
+            }
+        } catch (attErr) {
+            console.warn('Silent failure marking new student attendance for today:', attErr);
+        }
+
         res.status(201).json(result.rows[0]);
     } catch (error: any) {
         console.error('Enroll student error:', error);
@@ -1022,6 +1041,29 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
 
                 const query = `INSERT INTO "Student" ${columns} VALUES ${placeholders.join(', ')}`;
                 await client.query(query, values);
+
+                // AUTOMATIC ATTENDANCE MARKING FOR BULK IMPORT (TODAY)
+                try {
+                    const todayDate = new Date().toLocaleDateString('en-CA');
+                    const staffCheck = await client.query('SELECT id FROM "Admin" UNION SELECT id FROM "Teacher" LIMIT 1');
+                    if (staffCheck.rows.length > 0) {
+                        const markerId = staffCheck.rows[0].id;
+                        const attendanceValues: any[] = [];
+                        const attendancePlaceholders: string[] = [];
+                        
+                        validStudents.forEach((st, idx) => {
+                            const base = idx * 5;
+                            attendancePlaceholders.push(`($${base+1}, $${base+2}, 'PRESENT', $${base+3}, $${base+4}, $${base+5}, 'FULL DAY SESSION')`);
+                            attendanceValues.push(crypto.randomUUID(), todayDate, st.id, markerId, st.classId);
+                        });
+
+                        const attQuery = `INSERT INTO "Attendance" (id, date, status, "studentId", "teacherId", "classId", subject) VALUES ${attendancePlaceholders.join(', ')}`;
+                        await client.query(attQuery, attendanceValues);
+                    }
+                } catch (autoAttErr) {
+                    console.warn("Silent failure in bulk auto-attendance marking:", autoAttErr);
+                }
+
                 await client.query('COMMIT');
                 broadcast('user:created', { count: validStudents.length });
                 results.success = validStudents.length;

@@ -132,6 +132,18 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
     return "/login";
   };
 
+  const handleNavClick = (id: string) => {
+    if (open) onToggle(); // Close mobile menu
+    if (id === "home") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+    }
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   return (
     <nav className="landing-navbar">
       <div className="logo-group">
@@ -159,11 +171,11 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
         ☰
       </button>
       <div className={"landing-nav-menu" + (open ? " open" : "")}>
-        <a href="#">Home</a>
-        <a href="#notice-resources">Admission</a>
-        <a href="#notice">Upcoming Festivals</a>
-        <a href="#gallery">Gallery</a>
-        <a href="#contact">Contact</a>
+        <a href="javascript:void(0)" onClick={() => handleNavClick("home")}>Home</a>
+        <a href="javascript:void(0)" onClick={() => handleNavClick("notice-resources")}>Admission</a>
+        <a href="javascript:void(0)" onClick={() => handleNavClick("notice")}>Upcoming Festivals</a>
+        <a href="javascript:void(0)" onClick={() => handleNavClick("gallery")}>Gallery</a>
+        <a href="javascript:void(0)" onClick={() => handleNavClick("contact")}>Contact</a>
         <div
           style={{ marginLeft: "12px", display: "flex", alignItems: "center" }}
         >
@@ -171,14 +183,14 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
         </div>
         {user ? (
           <a
-            href={getDashboardPath()}
+            href={`#${getDashboardPath()}`}
             className="login-btn"
             style={{ background: "var(--primary-bold)", color: "white" }}
           >
             Dashboard
           </a>
         ) : (
-          <a href="/login" className="login-btn">
+          <a href="#/login" className="login-btn">
             Login
           </a>
         )}

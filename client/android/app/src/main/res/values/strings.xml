@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Rabindra Academy</string>
+    <string name="title_activity_main">Rabindra Academy</string>
+    <string name="package_name">com.madhyamgram.rabindra.academy</string>
+    <string name="custom_url_scheme">com.madhyamgram.rabindra.academy</string>
+</resources>

@@ -6,6 +6,9 @@
  */
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from './ToastContext';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
+import { getStorage } from '../services/api';
 
 interface User {
     id: string;
@@ -37,8 +40,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Inactivity Monitoring:
     // Automatically logs out the user after 10 minutes of no interaction (mouse/keyboard).
     const logout = useCallback(() => {
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('user');
+        const storage = getStorage();
+        storage.removeItem('token');
+        storage.removeItem('user');
+        storage.removeItem('last_active_timestamp'); // Clear our grace period marker
         setToken(null);
         setUser(null);
     }, []);
@@ -71,24 +76,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [token, resetInactivityTimer]);
 
     const login = useCallback((newToken: string, newUser: User) => {
-        sessionStorage.setItem('token', newToken);
-        sessionStorage.setItem('user', JSON.stringify(newUser));
+        const storage = getStorage();
+        storage.setItem('token', newToken);
+        storage.setItem('user', JSON.stringify(newUser));
         setToken(newToken);
         setUser(newUser);
     }, []);
 
     const updateUser = useCallback((newUser: User) => {
-        sessionStorage.setItem('user', JSON.stringify(newUser));
+        const storage = getStorage();
+        storage.setItem('user', JSON.stringify(newUser));
         setUser(newUser);
     }, []);
 
     useEffect(() => {
-        // PER USER REQUEST: SECURITY ENFORCEMENT
-        // Session restoration on page reload is explicitly disabled.
-        // Every refresh or hard reload will clear the session and force a re-login.
-        logout(); 
-        setLoading(false);
+        // PLATFORM ADAPTIVE SECURITY
+        if (Capacitor.isNativePlatform()) {
+            // Android App: Try to restore session on mount (to support backgrounding)
+            const storage = getStorage();
+            const savedToken = storage.getItem('token');
+            const savedUser = storage.getItem('user');
+
+            if (savedToken && savedUser) {
+                setToken(savedToken);
+                setUser(JSON.parse(savedUser));
+            }
+            setLoading(false);
+        } else {
+            // Web Version: Session restoration explicitly disabled (Logout on Refresh)
+            logout();
+            setLoading(false);
+        }
     }, [logout]);
+
+    // Capacitor Native Only: Handle Background Grace Period (5 minutes)
+    useEffect(() => {
+        if (!Capacitor.isNativePlatform()) return;
+
+        const listener = App.addListener('appStateChange', ({ isActive }: { isActive: boolean }) => {
+            const storage = getStorage();
+            if (isActive) {
+                // Moving to Foreground: Check if we've been away too long
+                const lastActive = storage.getItem('last_active_timestamp');
+                if (lastActive) {
+                    const elapsed = Date.now() - parseInt(lastActive, 10);
+                    if (elapsed > 5 * 60 * 1000) { // 5 Minute Grace Period
+                        showToast('Session expired.', 'info');
+                        logout();
+                    }
+                }
+            } else {
+                // Moving to Background: Record the departure time
+                storage.setItem('last_active_timestamp', Date.now().toString());
+            }
+        });
+
+        return () => {
+            listener.then((l: any) => l.remove());
+        };
+    }, [logout, showToast]);
 
     const value = React.useMemo(() => ({
         user,

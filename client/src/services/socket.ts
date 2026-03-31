@@ -1,22 +1,31 @@
-/**
- * Client-Side WebSocket Client
- * 
- * Initializes the Socket.io connection to the backend.
- * Provides a persistent link for receiving real-time notifications and updates.
- */
 import { io } from 'socket.io-client';
+import { Capacitor } from '@capacitor/core';
 
-const SOCKET_URL = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000';
+// Determine the backend URL for Socket.io
+// In Native/Android: Use the production domain
+// In Web/Dev: Use the base URL or current origin
+const SOCKET_URL = Capacitor.isNativePlatform() 
+    ? 'https://madhyamgramrabindraacademy.in' 
+    : (import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000');
 
+/**
+ * Socket.io Client Instance
+ * Single instance used across the application to maintain a persistent connection.
+ */
 export const socket = io(SOCKET_URL, {
     autoConnect: true,
-    reconnection: true
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
 });
 
+// Debugging
 socket.on('connect', () => {
-    if (import.meta.env.DEV) console.log('Real-time connection established:', socket.id);
+    console.log('Socket connected to:', SOCKET_URL);
 });
 
 socket.on('disconnect', () => {
-    if (import.meta.env.DEV) console.log('Real-time connection lost');
+    console.log('Socket disconnected');
 });
+
+export default socket;

@@ -40,14 +40,15 @@ export const initCronJobs = () => {
             console.log(`Marking all students as PRESENT for ${todayStr}...`);
 
             await db.query(`
-                INSERT INTO "Attendance" (id, date, status, "studentId", "teacherId", "classId")
+                INSERT INTO "Attendance" (id, date, status, "studentId", "teacherId", "classId", subject)
                 SELECT 
                     gen_random_uuid(), 
                     $1::date, 
                     'PRESENT', 
                     s.id, 
                     $2, 
-                    s."classId"
+                    s."classId",
+                    'FULL DAY SESSION'
                 FROM "Student" s
                 WHERE NOT EXISTS (
                     SELECT 1 FROM "Attendance" a 
@@ -80,6 +81,6 @@ export const initCronJobs = () => {
         }
     });
 
-    console.log('Attendance Cron Jobs Initialized (6:00 AM Daily).');
+    console.log('Attendance Cron Jobs Initialized (Midnight Daily).');
     console.log('Notice Cleanup Cron Initialized (Hourly).');
 };

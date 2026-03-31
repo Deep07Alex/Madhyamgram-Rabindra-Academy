@@ -22,8 +22,8 @@ const StudentAttendance = () => {
 
     const monthName = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(currentYear, currentMonth));
 
-    const fetchAttendance = useCallback(async () => {
-        setIsLoading(true);
+    const fetchAttendance = useCallback(async (silent = false) => {
+        if (!silent) setIsLoading(true);
         try {
             const startDate = new Date(currentYear, currentMonth, 1).toLocaleDateString('en-CA');
             const endDate = new Date(currentYear, currentMonth + 1, 0).toLocaleDateString('en-CA');
@@ -34,14 +34,26 @@ const StudentAttendance = () => {
         } catch (error) {
             console.error('Failed to fetch attendance', error);
         } finally {
-            setIsLoading(false);
+            if (!silent) setIsLoading(false);
         }
     }, [currentMonth, currentYear]);
 
     useEffect(() => { fetchAttendance(); }, [fetchAttendance]);
 
-    // Live updates: refresh when teacher marks or admin edits attendance
-    useServerEvents({ 'attendance:updated': fetchAttendance });
+    // Live updates via Socket.io (instant, silent - no flicker)
+    useServerEvents({ 
+        'attendance:updated': () => {
+            fetchAttendance(true);
+        }
+    });
+
+    // Polling fallback every 5 seconds - silent so no loading flicker
+    useEffect(() => {
+        const interval = setInterval(() => {
+            fetchAttendance(true);
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [fetchAttendance]);
 
     const handlePrevMonth = () => {
         if (currentMonth === 0) {
@@ -168,7 +180,8 @@ const StudentAttendance = () => {
                                 const isFuture = dateStr > todayStr;
 
                                 const record = attendanceData.records.find((r: any) => {
-                                    const rDate = new Date(r.date).toLocaleDateString('en-CA');
+                                    // Use raw string comparison to avoid timezone shifts from new Date()
+                                    const rDate = r.date.split('T')[0];
                                     return rDate === dateStr;
                                 });
 

@@ -14,8 +14,16 @@ let io: Server;
 export const initSocket = (server: HttpServer) => {
     io = new Server(server, {
         cors: {
-            origin: '*',
-            methods: ['GET', 'POST']
+            origin: [
+                'https://madhyamgramrabindraacademy.in',
+                'https://www.madhyamgramrabindraacademy.in',
+                'capacitor://localhost',
+                'http://localhost',
+                'http://localhost:5173',
+                'http://localhost:3000'
+            ],
+            methods: ['GET', 'POST'],
+            credentials: true
         }
     });
 

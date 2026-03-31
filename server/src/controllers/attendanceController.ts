@@ -63,6 +63,9 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
         broadcast('attendance:updated', { studentId, date: attendanceDateStr });
         sendToUser(studentId, 'attendance:updated', { date: attendanceDateStr });
         sendToRole('ADMIN', 'attendance:updated', { studentId, date: attendanceDateStr });
+        
+        // Live Update - Mirroring the "Force Open/Close" Technique (Dual-stack Sockets + SSE)
+        broadcast('attendance:updated', { studentId, date: attendanceDateStr });
 
         res.status(200).json(attendanceRes.rows[0]);
     } catch (error) {
@@ -267,6 +270,9 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
         sendToUser(targetTeacherId, 'attendance:updated', { date: attendanceDateStr });
         sendToRole('ADMIN', 'attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr });
 
+        // Live Update - Mirroring the "Force Open/Close" Technique (Dual-stack Sockets + SSE)
+        broadcast('attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr });
+
         res.status(200).json(attendanceRes.rows[0]);
     } catch (error) {
         console.error('Error marking teacher attendance:', error);
@@ -304,11 +310,8 @@ export const updateStudentAttendance = async (req: AuthRequest, res: Response) =
             const d = new Date(record.date);
             const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-            if (sid) {
-                broadcast('attendance:updated', { studentId: sid, date: dStr });
-                sendToUser(sid, 'attendance:updated', { date: dStr });
-            }
-            sendToRole('ADMIN', 'attendance:updated', { date: dStr });
+            // Live Update - Mirroring the "Force Open/Close" Technique (Dual-stack Sockets + SSE)
+            broadcast('attendance:updated', { studentId: sid, date: dStr });
         } catch (err) {
             console.error('Live update broadcast failed (student):', err);
         }
@@ -377,11 +380,8 @@ export const updateTeacherAttendance = async (req: AuthRequest, res: Response) =
             const d = new Date(record.date);
             const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-            if (tid) {
-                broadcast('attendance:updated', { teacherId: tid, date: dStr });
-                sendToUser(tid, 'attendance:updated', { date: dStr });
-            }
-            sendToRole('ADMIN', 'attendance:updated', { date: dStr });
+            // Live Update - Mirroring the "Force Open/Close" Technique (Dual-stack Sockets + SSE)
+            broadcast('attendance:updated', { teacherId: tid, date: dStr });
         } catch (err) {
             console.error('Live update broadcast failed (teacher):', err);
         }
@@ -455,6 +455,7 @@ export const updateAttendanceConfig = async (req: AuthRequest, res: Response) =>
             ['attendance_override', attendance_override]
         );
         broadcast('system:config_updated', { key: 'attendance_override', value: attendance_override });
+        emitEvent('system:config_updated', { key: 'attendance_override', value: attendance_override });
         res.json({ message: 'Configuration updated successfully', attendance_override });
     } catch (error) {
         console.error('Error updating attendance config:', error);

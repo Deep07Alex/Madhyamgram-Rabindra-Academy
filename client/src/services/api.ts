@@ -9,9 +9,15 @@
  */
 import axios from 'axios';
 import type { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
+import { Capacitor } from '@capacitor/core';
+
+// Helper to determine storage type
+// Native: Use localStorage for persistence across app switches
+// Web: Use sessionStorage for security (logout on refresh)
+export const getStorage = () => (Capacitor.isNativePlatform() ? localStorage : sessionStorage);
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+    baseURL: Capacitor.isNativePlatform() ? 'https://madhyamgramrabindraacademy.in/api' : (import.meta.env.VITE_API_BASE_URL || '/api'),
     timeout: 120000, // 2 minutes (Needed for large media uploads)
 });
 
