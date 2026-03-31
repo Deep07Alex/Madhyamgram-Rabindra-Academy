@@ -718,7 +718,18 @@ const AdmissionFeeTab = () => {
     const [showDues, setShowDues] = useState(false);
     const { showToast } = useToast();
 
-    const due = (parseFloat(form.totalAdmissionFee) || 0) - (parseFloat(form.amountPaid) || 0);
+    // Effect to auto-fill form when student is selected via Roll Number
+    useEffect(() => {
+        if (student) {
+            setForm(f => ({
+                ...f,
+                totalAdmissionFee: (student.totalAdmissionFee || '').toString()
+            }));
+        }
+    }, [student]);
+
+    const due = (parseFloat(form.totalAdmissionFee) || 0) -
+                (parseFloat(student?.amountPaid || 0) + (parseFloat(form.amountPaid) || 0));
 
     const fetchRecords = useCallback(async () => {
         try {
@@ -810,11 +821,11 @@ const AdmissionFeeTab = () => {
                 <div className="submit-btn-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px', flexWrap: 'wrap', gap: '12px' }}>
                     <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }} className="total-amount-display">
                         <div style={{ padding: '14px 24px', borderRadius: 'var(--radius-md)', background: 'var(--primary-soft)', border: '2px solid var(--primary-bold)', flex: 1 }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary-bold)', display: 'block' }}>AMOUNT PAID</span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary-bold)', display: 'block' }}>NEW PAYMENT</span>
                             <span style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--primary-bold)' }}>₹ {(parseFloat(form.amountPaid) || 0).toFixed(2)}</span>
                         </div>
                         <div style={{ padding: '14px 24px', borderRadius: 'var(--radius-md)', background: due > 0 ? '#ef444415' : '#22c55e15', border: `2px solid ${due > 0 ? '#ef4444' : '#22c55e'}`, flex: 1 }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: due > 0 ? '#ef4444' : '#22c55e', display: 'block' }}>DUE AMOUNT</span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: due > 0 ? '#ef4444' : '#22c55e', display: 'block' }}>REMAINING DUE</span>
                             <span style={{ fontSize: '1.8rem', fontWeight: 900, color: due > 0 ? '#ef4444' : '#22c55e' }}>₹ {Math.max(due, 0).toFixed(2)}</span>
                         </div>
                     </div>

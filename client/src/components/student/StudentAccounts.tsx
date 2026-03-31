@@ -88,9 +88,16 @@ const StudentAccounts = () => {
                         <div className="card-content">
                             <h3>Admission Fee</h3>
                             <div className="amount">₹ {admissionFee ? (parseFloat(admissionFee.totalAdmissionFee)).toFixed(2) : '0.00'}</div>
-                            {admissionFee && admissionFee.due > 0 && (
-                                <div className="due-badge-pill">
-                                    Due: ₹{parseFloat(admissionFee.due).toFixed(2)}
+                            {admissionFee && (
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                                    <div className="status-badge cleared" style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>
+                                        Paid: ₹{parseFloat(admissionFee.amountPaid || 0).toFixed(2)}
+                                    </div>
+                                    {parseFloat(admissionFee.due) > 0 && (
+                                        <div className="status-badge pending" style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>
+                                            Due: ₹{parseFloat(admissionFee.due).toFixed(2)}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

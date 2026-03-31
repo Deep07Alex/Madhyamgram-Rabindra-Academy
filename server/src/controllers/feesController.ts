@@ -197,16 +197,19 @@ export const recordAdmissionFee = async (req: Request, res: Response) => {
         const stuUUID = stuRes.rows[0].id;
 
         // CHECK IF RECORD EXISTS
-        const existing = await db.query(`SELECT id FROM "AdmissionFee" WHERE "studentId" = $1 LIMIT 1`, [stuUUID]);
+        const existing = await db.query(`SELECT id, "amountPaid" FROM "AdmissionFee" WHERE "studentId" = $1 LIMIT 1`, [stuUUID]);
 
         let result;
         if (existing.rows.length > 0) {
-            // OVERWRITE
+            // INCREMENTAL UPDATE
+            const newTotalPaid = parseFloat(existing.rows[0].amountPaid) + paid;
+            const newDue = total - newTotalPaid;
+            
             result = await db.query(
                 `UPDATE "AdmissionFee"
                  SET date = $1, "totalAdmissionFee" = $2, "amountPaid" = $3, due = $4, "createdAt" = CURRENT_TIMESTAMP
                  WHERE id = $5 RETURNING *`,
-                [date, total, paid, due, existing.rows[0].id]
+                [date, total, newTotalPaid, newDue, existing.rows[0].id]
             );
         } else {
             // INSERT
