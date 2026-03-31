@@ -25,67 +25,59 @@ export const recordMonthlyFee = async (req: Request, res: Response) => {
     const total = feeAmt + fineAmt + othersAmt;
 
     try {
-        // Resolve student UUID from their admission number (studentId like S-1042)
+        // Resolve student UUID
         let sid = (studentId as string).trim();
         if (!sid.toUpperCase().startsWith('S-')) sid = `S-${sid}`;
 
         const stuRes = await db.query(`SELECT id FROM "Student" WHERE "studentId" = $1 LIMIT 1`, [sid]);
-        if (stuRes.rows.length === 0) {
-            return res.status(404).json({ message: `No student found with ID ${studentId}` });
-        }
+        if (stuRes.rows.length === 0) return res.status(404).json({ message: `No student found with ID ${studentId}` });
         const stuUUID = stuRes.rows[0].id;
         const year = academicYear || new Date().getFullYear();
 
-        // CHECK IF RECORD EXISTS FOR THIS STUDENT/MONTH/YEAR
-        // We look for an exact month match or an overlap to prevent duplicates
-        const existing = await db.query(
-            `SELECT id FROM "MonthlyFee" WHERE "studentId" = $1 AND month = $2 AND "academicYear" = $3`,
-            [stuUUID, month, year]
-        );
+        // Handle multiple months (e.g. "January, February")
+        const monthArray = month.split(',').map((m: string) => m.trim()).filter((m: string) => m.length > 0);
+        const count = monthArray.length;
 
-        let result;
-        if (existing.rows.length > 0) {
-            // Update existing specific record
-            result = await db.query(
-                `UPDATE "MonthlyFee" 
-                 SET date = $1, fee = $2, fine = $3, others = $4, total = $5, "createdAt" = CURRENT_TIMESTAMP
-                 WHERE id = $6 RETURNING *`,
-                [date, feeAmt, fineAmt, othersAmt, total, existing.rows[0].id]
+        // Split total and fees by count for individual records
+        const perFee = (parseFloat(fee) || 0) / count;
+        const perFine = (parseFloat(fine) || 0) / count;
+        const perOthers = (parseFloat(others) || 0) / count;
+        const perTotal = perFee + perFine + perOthers;
+
+        let lastResult;
+        for (const m of monthArray) {
+            const existing = await db.query(
+                `SELECT id FROM "MonthlyFee" WHERE "studentId" = $1 AND month = $2 AND "academicYear" = $3`,
+                [stuUUID, m, year]
             );
-        } else {
-            // INSERT NEW
-            result = await db.query(
-                `INSERT INTO "MonthlyFee"
-                    (id, "studentId", date, month, "academicYear", fee, fine, others, total)
-                 VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8)
-                 RETURNING *`,
-                [stuUUID, date, month, year, feeAmt, fineAmt, othersAmt, total]
-            );
+
+            if (existing.rows.length > 0) {
+                lastResult = await db.query(
+                    `UPDATE "MonthlyFee" SET date = $1, fee = $2, fine = $3, others = $4, total = $5, "createdAt" = CURRENT_TIMESTAMP WHERE id = $6 RETURNING *`,
+                    [date, perFee, perFine, perOthers, perTotal, existing.rows[0].id]
+                );
+            } else {
+                lastResult = await db.query(
+                    `INSERT INTO "MonthlyFee" (id, "studentId", date, month, "academicYear", fee, fine, others, total) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+                    [stuUUID, date, m, year, perFee, perFine, perOthers, perTotal]
+                );
+            }
+
+            // Notice
+            try {
+                const noticeTitle = `Fee Record: ${m}`;
+                const noticeContent = `Fee for ${m} recorded (₹${perTotal.toFixed(2)}).`;
+                await db.query(
+                    `INSERT INTO "Notice" (id, title, content, type, "targetAudience", "targetStudentId") VALUES (gen_random_uuid(), $1, $2, 'INTERNAL', 'STUDENT', $3)`,
+                    [noticeTitle, noticeContent, stuUUID]
+                );
+            } catch (e) { }
         }
 
-        // CREATE OR UPDATE AUTO-NOTICE FOR STUDENT (Valid for 24 HOURS)
-        try {
-            const expiresAt = new Date();
-            expiresAt.setHours(expiresAt.getHours() + 24);
-            // Use a unique title per student/month/year to avoid grouping notices incorrectly
-            const noticeTitle = `Fee Cleared: ${month}`;
-
-            const noticeContent = `Your fees for ${month} (${year}) has been recorded successfully. Total: ₹${total.toFixed(2)}. This notice will expire in 24 hours.`;
-
-            await db.query(
-                `INSERT INTO "Notice" 
-                    (id, title, content, type, "targetAudience", "targetStudentId", "expiresAt")
-                 VALUES (gen_random_uuid(), $1, $2, 'INTERNAL', 'STUDENT', $3, $4)`,
-                [noticeTitle, noticeContent, stuUUID, expiresAt]
-            );
-        } catch (noticeErr) {
-            console.error('Failed to create auto-notice:', noticeErr);
-        }
-
-        res.status(201).json(result.rows[0]);
+        res.status(201).json(lastResult?.rows[0] || { message: 'Success' });
     } catch (error: any) {
         console.error('recordMonthlyFee error:', error);
-        res.status(500).json({ message: error.message || 'Failed to record monthly fee' });
+        res.status(500).json({ message: error.message || 'Failed' });
     }
 };
 
@@ -355,13 +347,21 @@ export const lookupStudent = async (req: Request, res: Response) => {
     if (!studentId.toUpperCase().startsWith('S-')) studentId = `S-${studentId}`;
 
     try {
+        const currentYear = new Date().getFullYear();
         const result = await db.query(
-            `SELECT s."studentId", s.name, s."rollNumber", s.photo,
-                    c.name AS "className", c.id AS "classId"
+            `SELECT s."studentId", s.name, s."rollNumber", s.id as "stuUUID",
+                    c.name AS "className", c.id AS "classId",
+                    COALESCE(af."totalAdmissionFee", 0) AS "totalAdmissionFee",
+                    COALESCE(af."amountPaid", 0) AS "amountPaid",
+                    COALESCE(af.due, 0) AS "due",
+                    (SELECT STRING_AGG(month, ', ' ORDER BY ARRAY_POSITION(ARRAY['January','February','March','April','May','June','July','August','September','October','November','December'], month))
+                     FROM "MonthlyFee" WHERE "studentId" = s.id AND "academicYear" = $2) AS "monthsPaid",
+                    (SELECT COALESCE(SUM(total), 0) FROM "MonthlyFee" WHERE "studentId" = s.id AND "academicYear" = $2) AS "monthlyFeePaidTotal"
              FROM "Student" s
              JOIN "Class" c ON c.id = s."classId"
+             LEFT JOIN "AdmissionFee" af ON af."studentId" = s.id
              WHERE s."studentId" = $1 LIMIT 1`,
-            [studentId]
+            [studentId, currentYear]
         );
 
         if (result.rows.length === 0) {

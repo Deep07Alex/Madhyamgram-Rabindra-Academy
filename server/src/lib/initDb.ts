@@ -481,7 +481,7 @@ export const initDb = async () => {
         for (const cls of classesRes.rows) {
             const list = SUBJECTS_BY_CLASS[cls.name];
             if (!list) continue;
-            
+
             for (const sub of list) {
                 const fm = getFullMarks(sub, cls.name);
                 await db.query(`

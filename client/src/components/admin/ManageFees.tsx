@@ -231,26 +231,82 @@ const StudentSelector = ({ onFound, resetTrigger }: { onFound: (s: any) => void,
 };
 
 // ─── Student info card (auto-filled) ──────────────────────────────────────────
-const StudentCard = ({ student }: { student: any }) => (
-    <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-        gap: '16px', padding: '16px', background: 'var(--primary-soft)',
-        borderRadius: 'var(--radius-md)', border: '1px solid var(--primary-bold)',
-        marginTop: '16px'
-    }}>
-        {[
-            { label: 'Admission No', value: student.studentId },
-            { label: 'Name', value: student.name },
-            { label: 'Class', value: student.className },
-            { label: 'Roll', value: student.rollNumber },
-        ].map(f => (
-            <div key={f.label}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--primary-bold)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{f.label}</div>
-                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '2px' }}>{f.value || '—'}</div>
+const StudentCard = ({ student }: { student: any }) => {
+    if (!student) return null;
+    
+    const hasMonthlyFees = student.monthsPaid && student.monthsPaid.trim().length > 0;
+    const admissionTotal = parseFloat(student.totalAdmissionFee || 0);
+    const admissionPaid = parseFloat(student.amountPaid || 0);
+    const admissionDue = parseFloat(student.due || 0);
+    const monthsArr = hasMonthlyFees ? student.monthsPaid.split(', ').map((m: string) => m.trim()) : [];
+
+    return (
+        <div style={{ marginTop: '20px', borderRadius: '12px', border: '1.5px solid var(--border-soft)', overflow: 'hidden', background: 'var(--bg-card)', animation: 'slideDown 0.3s ease-out' }}>
+            {/* Identity Header */}
+            <div style={{ 
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+                gap: '16px', padding: '16px 20px', 
+                background: 'rgba(255, 215, 0, 0.05)', borderBottom: '1px solid var(--border-soft)' 
+            }}>
+                {[
+                    { label: 'Admission No', value: student.studentId },
+                    { label: 'Name', value: student.name },
+                    { label: 'Class', value: student.className },
+                    { label: 'Roll', value: student.rollNumber },
+                ].map(f => (
+                    <div key={f.label}>
+                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--primary-bold)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{f.label}</div>
+                        <div style={{ fontSize: '1.15rem', fontWeight: 900, color: 'var(--text-main)' }}>{f.value || '—'}</div>
+                    </div>
+                ))}
             </div>
-        ))}
-    </div>
-);
+
+            {/* Admission Fee Status Box Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px', background: 'var(--border-soft)' }}>
+                <div style={{ padding: '18px 20px', background: 'var(--bg-card)', textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, display: 'block', textTransform: 'uppercase' }}>Admission Total</span>
+                    <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-main)' }}>₹ {admissionTotal.toFixed(2)}</span>
+                </div>
+                <div style={{ padding: '18px 20px', background: 'var(--bg-card)', textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--primary-bold)', fontWeight: 800, display: 'block', textTransform: 'uppercase' }}>Actually Paid</span>
+                    <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--primary-bold)' }}>₹ {admissionPaid.toFixed(2)}</span>
+                </div>
+                <div style={{ padding: '18px 20px', background: 'var(--bg-card)', textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.65rem', color: admissionDue > 0 ? '#ef4444' : '#22c55e', fontWeight: 800, display: 'block', textTransform: 'uppercase' }}>Current Due</span>
+                    <span style={{ fontSize: '1.4rem', fontWeight: 900, color: admissionDue > 0 ? '#ef4444' : '#22c55e' }}>₹ {admissionDue.toFixed(2)}</span>
+                </div>
+            </div>
+
+            {/* Monthly Status Section */}
+            <div style={{ padding: '16px 20px', background: 'rgba(59, 130, 246, 0.04)', borderTop: '1px solid var(--border-soft)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Calendar size={13} /> Monthly Fee Status ({new Date().getFullYear()})
+                    </div>
+                    {hasMonthlyFees && (
+                        <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#22c55e', background: 'var(--bg-card)', padding: '2px 10px', borderRadius: '6px', border: '1px solid #22c55e30' }}>
+                            Total Paid: ₹{parseFloat(student.monthlyFeePaidTotal || 0).toFixed(2)}
+                        </div>
+                    )}
+                </div>
+                {hasMonthlyFees ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {monthsArr.map((m: string) => (
+                            <span key={m} style={{ padding: '4px 10px', background: 'var(--bg-card)', color: '#22c55e', border: '1.5px solid #22c55e50', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <CheckCircle2 size={12} /> {m}
+                            </span>
+                        ))}
+                    </div>
+                ) : (
+                    <div style={{ color: '#ef4444', fontSize: '0.85rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <AlertCircle size={14} /> No monthly payments recorded for this year.
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 
 // ─── Tab: Monthly Fee ─────────────────────────────────────────────────────────
 const MonthlyFeeTab = () => {
@@ -841,7 +897,8 @@ const AdmissionFeeTab = () => {
                                 <tr>
                                     <th style={{ textAlign: 'left' }}>Date</th>
                                     <th style={{ textAlign: 'left' }}>Name</th>
-                                    <th>Class</th>
+                                    <th style={{ textAlign: 'center' }}>Roll</th>
+                                    <th style={{ textAlign: 'center' }}>Class</th>
                                     <th>Total Fee</th>
                                     <th>Paid</th>
                                     <th>Due</th>
@@ -853,6 +910,7 @@ const AdmissionFeeTab = () => {
                                     <tr key={r.id}>
                                         <td>{new Date(r.date).toLocaleDateString('en-IN')}</td>
                                         <td style={{ fontWeight: 700 }}>{r.studentName} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({r.admissionNo})</span></td>
+                                        <td style={{ textAlign: 'center', fontWeight: 700 }}>{r.rollNumber || '—'}</td>
                                         <td style={{ textAlign: 'center' }}>{r.className}</td>
                                         <td style={{ textAlign: 'center' }}>₹{parseFloat(r.totalAdmissionFee).toFixed(2)}</td>
                                         <td style={{ textAlign: 'center', color: '#22c55e', fontWeight: 700 }}>₹{parseFloat(r.amountPaid).toFixed(2)}</td>
