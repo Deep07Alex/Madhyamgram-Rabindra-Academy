@@ -16,6 +16,12 @@
   padding: 2rem;
 }
 
+@media (max-width: 768px) {
+  .main-container {
+    padding: 1rem;
+  }
+}
+
 /* Navbar */
 .landing-navbar {
   display: flex;
@@ -509,10 +515,15 @@
 
 .festival-slider-wrapper {
   max-width: 1250px;
-  /* Increased from 1000px */
   margin: 0 auto;
   position: relative;
   padding: 0 1rem;
+}
+
+@media (max-width: 768px) {
+  .festival-slider-wrapper {
+    padding: 0;
+  }
 }
 
 .festival-swiper {
@@ -849,17 +860,15 @@
 /* Forced Desktop Symmetry on Mobile */
 @media (max-width: 992px) {
   .notice-resources .section-grid {
-    grid-template-columns: 1fr 1fr;
-    /* Keep 1:1 symmetry */
-    gap: 10px;
-    /* Even tighter gap for mobile */
+    grid-template-columns: 1fr;
+    gap: 30px;
   }
 
   .notice-board-container,
   .resources-board-container {
-    padding: 10px;
-    /* Reduced padding */
-    height: 400px;
+    padding: 20px;
+    height: auto;
+    min-height: 400px;
   }
 
   .column-header h2 {
@@ -1235,44 +1244,44 @@
 /* Final Desktop-to-Mobile Symmetry Fixes */
 @media (max-width: 600px) {
   .alumni-grid {
-    grid-template-columns: 1fr 1fr;
-    /* Keep 2 columns on mobile */
-    gap: 10px;
+    grid-template-columns: 1fr;
+    /* Stack on mobile */
+    gap: 20px;
   }
 
   .alumni-info {
-    padding: 10px;
+    padding: 20px;
   }
 
   .alumni-info h4 {
-    font-size: 0.75rem;
+    font-size: 1.1rem;
   }
 
   .alumni-info p {
-    font-size: 0.65rem;
+    font-size: 0.9rem;
   }
 
   .alumni-download-btn {
-    width: 34px;
-    height: 34px;
+    width: 44px;
+    height: 44px;
   }
 
   .notice-resources .section-grid {
-    grid-template-columns: 1fr 1fr;
-    /* Force side-by-side */
-    gap: 8px;
+    grid-template-columns: 1fr;
+    /* Stacked */
+    gap: 30px;
   }
 
   .notice-board-container,
   .resources-board-container {
-    height: 380px;
-    /* Shorter for mobile */
-    padding: 10px;
+    height: auto;
+    min-height: 400px;
+    padding: 20px;
   }
 
   .gallery-grid {
-    grid-template-columns: 1fr 1fr;
-    /* 2 columns for symmetry on mobile */
-    gap: 10px;
+    grid-template-columns: 1fr;
+    /* Full width on mobile */
+    gap: 20px;
   }
 }

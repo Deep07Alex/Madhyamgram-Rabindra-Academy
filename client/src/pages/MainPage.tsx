@@ -363,11 +363,11 @@ function Gallery({ items }: { items: GalleryItem[] }) {
         <h2>School Gallery</h2>
         <div className="section-divider"></div>
       </div>
-      <div className="gallery-slider-wrapper" style={{ padding: "0 10px 40px", maxWidth: "1200px", margin: "0 auto" }}>
+      <div className="gallery-slider-wrapper" style={{ padding: "0 0 40px", maxWidth: "1200px", margin: "0 auto" }}>
         <Swiper
           modules={[Autoplay, Pagination, Navigation]}
           spaceBetween={20}
-          slidesPerView={1.1}
+          slidesPerView={1}
           navigation
           autoplay={{ delay: 4000, disableOnInteraction: false }}
           pagination={{ clickable: true, dynamicBullets: true }}

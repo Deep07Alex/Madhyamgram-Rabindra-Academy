@@ -285,27 +285,36 @@ export const enrollStudent = async (req: Request, res: Response) => {
     try {
         const id = crypto.randomUUID();
 
-        // Ensure uppercase S- prefix
+        // Ensure uppercase S- prefix for standardize comparison
         let finalId = studentId.trim();
         if (!finalId.toUpperCase().startsWith('S-')) {
             finalId = `S-${finalId}`;
         } else {
-            finalId = `S-${finalId.slice(2)}`;
+            const numericPart = finalId.slice(2).replace(/\s/g, '');
+            finalId = `S-${numericPart}`;
         }
 
-        // Check if studentId already exists
+        // 1. Check Banglar Sikkha ID (If provided) - MUST BE FIRST per user req
+        if (banglarSikkhaId && banglarSikkhaId.trim() !== "") {
+            const banglarCheck = await db.query(`SELECT id FROM "Student" WHERE "banglarSikkhaId" = $1 LIMIT 1`, [banglarSikkhaId.trim()]);
+            if (banglarCheck.rows.length > 0) {
+                return res.status(400).json({ message: `Bangla Sikkhar id (${banglarSikkhaId.trim()}) already exist` });
+            }
+        }
+
+        // 2. Check Admission Number (studentId) - SECOND
         const idCheck = await db.query(`SELECT id FROM "Student" WHERE "studentId" = $1 LIMIT 1`, [finalId]);
         if (idCheck.rows.length > 0) {
-            return res.status(400).json({ message: `Admission Number ${studentId} already exists` });
+            return res.status(400).json({ message: `Admission number (${studentId.trim()}) already exist` });
         }
 
-        // Check if roll number already exists in the same class
+        // 3. Check Roll Number within the specific Class - THIRD
         const rollCheck = await db.query(
             `SELECT id FROM "Student" WHERE "rollNumber" = $1 AND "classId" = $2 LIMIT 1`,
-            [rollNumber, classId]
+            [rollNumber.toString().trim(), classId]
         );
         if (rollCheck.rows.length > 0) {
-            return res.status(400).json({ message: `Roll number ${rollNumber} is already taken in this class` });
+            return res.status(400).json({ message: `Roll number (${rollNumber.toString().trim()}) already exist in this class` });
         }
 
         // Auto-generate password if not provided (Name@Last4DigitsOfID)
@@ -344,6 +353,103 @@ export const enrollStudent = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * Live Validation for Enrollment
+ */
+export const validateStudentEnrollment = async (req: Request, res: Response) => {
+    try {
+        const { type, value, classId, studentId: currentStudentId } = req.query;
+
+        if (type === 'studentId') {
+            let finalId = (value as string).trim();
+            if (!finalId.toUpperCase().startsWith('S-')) {
+                finalId = `S-${finalId}`;
+            } else {
+                const numericPart = finalId.slice(2).replace(/\s/g, '');
+                finalId = `S-${numericPart}`;
+            }
+            
+            const check = await db.query(
+                `SELECT id FROM "Student" WHERE "studentId" = $1 ${currentStudentId ? 'AND id != $2' : ''} LIMIT 1`, 
+                currentStudentId ? [finalId, currentStudentId] : [finalId]
+            );
+            return res.json({ exists: check.rows.length > 0, message: check.rows.length > 0 ? `Admission number (${(value as string).trim()}) already exist` : '' });
+        }
+
+        if (type === 'banglarSikkhaId') {
+            const check = await db.query(
+                `SELECT id FROM "Student" WHERE "banglarSikkhaId" = $1 ${currentStudentId ? 'AND id != $2' : ''} LIMIT 1`, 
+                currentStudentId ? [value, currentStudentId] : [value]
+            );
+            return res.json({ exists: check.rows.length > 0, message: check.rows.length > 0 ? `Bangla Sikkhar id (${(value as string).trim()}) already exist` : '' });
+        }
+
+        if (type === 'rollNumber' && classId) {
+            const check = await db.query(
+                `SELECT id FROM "Student" WHERE "rollNumber" = $1 AND "classId" = $2 ${currentStudentId ? 'AND id != $3' : ''} LIMIT 1`,
+                currentStudentId ? [value, classId, currentStudentId] : [value, classId]
+            );
+            return res.json({ exists: check.rows.length > 0, message: check.rows.length > 0 ? `Roll number (${(value as string).trim()}) already exist in this class` : '' });
+        }
+
+        res.json({ exists: false });
+    } catch (error) {
+        res.status(500).json({ message: 'Validation error' });
+    }
+};
+
+/**
+ * Live Validation for Teacher/Faculty Enrollment
+ */
+export const validateTeacherEnrollment = async (req: Request, res: Response) => {
+    try {
+        const { type, value, teacherId: currentTeacherId } = req.query;
+
+        if (type === 'teacherId') {
+            const val = (value as string).trim();
+            // Check both Teacher and Admin tables
+            const checkTeacher = await db.query(
+                `SELECT id FROM "Teacher" WHERE "teacherId" = $1 ${currentTeacherId ? 'AND id != $2' : ''} LIMIT 1`, 
+                currentTeacherId ? [val, currentTeacherId] : [val]
+            );
+            
+            const checkAdmin = await db.query(
+                `SELECT id FROM "Admin" WHERE "adminId" = $1 ${currentTeacherId ? 'AND id != $2' : ''} LIMIT 1`, 
+                currentTeacherId ? [val, currentTeacherId] : [val]
+            );
+
+            const exists = checkTeacher.rows.length > 0 || checkAdmin.rows.length > 0;
+            return res.json({ 
+                exists, 
+                message: exists ? `${val} already present` : '' 
+            });
+        }
+
+        if (type === 'aadhar') {
+            const val = (value as string).trim();
+            const checkTeacher = await db.query(
+                `SELECT id FROM "Teacher" WHERE "aadhar" = $1 ${currentTeacherId ? 'AND id != $2' : ''} LIMIT 1`, 
+                currentTeacherId ? [val, currentTeacherId] : [val]
+            );
+            
+            const checkAdmin = await db.query(
+                `SELECT id FROM "Admin" WHERE "aadhar" = $1 ${currentTeacherId ? 'AND id != $2' : ''} LIMIT 1`, 
+                currentTeacherId ? [val, currentTeacherId] : [val]
+            );
+
+            const exists = checkTeacher.rows.length > 0 || checkAdmin.rows.length > 0;
+            return res.json({ 
+                exists, 
+                message: exists ? `Aadhar number already exists` : '' 
+            });
+        }
+
+        res.json({ exists: false });
+    } catch (error) {
+        res.status(500).json({ message: 'Validation error' });
+    }
+};
+
 // Update a student (general update)
 /**
  * Dynamically updates student fields. 
@@ -376,15 +482,32 @@ export const updateStudent = async (req: Request, res: Response) => {
             if (!finalId.toUpperCase().startsWith('S-')) {
                 finalId = `S-${finalId}`;
             } else {
-                finalId = `S-${finalId.slice(2)}`;
+                const numericPart = finalId.slice(2).replace(/\s/g, '');
+                finalId = `S-${numericPart}`;
             }
+
+            // Check duplicate Admission Number
+            const idCheck = await db.query(`SELECT id FROM "Student" WHERE "studentId" = $1 AND id != $2`, [finalId, id]);
+            if (idCheck.rows.length > 0) {
+                return res.status(400).json({ message: 'Admission number already exists' });
+            }
+
             updateQuery += `"studentId" = $${paramCount++}, `;
             params.push(finalId);
         }
+
         if (rollNumber !== undefined) {
+            const rollCheck = await db.query(
+                `SELECT id FROM "Student" WHERE "rollNumber" = $1 AND "classId" = (SELECT "classId" FROM "Student" WHERE id = $2) AND id != $2`,
+                [rollNumber.toString().trim(), id]
+            );
+            if (rollCheck.rows.length > 0) {
+                return res.status(400).json({ message: 'Roll number already exists in this class' });
+            }
             updateQuery += `"rollNumber" = $${paramCount++}, `;
-            params.push(rollNumber);
+            params.push(rollNumber.toString().trim());
         }
+
         if (banglarSikkhaId !== undefined) {
             const safeBanglarSikkhaId = (banglarSikkhaId && banglarSikkhaId.trim()) ? banglarSikkhaId.trim() : null;
             if (safeBanglarSikkhaId) {
@@ -393,7 +516,7 @@ export const updateStudent = async (req: Request, res: Response) => {
                     [safeBanglarSikkhaId, id]
                 );
                 if (banglarCheck.rows.length > 0) {
-                    return res.status(400).json({ message: 'Cannot be updated as this Banglar Sikkha ID is already allotted to another student' });
+                    return res.status(400).json({ message: 'Bangla Sikkhar id already exist' });
                 }
             }
             updateQuery += `"banglarSikkhaId" = $${paramCount++}, `;

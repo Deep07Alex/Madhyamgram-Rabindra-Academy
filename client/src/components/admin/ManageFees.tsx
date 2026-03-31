@@ -7,12 +7,12 @@
  *
  * Both tabs support auto-filling student details by Admission ID lookup.
  */
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import {
     Banknote, Search, CheckCircle2, AlertCircle, Loader2,
-    ReceiptText, ClipboardList, Calendar, RefreshCw, Trash2
+    ReceiptText, ClipboardList, Calendar, RefreshCw, Trash2, ChevronDown
 } from 'lucide-react';
 
 // Responsive CSS for Fees Module
@@ -123,6 +123,7 @@ const StudentSelector = ({ onFound, resetTrigger }: { onFound: (s: any) => void,
 
     // Load students when class changes
     useEffect(() => {
+        let isMounted = true;
         const fetchStudents = async () => {
             if (!selectedClassId) {
                 setStudents([]);
@@ -131,15 +132,18 @@ const StudentSelector = ({ onFound, resetTrigger }: { onFound: (s: any) => void,
             setLoading(true);
             try {
                 const res = await api.get('/fees/search', { params: { classId: selectedClassId } });
-                setStudents(res.data);
-                setRollNumber('');
+                if (isMounted) {
+                    setStudents(res.data);
+                    setRollNumber('');
+                }
             } catch {
-                setError('Failed to load students.');
+                if (isMounted) setError('Failed to load students.');
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         };
         fetchStudents();
+        return () => { isMounted = false; };
     }, [selectedClassId]);
 
     // Live fetching when roll number is entered
@@ -185,7 +189,7 @@ const StudentSelector = ({ onFound, resetTrigger }: { onFound: (s: any) => void,
                 <select 
                     value={selectedClassId} 
                     onChange={e => setSelectedClassId(e.target.value)}
-                    style={{ width: '100%', height: '52px', marginTop: '10px', fontSize: '1.1rem', fontWeight: 700 }}
+                    style={{ width: '100%', height: '52px', marginTop: '10px', fontSize: '1.1rem', fontWeight: 700, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', padding: '0 12px' }}
                 >
                     <option value="">-- Choose Class --</option>
                     {classes.map(c => (
@@ -250,9 +254,10 @@ const StudentCard = ({ student }: { student: any }) => (
 // ─── Tab: Monthly Fee ─────────────────────────────────────────────────────────
 const MonthlyFeeTab = () => {
     const [student, setStudent] = useState<any>(null);
+    const [monthDropdownOpen, setMonthDropdownOpen] = useState(false);
     const [form, setForm] = useState({
         date: new Date().toISOString().split('T')[0],
-        month: MONTHS[new Date().getMonth()],
+        months: [MONTHS[new Date().getMonth()]],
         academicYear: CURRENT_YEAR,
         fee: '', fine: '', others: ''
     });
@@ -270,6 +275,18 @@ const MonthlyFeeTab = () => {
     const [showDues, setShowDues] = useState(false);
     const [resetCounter, setResetCounter] = useState(0);
     const { showToast } = useToast();
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Global click listener to close dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setMonthDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Load classes on mount (for dues filter)
     useEffect(() => {
@@ -321,13 +338,22 @@ const MonthlyFeeTab = () => {
         try {
             await api.post('/fees/monthly', {
                 studentId: student.studentId,
-                ...form
+                date: form.date,
+                month: form.months.join(', '),
+                academicYear: form.academicYear,
+                fee: form.fee,
+                fine: form.fine,
+                others: form.others
             });
             showToast('Monthly fee recorded successfully!', 'success');
             setStudent(null);
-            setForm(f => ({ ...f, fee: '', fine: '', others: '' }));
-            setResetCounter(c => c + 1); // Trigger roll number clear
+            setMonthDropdownOpen(false);
+            setForm(f => ({ ...f, fee: '', fine: '', others: '', months: [MONTHS[new Date().getMonth()]] }));
+            // Refresh related reports
             fetchRecent();
+            if (showDues) fetchDues();
+
+            setResetCounter(c => c + 1); // Trigger roll number clear
         } catch (e: any) {
             showToast(e?.response?.data?.message || 'Failed to record fee', 'error');
         } finally {
@@ -362,19 +388,64 @@ const MonthlyFeeTab = () => {
                         <label>Date</label>
                         <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
                     </div>
-                    <div className="form-group" style={{ margin: 0 }}>
-                        <label>Month</label>
-                        <select value={form.month} onChange={e => setForm(f => ({ ...f, month: e.target.value }))}
-                            style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.9rem' }}>
-                            {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
-                        </select>
+                    <div className="form-group" style={{ margin: 0, position: 'relative' }} ref={dropdownRef}>
+                        <label style={{ color: 'var(--text-muted)', fontWeight: 700 }}>Months</label>
+                        <div 
+                            onClick={() => setMonthDropdownOpen(!monthDropdownOpen)}
+                            className="custom-dropdown-trigger"
+                            style={{ 
+                                width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', 
+                                border: monthDropdownOpen ? '1.5px solid var(--primary-bold)' : '1px solid var(--border-color)', 
+                                background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.9rem', 
+                                cursor: 'pointer', display: 'flex', justifyContent: 'space-between', 
+                                alignItems: 'center', height: '44px', transition: 'all 0.2s ease',
+                                boxShadow: monthDropdownOpen ? '0 0 0 3px var(--primary-soft)' : 'none'
+                            }}
+                        >
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                                {form.months.length > 2 ? `${form.months.length} months selected` : form.months.join(', ')}
+                            </span>
+                            <ChevronDown size={18} style={{ color: monthDropdownOpen ? 'var(--primary-bold)' : 'var(--text-muted)', transition: 'transform 0.3s ease', transform: monthDropdownOpen ? 'rotate(180deg)' : 'none' }} />
+                        </div>
+                        {monthDropdownOpen && (
+                            <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, background: 'var(--bg-card)', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)', zIndex: 100, maxHeight: '280px', overflowY: 'auto', boxShadow: 'var(--shadow-premium)', animation: 'slideUp 0.2s ease' }}>
+                                {MONTHS.map(m => (
+                                    <div 
+                                        key={m}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setForm(f => {
+                                                const newMonths = f.months.includes(m) ? f.months.filter(x => x !== m) : [...f.months, m];
+                                                return { ...f, months: newMonths.length ? newMonths : [m] };
+                                            });
+                                        }}
+                                        style={{ 
+                                            padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', 
+                                            cursor: 'pointer', background: form.months.includes(m) ? 'var(--primary-soft)' : 'transparent', 
+                                            borderBottom: '1px solid var(--border-soft)', transition: 'background 0.2s ease'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-main)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.background = form.months.includes(m) ? 'var(--primary-soft)' : 'transparent'}
+                                    >
+                                        <div style={{ 
+                                            width: '20px', height: '20px', borderRadius: '4px', border: `2px solid ${form.months.includes(m) ? 'var(--primary-bold)' : 'var(--border-color)'}`,
+                                            background: form.months.includes(m) ? 'var(--primary-bold)' : 'transparent',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s ease'
+                                        }}>
+                                            {form.months.includes(m) && <CheckCircle2 size={14} color="#fff" />}
+                                        </div>
+                                        <span style={{ fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: form.months.includes(m) ? 700 : 500 }}>{m}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
                         <label>Academic Year</label>
                         <select
                             value={form.academicYear}
                             onChange={e => setForm(f => ({ ...f, academicYear: parseInt(e.target.value) }))}
-                            style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.9rem' }}
+                            style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.9rem' }}
                         >
                             {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
@@ -425,7 +496,7 @@ const MonthlyFeeTab = () => {
                         <select 
                             value={dueMonth} 
                             onChange={e => setDueMonth(e.target.value)}
-                            style={{ width: '100%', height: '44px', marginTop: '6px' }}
+                            style={{ width: '100%', padding: '10px 12px', marginTop: '6px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.9rem' }}
                         >
                             {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
                         </select>
@@ -436,7 +507,7 @@ const MonthlyFeeTab = () => {
                         <select 
                             value={dueYear} 
                             onChange={e => setDueYear(parseInt(e.target.value))}
-                            style={{ width: '100%', height: '44px', marginTop: '6px' }}
+                            style={{ width: '100%', padding: '10px 12px', marginTop: '6px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.9rem' }}
                         >
                             {ACADEMIC_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
@@ -447,7 +518,7 @@ const MonthlyFeeTab = () => {
                         <select 
                             value={dueClassId} 
                             onChange={e => setDueClassId(e.target.value)}
-                            style={{ width: '100%', height: '44px', marginTop: '6px' }}
+                            style={{ width: '100%', padding: '10px 12px', marginTop: '6px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', fontSize: '0.9rem' }}
                         >
                             <option value="">-- Choose Class --</option>
                             {classes.map(c => (

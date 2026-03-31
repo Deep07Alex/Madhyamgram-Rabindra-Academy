@@ -60,10 +60,17 @@ export const createNotice = async (req: Request, res: Response) => {
 export const getNotices = async (req: Request, res: Response) => {
     try {
         const user = (req as any).user;
+        const now = new Date().toISOString();
 
         if (!user) {
-            // Unauthenticated user -> No notices (Public landing page concept removed)
-            return res.json([]);
+            // Unauthenticated user -> ONLY public notices
+            const result = await db.query(
+                `SELECT * FROM "Notice" 
+                 WHERE "type" = 'PUBLIC'
+                 AND ("expiresAt" IS NULL OR "expiresAt" > CURRENT_TIMESTAMP)
+                 ORDER BY "createdAt" DESC`
+            );
+            return res.json(result.rows);
         }
 
         if (user.role === 'ADMIN') {

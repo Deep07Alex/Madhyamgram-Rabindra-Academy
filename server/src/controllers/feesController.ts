@@ -37,6 +37,7 @@ export const recordMonthlyFee = async (req: Request, res: Response) => {
         const year = academicYear || new Date().getFullYear();
 
         // CHECK IF RECORD EXISTS FOR THIS STUDENT/MONTH/YEAR
+        // We look for an exact month match or an overlap to prevent duplicates
         const existing = await db.query(
             `SELECT id FROM "MonthlyFee" WHERE "studentId" = $1 AND month = $2 AND "academicYear" = $3`,
             [stuUUID, month, year]
@@ -44,7 +45,7 @@ export const recordMonthlyFee = async (req: Request, res: Response) => {
 
         let result;
         if (existing.rows.length > 0) {
-            // OVERWRITE (Update)
+            // Update existing specific record
             result = await db.query(
                 `UPDATE "MonthlyFee" 
                  SET date = $1, fee = $2, fine = $3, others = $4, total = $5, "createdAt" = CURRENT_TIMESTAMP
@@ -66,49 +67,25 @@ export const recordMonthlyFee = async (req: Request, res: Response) => {
         try {
             const expiresAt = new Date();
             expiresAt.setHours(expiresAt.getHours() + 24);
-            const noticeTitle = `Fee Record: ${month} ${year}`;
+            // Use a unique title per student/month/year to avoid grouping notices incorrectly
+            const noticeTitle = `Fee Cleared: ${month}`;
 
-            // Check if a notice already exists for this fee entry
-            const existingNotice = await db.query(
-                `SELECT id FROM "Notice" 
-                 WHERE "targetStudentId" = $1 AND title = $2 AND type = 'INTERNAL' LIMIT 1`,
-                [stuUUID, noticeTitle]
+            const noticeContent = `Your fees for ${month} (${year}) has been recorded successfully. Total: ₹${total.toFixed(2)}. This notice will expire in 24 hours.`;
+
+            await db.query(
+                `INSERT INTO "Notice" 
+                    (id, title, content, type, "targetAudience", "targetStudentId", "expiresAt")
+                 VALUES (gen_random_uuid(), $1, $2, 'INTERNAL', 'STUDENT', $3, $4)`,
+                [noticeTitle, noticeContent, stuUUID, expiresAt]
             );
-
-            if (existingNotice.rows.length > 0) {
-                // Update existing notice
-                await db.query(
-                    `UPDATE "Notice" 
-                     SET content = $1, "expiresAt" = $2, "createdAt" = CURRENT_TIMESTAMP
-                     WHERE id = $3`,
-                    [
-                        `Your fees for ${month} ${year} has been updated/cleared successfully. Total paid: ₹${total.toFixed(2)}.`,
-                        expiresAt,
-                        existingNotice.rows[0].id
-                    ]
-                );
-            } else {
-                // Insert new notice
-                await db.query(
-                    `INSERT INTO "Notice" 
-                        (id, title, content, type, "targetAudience", "targetStudentId", "expiresAt")
-                     VALUES (gen_random_uuid(), $1, $2, 'INTERNAL', 'STUDENT', $3, $4)`,
-                    [
-                        noticeTitle,
-                        `Your fees for ${month} ${year} has been updated/cleared successfully. Total paid: ₹${total.toFixed(2)}.`,
-                        stuUUID,
-                        expiresAt
-                    ]
-                );
-            }
         } catch (noticeErr) {
-            console.error('Failed to update/create auto-notice for fee payment:', noticeErr);
+            console.error('Failed to create auto-notice:', noticeErr);
         }
 
         res.status(201).json(result.rows[0]);
     } catch (error: any) {
         console.error('recordMonthlyFee error:', error);
-        res.status(500).json({ message: 'Failed to record monthly fee' });
+        res.status(500).json({ message: error.message || 'Failed to record monthly fee' });
     }
 };
 
@@ -122,7 +99,7 @@ export const getMonthlyFees = async (req: Request, res: Response) => {
         const params: any[] = [];
         let pi = 1;
 
-        if (month) { conditions.push(`mf.month = $${pi++}`); params.push(month); }
+        if (month) { conditions.push(`mf.month LIKE '%' || $${pi++} || '%'`); params.push(month); }
         if (academicYear) { conditions.push(`mf."academicYear" = $${pi++}`); params.push(parseInt(academicYear as string)); }
         if (classId) { conditions.push(`s."classId" = $${pi++}`); params.push(classId); }
 
@@ -176,7 +153,7 @@ export const getMonthlyDueReport = async (req: Request, res: Response) => {
              JOIN "Class" c ON c.id = s."classId"
              WHERE s.id NOT IN (
                  SELECT "studentId" FROM "MonthlyFee"
-                 WHERE month = $1 AND "academicYear" = $2
+                 WHERE month LIKE '%' || $1 || '%' AND "academicYear" = $2
              ) ${classFilter}
              ORDER BY c.name, s."rollNumber"`,
             params

@@ -65,8 +65,49 @@ const ManageTeachers = () => {
         photo: '', address: '', qualification: '', extraQualification: '', caste: 'GENERAL'
     });
 
+    const [validationErrors, setValidationErrors] = useState({ teacherId: '', aadhar: '' });
+    const debouncedTeacherId = useDebounce(newUser.teacherId, 500);
+    const debouncedAadhar = useDebounce(newUser.aadhar, 500);
+
+    // Real-time validation for Teacher ID
+    useEffect(() => {
+        if (debouncedTeacherId && debouncedTeacherId.length > 2) {
+            api.get('/users/teachers/validate', { 
+                params: { type: 'teacherId', value: debouncedTeacherId } 
+            })
+            .then(res => {
+                setValidationErrors(prev => ({ ...prev, teacherId: res.data.message }));
+            })
+            .catch(err => console.error('Teacher ID validation failed:', err));
+        } else {
+            setValidationErrors(prev => ({ ...prev, teacherId: '' }));
+        }
+    }, [debouncedTeacherId]);
+
+    // Real-time validation for Aadhar
+    useEffect(() => {
+        if (debouncedAadhar && debouncedAadhar.length >= 12) {
+            api.get('/users/teachers/validate', { 
+                params: { type: 'aadhar', value: debouncedAadhar } 
+            })
+            .then(res => {
+                setValidationErrors(prev => ({ ...prev, aadhar: res.data.message }));
+            })
+            .catch(err => console.error('Aadhar validation failed:', err));
+        } else {
+            setValidationErrors(prev => ({ ...prev, aadhar: '' }));
+        }
+    }, [debouncedAadhar]);
+
     const handleCreateTeacher = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // Prevent submission if real-time validation has active errors
+        if (validationErrors.teacherId || validationErrors.aadhar) {
+            showToast(validationErrors.teacherId || validationErrors.aadhar, 'error');
+            return;
+        }
+
         try {
             let finalUser = { ...newUser, role: 'TEACHER' };
             if (['PRINCIPAL', 'HEAD MISTRESS'].includes(newUser.designation) && newUser.teacherId && !newUser.teacherId.toUpperCase().startsWith('A-')) {
@@ -209,6 +250,7 @@ const ManageTeachers = () => {
                         <input 
                             type="text" 
                             placeholder="12-digit Aadhar" 
+                            style={{ borderColor: validationErrors.aadhar ? '#ef4444' : 'var(--border-color)' }}
                             value={newUser.aadhar} 
                             onChange={e => {
                                 const aadhar = e.target.value;
@@ -228,6 +270,11 @@ const ManageTeachers = () => {
                                 });
                             }} 
                         />
+                        {validationErrors.aadhar && (
+                            <span style={{ color: '#ef4444', fontSize: '0.7rem', fontWeight: '700', marginTop: '4px' }}>
+                                {validationErrors.aadhar}
+                            </span>
+                        )}
                     </div>
                     <div className="form-group">
                         <label>Date of Joining</label>
@@ -272,10 +319,17 @@ const ManageTeachers = () => {
                                 <input 
                                     type="text" 
                                     placeholder={['PRINCIPAL', 'HEAD MISTRESS'].includes(newUser.designation) ? 'e.g. A-101' : 'e.g. T-101'} 
+                                    className={validationErrors.teacherId ? 'border-error' : ''}
+                                    style={{ borderColor: validationErrors.teacherId ? '#ef4444' : 'var(--border-color)' }}
                                     value={newUser.teacherId} 
                                     onChange={e => setNewUser({ ...newUser, teacherId: e.target.value })} 
                                     required={newUser.isTeaching} 
                                 />
+                                {validationErrors.teacherId && (
+                                    <span style={{ color: '#ef4444', fontSize: '0.7rem', fontWeight: '700', marginTop: '4px' }}>
+                                        {validationErrors.teacherId}
+                                    </span>
+                                )}
                             </div>
                             <div className="form-group">
                                 <label>Password (Auto-generated if empty)</label>

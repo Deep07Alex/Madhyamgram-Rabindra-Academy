@@ -88,17 +88,25 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
     }
 
     try {
-        // 1. Get all unique school session dates
-        // This makes the history grow "one by one" as requested
-        const allSessionsRes = await db.query(`
+        // 1. Get all unique school session dates in the requested range
+        // This makes the history grow "one by one" as requested while staying performant
+        let sessionQuery = `
             SELECT DISTINCT date::date as session_date 
             FROM (
                 SELECT date::date FROM "Attendance"
                 UNION
                 SELECT date::date FROM "TeacherAttendance"
             ) as session_union
-            ORDER BY session_date DESC
-        `);
+        `;
+        const sessionParams: any[] = [];
+        if (startDate && endDate) {
+            sessionQuery += ` WHERE date >= $1 AND date <= $2 `;
+            sessionParams.push(new Date(startDate as string).toLocaleDateString('en-CA'));
+            sessionParams.push(new Date(endDate as string).toLocaleDateString('en-CA'));
+        }
+        sessionQuery += ` ORDER BY session_date DESC`;
+
+        const allSessionsRes = await db.query(sessionQuery, sessionParams);
         const sessionDates = allSessionsRes.rows.map(r => new Date(r.session_date).toLocaleDateString('en-CA'));
 
         // 2. Add today's date if not already in session dates (Virtual Presence for Today)

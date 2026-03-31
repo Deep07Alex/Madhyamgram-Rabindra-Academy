@@ -233,11 +233,11 @@ const ManageResults = () => {
             onConfirm: async () => {
                 try {
                     await api.delete(`/results/bulk/class/${selectedClassId}?semester=${selectedTerm}&academicYear=${selectedYear}`);
-                    showToast(`Bulk deletion successful for ${selectedClass.name}`, 'success');
+                    showToast(`Bulk Result deletion successful for ${selectedClass.name}`, 'success');
                     fetchData();
                     setConfirmModal(prev => ({ ...prev, isOpen: false }));
                 } catch (error) {
-                    showToast('Bulk deletion failed', 'error');
+                    showToast('Bulk Result deletion failed', 'error');
                 }
             }
         });

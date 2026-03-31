@@ -66,6 +66,84 @@ const ManageStudents = () => {
         phone: ''
     });
 
+    const [registrationErrors, setRegistrationErrors] = useState({
+        studentId: '',
+        rollNumber: '',
+        banglarSikkhaId: ''
+    });
+
+    const debouncedNewStudentId = useDebounce(newUser.studentId, 600);
+    const debouncedNewRoll = useDebounce(newUser.rollNumber, 600);
+    const debouncedNewBanglarSikkha = useDebounce(newUser.banglarSikkhaId, 600);
+
+    // Live Validation for Student ID
+    useEffect(() => {
+        if (!debouncedNewStudentId) {
+            setRegistrationErrors(prev => ({ ...prev, studentId: '' }));
+            return;
+        }
+
+        const validateId = async () => {
+            try {
+                const res = await api.get('/users/students/validate', {
+                    params: { type: 'studentId', value: debouncedNewStudentId }
+                });
+                if (res.data.exists) {
+                    setRegistrationErrors(prev => ({ ...prev, studentId: res.data.message }));
+                } else {
+                    setRegistrationErrors(prev => ({ ...prev, studentId: '' }));
+                }
+            } catch (err) {
+                console.error('Validation failed:', err);
+            }
+        };
+        validateId();
+    }, [debouncedNewStudentId]);
+
+    // Live Validation for Roll Number
+    useEffect(() => {
+        if (!debouncedNewRoll || !newUser.classId) {
+            setRegistrationErrors(prev => ({ ...prev, rollNumber: '' }));
+            return;
+        }
+
+        const validateRoll = async () => {
+            try {
+                const res = await api.get('/users/students/validate', {
+                    params: { type: 'rollNumber', value: debouncedNewRoll, classId: newUser.classId }
+                });
+                if (res.data.exists) {
+                    setRegistrationErrors(prev => ({ ...prev, rollNumber: res.data.message }));
+                } else {
+                    setRegistrationErrors(prev => ({ ...prev, rollNumber: '' }));
+                }
+            } catch (err) { }
+        };
+        validateRoll();
+    }, [debouncedNewRoll, newUser.classId]);
+
+    // Live Validation for Banglar Sikkha ID
+    useEffect(() => {
+        if (!debouncedNewBanglarSikkha) {
+            setRegistrationErrors(prev => ({ ...prev, banglarSikkhaId: '' }));
+            return;
+        }
+
+        const validateBanglarSikkha = async () => {
+            try {
+                const res = await api.get('/users/students/validate', {
+                    params: { type: 'banglarSikkhaId', value: debouncedNewBanglarSikkha }
+                });
+                if (res.data.exists) {
+                    setRegistrationErrors(prev => ({ ...prev, banglarSikkhaId: res.data.message }));
+                } else {
+                    setRegistrationErrors(prev => ({ ...prev, banglarSikkhaId: '' }));
+                }
+            } catch (err) { }
+        };
+        validateBanglarSikkha();
+    }, [debouncedNewBanglarSikkha]);
+
     const [editData, setEditData] = useState<any>({
         name: '',
         studentId: '',
@@ -379,6 +457,11 @@ const ManageStudents = () => {
                             onChange={e => setNewUser({ ...newUser, studentId: e.target.value })}
                             required
                         />
+                        {registrationErrors.studentId && (
+                            <p style={{ margin: '4px 0 0 0', color: '#ef4444', fontSize: '0.75rem', fontWeight: 700 }}>
+                                {registrationErrors.studentId}
+                            </p>
+                        )}
                     </div>
                     <div className="form-group">
                         <label>Roll Number</label>
@@ -389,6 +472,11 @@ const ManageStudents = () => {
                             onChange={e => setNewUser({ ...newUser, rollNumber: e.target.value })}
                             required
                         />
+                        {registrationErrors.rollNumber && (
+                            <p style={{ margin: '4px 0 0 0', color: '#ef4444', fontSize: '0.75rem', fontWeight: 700 }}>
+                                {registrationErrors.rollNumber}
+                            </p>
+                        )}
                     </div>
                     <CustomSelect
                         label="Select Class"
@@ -412,6 +500,11 @@ const ManageStudents = () => {
                                     value={newUser.banglarSikkhaId}
                                     onChange={e => setNewUser({ ...newUser, banglarSikkhaId: e.target.value })}
                                 />
+                                {registrationErrors.banglarSikkhaId && (
+                                    <p style={{ margin: '4px 0 0 0', color: '#ef4444', fontSize: '0.75rem', fontWeight: 700 }}>
+                                        {registrationErrors.banglarSikkhaId}
+                                    </p>
+                                )}
                             </div>
                         );
                     })()}

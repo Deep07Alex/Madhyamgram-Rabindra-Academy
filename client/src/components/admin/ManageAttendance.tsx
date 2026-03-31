@@ -143,21 +143,28 @@ const InlineStatusEdit = React.memo(({
 
     if (!editing) {
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start', opacity: isSubmitting ? 0.7 : 1, transition: 'opacity 0.2s' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <StatusBadge status={(isSubmitting && status) ? (status as AttendanceStatus) : currentStatus} />
-                    {!isSubmitting && (
-                        <button onClick={() => setEditing(true)} style={{
-                            background: 'none', border: 'none', cursor: 'pointer',
-                            color: 'var(--text-muted)', padding: '2px', display: 'flex'
-                        }} title="Edit">
-                            <Pencil size={14} />
-                        </button>
+                    {isSubmitting ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 12px', background: 'var(--bg-main)', borderRadius: '20px', border: '1px solid var(--border-soft)' }}>
+                            <div className="animate-spin" style={{ width: '12px', height: '12px', border: '2px solid var(--primary-bold)', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
+                            <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text-muted)' }}>Updating...</span>
+                        </div>
+                    ) : (
+                        <>
+                            <StatusBadge status={currentStatus} />
+                            <button onClick={() => setEditing(true)} style={{
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                color: 'var(--text-muted)', padding: '2px', display: 'flex'
+                            }} title="Edit">
+                                <Pencil size={14} />
+                            </button>
+                        </>
                     )}
                 </div>
-                {type === 'teacher' && (isSubmitting ? status : currentStatus) === 'ABSENT' && (reason || initialReason) && (
+                {type === 'teacher' && currentStatus === 'ABSENT' && initialReason && !isSubmitting && (
                     <span style={{ fontSize: '0.75rem', color: '#ef4444', background: 'var(--bg-main)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                        {isSubmitting ? reason : initialReason}
+                        {initialReason}
                     </span>
                 )}
             </div>

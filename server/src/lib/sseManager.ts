@@ -56,6 +56,7 @@ export type SSEEventType =
     | 'homework_graded'
     | 'attendance:updated'
     | 'system:config_updated'
+    | 'gallery:updated'
     | 'user:created';
 
 /**
