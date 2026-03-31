@@ -313,6 +313,18 @@
   padding: 4rem 1rem;
 }
 
+.toppers-slider-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  overflow: hidden; /* Prevent extra slides from showing on sides */
+}
+
+/* Ensure the Swiper itself has padding + visible overflow for badges */
+.toppers-slider-wrapper .swiper {
+  padding: 30px 10px 40px !important;
+  overflow: visible !important; /* Let the badges 'peek' out of the swiper box */
+}
+
 .toppers-container {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
