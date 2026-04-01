@@ -90,23 +90,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     useEffect(() => {
-        // PLATFORM ADAPTIVE SECURITY
-        if (Capacitor.isNativePlatform()) {
-            // Android App: Try to restore session on mount (to support backgrounding)
-            const storage = getStorage();
-            const savedToken = storage.getItem('token');
-            const savedUser = storage.getItem('user');
+        // PLATFORM ADAPTIVE SESSION RESTORATION
+        const storage = getStorage();
+        const savedToken = storage.getItem('token');
+        const savedUser = storage.getItem('user');
 
-            if (savedToken && savedUser) {
+        if (savedToken && savedUser) {
+            try {
                 setToken(savedToken);
                 setUser(JSON.parse(savedUser));
+            } catch (err) {
+                console.error('Failed to restore session:', err);
+                logout(); 
             }
-            setLoading(false);
-        } else {
-            // Web Version: Session restoration explicitly disabled (Logout on Refresh)
-            logout();
-            setLoading(false);
         }
+        
+        setLoading(false);
     }, [logout]);
 
     // Capacitor Native Only: Handle Background Grace Period (5 minutes)

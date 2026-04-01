@@ -140,7 +140,7 @@ const TeacherAttendance = () => {
         }
     });
 
-    // Check time-based AUTO closure or Admin override every 5 seconds while on this page
+    // Check time-based AUTO closure or Admin override every 3 seconds while on this page
     useEffect(() => {
         const interval = setInterval(() => {
             api.get('/attendance/config').then(res => {
@@ -149,7 +149,7 @@ const TeacherAttendance = () => {
                 // Fallback to time-based check if API fails
                 checkEviction(); 
             });
-        }, 5000);
+        }, 3000);
         return () => clearInterval(interval);
     }, [checkEviction, updateConfigAndCheck]);
 

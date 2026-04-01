@@ -107,7 +107,7 @@ const TeacherDashboard = () => {
     useEffect(() => {
         const interval = setInterval(() => {
             refreshData(true);
-        }, 5000);
+        }, 3000);
         return () => clearInterval(interval);
     }, [refreshData]);
 

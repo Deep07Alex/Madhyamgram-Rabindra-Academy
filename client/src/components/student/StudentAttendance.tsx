@@ -47,11 +47,11 @@ const StudentAttendance = () => {
         }
     });
 
-    // Polling fallback every 5 seconds - silent so no loading flicker
+    // Polling fallback every 3 seconds - silent so no loading flicker
     useEffect(() => {
         const interval = setInterval(() => {
             fetchAttendance(true);
-        }, 5000);
+        }, 3000);
         return () => clearInterval(interval);
     }, [fetchAttendance]);
 

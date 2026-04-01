@@ -133,11 +133,11 @@ const StudentDashboard = () => {
         }
     }, [pathname, unreadCount, refreshData]);
 
-    // Live Auto-Refresh (Silent background polling to guarantee banner removal)
+    // Live Auto-Refresh (Silent background polling every 3 seconds for resilience)
     useEffect(() => {
         const intervalId = setInterval(() => {
             refreshData(true);
-        }, 30000); // 30 seconds (Fail-safe only)
+        }, 3000);
         return () => clearInterval(intervalId);
     }, [refreshData]);
 
