@@ -10,7 +10,7 @@
  */
 import { useState, useEffect, memo } from "react";
 import "./MainPage.css";
-import api from "../services/api";
+import api, { getBaseUrl } from "../services/api";
 import ThemeToggle from "../components/common/ThemeToggle";
 import { useAuth } from "../context/AuthContext";
 
@@ -29,8 +29,8 @@ type GalleryItem = { src: string; caption: string };
 
 function MainPage() {
   const [navOpen, setNavOpen] = useState(false);
-  const [heroBanner, setHeroBanner] = useState("/banner.png");
-  const [festivalBanners, setFestivalBanners] = useState<any[]>([]);
+  const [heroBanner, setHeroBanner] = useState("");
+  const [festivalBanners, setFestivalBanners] = useState<any[] | null>(null);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [notices, setNotices] = useState<any[]>([]);
   const [resources, setResources] = useState<any[]>([]);
@@ -43,9 +43,16 @@ function MainPage() {
     api
       .get("/system/hero-banner")
       .then((res) => {
-        if (res.data.url) setHeroBanner(res.data.url);
+        if (res.data.url) {
+          setHeroBanner(res.data.url);
+        } else {
+          setHeroBanner("/banner.png"); 
+        }
       })
-      .catch((err) => console.error("Failed to fetch hero banner:", err));
+      .catch((err) => {
+        console.error("Failed to fetch hero banner:", err);
+        setHeroBanner("/banner.png");
+      });
 
     api
       .get("/system/festival-banner/all")
@@ -204,34 +211,26 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
  * Displays the school name, tagline, and main banner image.
  */
 function Hero({ bannerUrl }: { bannerUrl: string }) {
-  const baseUrl =
-    import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_API_BASE_URL?.replace("/api", "") ||
-    "";
-  const fullUrl =
-    (bannerUrl.startsWith("/") ? `${baseUrl}${bannerUrl}` : bannerUrl) +
-    `?t=${Date.now()}`;
+  const baseUrl = getBaseUrl();
+  const fullUrl = bannerUrl
+    ? (bannerUrl.startsWith("/") ? `${baseUrl}${bannerUrl}` : bannerUrl) + `?t=${Date.now()}`
+    : "";
 
   return (
     <section className="hero">
-      <img
-        src={fullUrl}
-        alt="School building"
-        loading="eager"
-        fetchPriority="high"
-        onError={(e) => {
-          e.currentTarget.src = "/banner.png";
-        }}
-      />
-      {/* <div className="hero-content">
-        <p className="hero-mission-top">Education ★ Culture ★ Art</p>
-        <h1>MADHYAMGRAM RABINDRA ACADEMY</h1>
-        <div className="hero-level-badge">K.G. & PRIMARY SCHOOL</div>
-        <div className="hero-stats-row">
-          <span>UDISE CODE: 19112601311</span>
-          <span>ESTD: 2005</span>
-        </div>
-      </div> */}
+      {bannerUrl ? (
+        <img
+          src={fullUrl}
+          alt="School building"
+          loading="eager"
+          fetchPriority="high"
+          onError={(e) => {
+            e.currentTarget.src = "/banner.png";
+          }}
+        />
+      ) : (
+        <div style={{ width: '100%', height: '100%', background: 'var(--bg-main)' }}></div>
+      )}
     </section>
   );
 }
@@ -245,7 +244,7 @@ function Hero({ bannerUrl }: { bannerUrl: string }) {
 function ToppersSection({ students, session }: { students: any[], session: string }) {
   if (!students || students.length === 0) return null;
 
-  const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || '';
+  const baseUrl = getBaseUrl();
 
   return (
     <section className="landing-section toppers">
@@ -300,14 +299,14 @@ function ToppersSection({ students, session }: { students: any[], session: strin
   );
 }
 
-function FestivalSection({ banners }: { banners: any[] }) {
-  const baseUrl =
-    import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_API_BASE_URL?.replace("/api", "") ||
-    "";
+function FestivalSection({ banners }: { banners: any[] | null }) {
+  const baseUrl = getBaseUrl();
+
+  // Handle loading state: Show nothing (clean background) until API returns or fails
+  if (banners === null) return null;
 
   // Use fetched banners or fall back to defaults if empty
-  const displayBanners = banners && banners.length > 0
+  const displayBanners = (banners && banners.length > 0)
     ? banners
     : [
       { imageUrl: "/festivals/diwali.png", title: "Happy Diwali" },
@@ -364,7 +363,7 @@ function FestivalSection({ banners }: { banners: any[] }) {
 }
 
 function Gallery({ items }: { items: GalleryItem[] }) {
-  const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "";
+  const baseUrl = getBaseUrl();
 
   if (!items || items.length === 0) return null;
 
@@ -409,7 +408,7 @@ function Gallery({ items }: { items: GalleryItem[] }) {
 }
 
 function NoticeAndResources({ notices, resources }: { notices: any[]; resources: any[] }) {
-  const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "";
+  const baseUrl = getBaseUrl();
 
   return (
     <section id="notice-resources" className="landing-section notice-resources">
@@ -492,7 +491,7 @@ function NoticeAndResources({ notices, resources }: { notices: any[]; resources:
 
 function AlumniGallery({ photos }: { photos: any[] }) {
   const [visibleCount, setVisibleCount] = useState(6);
-  const baseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "";
+  const baseUrl = getBaseUrl();
 
   const visiblePhotos = photos.slice(0, visibleCount);
   const hasMore = photos.length > visibleCount;

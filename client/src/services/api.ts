@@ -16,9 +16,17 @@ import { Capacitor } from '@capacitor/core';
 // Web: Use sessionStorage for security (logout on refresh)
 export const getStorage = () => (Capacitor.isNativePlatform() ? localStorage : sessionStorage);
 
+// Helper to get the absolute production URL (Critical for Native Android support)
+export const getBaseUrl = () => {
+    if (Capacitor.isNativePlatform()) {
+        return 'https://madhyamgramrabindraacademy.in';
+    }
+    return import.meta.env.VITE_API_URL || window.location.origin;
+};
+
 const api = axios.create({
-    baseURL: Capacitor.isNativePlatform() ? 'https://madhyamgramrabindraacademy.in/api' : (import.meta.env.VITE_API_BASE_URL || '/api'),
-    timeout: 120000, // 2 minutes (Needed for large media uploads)
+    baseURL: getBaseUrl() + (import.meta.env.VITE_API_BASE_URL || '/api'),
+    timeout: 120000,
 });
 
 // Add a request interceptor to include the JWT token
