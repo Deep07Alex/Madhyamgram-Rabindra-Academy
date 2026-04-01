@@ -65,8 +65,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Health Check (Professional monitoring)
 app.get('/health', (req, res) => {
-    res.status(200).json({ 
-        status: 'UP', 
+    res.status(200).json({
+        status: 'UP',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         memoryUsage: process.memoryUsage()
@@ -93,29 +93,7 @@ app.use(helmet({
     hsts: isProd ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false
 }));
 
-// 3. Rate Limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: isProd ? 1000 : 5000, // Stricter in prod
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { message: 'Too many requests from this IP, please try again after 15 minutes' }
-});
-app.use('/api', limiter);
-
-// Stricter limiter for auth/login
-const loginLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: isProd ? 20 : 100, // Very strict for login
-    message: { message: 'Too many login attempts, please try again after an hour' }
-});
-app.use('/api/auth/login', loginLimiter);
-
-if (!process.env.NODE_ENV) {
-    process.env.NODE_ENV = 'development';
-}
-
-// 4. CORS
+// 3. CORS
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:5173', 'http://localhost:3000'];
 app.use(cors({
     origin: (origin, callback) => {
@@ -129,6 +107,28 @@ app.use(cors({
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// 4. Rate Limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: isProd ? 10000 : 5000, // Professional High-Traffic Capacity
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: 'High traffic detected. Please wait a moment and try again.' }
+});
+app.use('/api', limiter);
+
+// Stricter limiter for auth/login
+const loginLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: isProd ? 1000 : 300, // Professional Result-Day Capacity
+    message: { message: 'Too many login attempts from this network. Please try again after some time.' }
+});
+app.use('/api/auth/login', loginLimiter);
+
+if (!process.env.NODE_ENV) {
+    process.env.NODE_ENV = 'development';
+}
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -173,7 +173,7 @@ app.get('/api/events', (req, res) => {
     }
 
     const clientId = addClient(res, userId, role);
-    
+
     // Heartbeat to keep connection alive
     const heartbeat = setInterval(() => {
         if (res.writableEnded) {
@@ -250,36 +250,36 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 initDb().then(() => {
     initCronJobs();
-// Start Server
-const server = app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
-
-// Initialize Socket.io
-initSocket(server);
-
-// 5. Graceful Shutdown (Absolute Professional Final Step)
-const shutdown = async () => {
-    console.log('Shutdown signal received. Closing HTTP server...');
-    server.close(async () => {
-        console.log('HTTP server closed. Closing database pool...');
-        try {
-            await db.end();
-            console.log('Database pool closed. Shutdown complete.');
-            process.exit(0);
-        } catch (err) {
-            console.error('Error during database pool shutdown:', err);
-            process.exit(1);
-        }
+    // Start Server
+    const server = app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
     });
 
-    // Force close after 10s
-    setTimeout(() => {
-        console.error('Could not close connections in time, forcefully shutting down');
-        process.exit(1);
-    }, 10000);
-};
+    // Initialize Socket.io
+    initSocket(server);
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+    // 5. Graceful Shutdown (Absolute Professional Final Step)
+    const shutdown = async () => {
+        console.log('Shutdown signal received. Closing HTTP server...');
+        server.close(async () => {
+            console.log('HTTP server closed. Closing database pool...');
+            try {
+                await db.end();
+                console.log('Database pool closed. Shutdown complete.');
+                process.exit(0);
+            } catch (err) {
+                console.error('Error during database pool shutdown:', err);
+                process.exit(1);
+            }
+        });
+
+        // Force close after 10s
+        setTimeout(() => {
+            console.error('Could not close connections in time, forcefully shutting down');
+            process.exit(1);
+        }, 10000);
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
 });
