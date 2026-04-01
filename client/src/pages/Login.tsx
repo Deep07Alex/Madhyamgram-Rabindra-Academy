@@ -19,6 +19,7 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [cooldown, setCooldown] = useState(0);
     const navigate = useNavigate();
     const { user, login } = useAuth();
 
@@ -33,6 +34,14 @@ const Login = () => {
             else navigate('/student');
         }
     }, [user, navigate]);
+    
+    // Cooldown timer
+    useEffect(() => {
+        if (cooldown > 0) {
+            const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [cooldown]);
 
     const roleConfigs = {
         STUDENT: { label: 'School ID', placeholder: 'e.g. S-1001', icon: <GraduationCap size={20} className="input-icon" /> },
@@ -60,7 +69,14 @@ const Login = () => {
             else if (user.role === 'TEACHER') navigate('/teacher');
             else navigate('/student');
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Invalid credentials. Please verify your ID and password.');
+            if (err.response?.status === 429) {
+                const retryAfter = err.response.headers['retry-after'];
+                const customMsg = err.response.data?.message || (typeof err.response.data === 'string' ? err.response.data : '');
+                setError(customMsg || `Too many requests. ${retryAfter ? `Please wait ${retryAfter} seconds.` : 'Please try again later.'}`);
+                setCooldown(30); // 30s manual cooldown behavior
+            } else {
+                setError(err.response?.data?.message || 'Invalid credentials. Please verify your ID and password.');
+            }
         } finally {
             setLoading(false);
         }
@@ -161,10 +177,10 @@ const Login = () => {
                     <button
                         type="submit"
                         className="btn-primary login-button"
-                        disabled={loading}
+                        disabled={loading || cooldown > 0}
                         style={{ width: '100%', height: '52px', marginTop: '32px', borderRadius: '12px', fontSize: '1rem', fontWeight: 700, color: '#1e293b' }}
                     >
-                        {loading ? 'Authenticating...' : (
+                        {loading ? 'Authenticating...' : cooldown > 0 ? `Wait ${cooldown}s` : (
                             <>
                                 Access {activeRole.charAt(0) + activeRole.slice(1).toLowerCase()} Portal <ChevronRight size={18} />
                             </>

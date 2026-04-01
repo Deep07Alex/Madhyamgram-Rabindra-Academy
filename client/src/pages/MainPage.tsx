@@ -8,7 +8,7 @@
  * - Admission information
  * - Responsive navigation
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import "./MainPage.css";
 import api from "../services/api";
 import ThemeToggle from "../components/common/ThemeToggle";
@@ -97,15 +97,15 @@ function MainPage() {
       <Navbar open={navOpen} onToggle={() => setNavOpen(!navOpen)} />
 
       <div className="main-container">
-        <Hero bannerUrl={heroBanner} />
-        <ToppersSection students={toppers} session={topperSession} />
-        <NoticeAndResources notices={notices} resources={resources} />
-        <FestivalSection banners={festivalBanners} />
-        <Gallery items={galleryItems} />
-        <AlumniGallery photos={alumni} />
+        <MemoizedHero bannerUrl={heroBanner} />
+        <MemoizedToppersSection students={toppers} session={topperSession} />
+        <MemoizedNoticeAndResources notices={notices} resources={resources} />
+        <MemoizedFestivalSection banners={festivalBanners} />
+        <MemoizedGallery items={galleryItems} />
+        <MemoizedAlumniGallery photos={alumni} />
       </div>
 
-      <Footer />
+      <MemoizedFooter />
     </div>
   );
 }
@@ -635,5 +635,13 @@ function Footer() {
     </footer>
   );
 }
+// Memoize sections for performance
+const MemoizedHero = memo(Hero);
+const MemoizedToppersSection = memo(ToppersSection);
+const MemoizedNoticeAndResources = memo(NoticeAndResources);
+const MemoizedFestivalSection = memo(FestivalSection);
+const MemoizedGallery = memo(Gallery);
+const MemoizedAlumniGallery = memo(AlumniGallery);
+const MemoizedFooter = memo(Footer);
 
 export default MainPage;
