@@ -129,7 +129,7 @@ const TeacherAttendance = () => {
     useEffect(() => {
         api.get('/attendance/config').then(res => {
             updateConfigAndCheck(res.data.attendance_override);
-        }).catch(() => {});
+        }).catch(() => { });
     }, [updateConfigAndCheck]);
 
     useServerEvents({
@@ -147,7 +147,7 @@ const TeacherAttendance = () => {
                 updateConfigAndCheck(res.data.attendance_override);
             }).catch(() => {
                 // Fallback to time-based check if API fails
-                checkEviction(); 
+                checkEviction();
             });
         }, 3000);
         return () => clearInterval(interval);
@@ -159,10 +159,10 @@ const TeacherAttendance = () => {
 
     // Load students for mark tab
     const loadRegister = useCallback(async () => {
-        if (!markClass) { 
-            setStudents([]); 
-            setAttendanceData({}); 
-            return; 
+        if (!markClass) {
+            setStudents([]);
+            setAttendanceData({});
+            return;
         }
 
         try {
@@ -179,7 +179,7 @@ const TeacherAttendance = () => {
             const init: Record<string, string> = {};
             const attMap: Record<string, string> = {};
             const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
-            
+
             attRecords.forEach((a: any) => {
                 if (!attMap[a.studentId]) attMap[a.studentId] = a.status;
             });
@@ -236,7 +236,7 @@ const TeacherAttendance = () => {
     useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
     // Live: refresh everything when attendance is updated
-    useServerEvents({ 
+    useServerEvents({
         'attendance:updated': () => {
             loadRegister();
             fetchHistory(true);
@@ -320,7 +320,7 @@ const TeacherAttendance = () => {
                 <div className="card">
                     <h3><ClipboardCheck size={20} color="var(--primary-bold)" /> Mark Class Attendance</h3>
                     <div className="form-grid" style={{ marginBottom: '32px' }}>
-                        <CustomSelect 
+                        <CustomSelect
                             label="Target Class"
                             value={markClass}
                             onChange={val => {
@@ -335,11 +335,11 @@ const TeacherAttendance = () => {
                             <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>Session Date</label>
                             <input type="date" value={markDate} onChange={e => setMarkDate(e.target.value)} />
                         </div>
-                        <CustomSelect 
+                        <CustomSelect
                             label="Academic Subject"
                             value={markSubject}
                             onChange={val => setMarkSubject(val)}
-                            options={(classes.find((c: any) => c.id === markClass)?.subjects || []).map((s:any) => ({ value: s.name, label: s.name }))}
+                            options={(classes.find((c: any) => c.id === markClass)?.subjects || []).map((s: any) => ({ value: s.name, label: s.name }))}
                             icon={<GraduationCap size={16} />}
                             placeholder="Select Subject"
                         />
@@ -405,7 +405,7 @@ const TeacherAttendance = () => {
 
                     {/* Filters */}
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '24px' }}>
-                        <CustomSelect 
+                        <CustomSelect
                             value={histClass}
                             onChange={val => { setHistClass(val); setHistSearch(''); }}
                             options={classes.map((c: any) => ({ value: c.id, label: c.name }))}
@@ -526,7 +526,7 @@ const TeacherAttendance = () => {
                             <h4 style={{ margin: '0 0 16px 0', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <AlertCircle size={20} /> Please provide a reason for absence
                             </h4>
-                            <textarea 
+                            <textarea
                                 value={absentReason}
                                 onChange={e => setAbsentReason(e.target.value)}
                                 placeholder="E.g., Sick leave, Personal emergency, etc."

@@ -96,10 +96,12 @@ const StudentResults = () => {
     const hasUnit2 = results.some((r: any) => r.semester === 'Unit-II');
     const hasUnit3 = results.some((r: any) => r.semester === 'Unit-III');
 
+    const isComplete = hasUnit1 && hasUnit2 && hasUnit3;
+
     // Grand totals across all units
-    const grandObtained = results.reduce((a: number, r: any) => a + (r.marks || 0), 0);
-    const grandFull = results.reduce((a: number, r: any) => a + (r.totalMarks || 0), 0);
-    const percentage = grandFull > 0 ? ((grandObtained / grandFull) * 100).toFixed(2) : '0.00';
+    const grandObtained = isComplete ? results.reduce((a: number, r: any) => a + (r.marks || 0), 0) : 0;
+    const grandFull = isComplete ? results.reduce((a: number, r: any) => a + (r.totalMarks || 0), 0) : 0;
+    const percentage = isComplete && grandFull > 0 ? ((grandObtained / grandFull) * 100).toFixed(2) : null;
 
     // Attendance
     const totalDays = parseInt(attendance?.total_days) || 0;
@@ -134,24 +136,24 @@ const StudentResults = () => {
                         options={ACADEMIC_YEARS.map(y => ({ value: y.toString(), label: y.toString() }))}
                         icon={<Calendar size={16} />}
                     />
-                    
+
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         {/* Individual Unit Downloads */}
                         {hasUnit1 && (
-                            <button 
-                                onClick={async () => await generateResultPDF({ ...reportData, targetSemester: 'Unit-I' })} 
-                                className="btn-primary" 
+                            <button
+                                onClick={async () => await generateResultPDF({ ...reportData, targetSemester: 'Unit-I' })}
+                                className="btn-primary"
                                 style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'var(--accent)', borderColor: 'var(--accent)', fontSize: '0.85rem' }}
                                 title="Download only Unit-I Report"
                             >
                                 <Download size={16} /> Unit-I
                             </button>
                         )}
-                        
+
                         {hasUnit2 && (
-                            <button 
-                                onClick={async () => await generateResultPDF({ ...reportData, targetSemester: 'Unit-II' })} 
-                                className="btn-primary" 
+                            <button
+                                onClick={async () => await generateResultPDF({ ...reportData, targetSemester: 'Unit-II' })}
+                                className="btn-primary"
                                 style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'var(--accent)', borderColor: 'var(--accent)', fontSize: '0.85rem' }}
                                 title="Download only Unit-II Report"
                             >
@@ -160,9 +162,9 @@ const StudentResults = () => {
                         )}
 
                         {hasUnit3 && (
-                            <button 
-                                onClick={async () => await generateResultPDF({ ...reportData, targetSemester: 'Unit-III' })} 
-                                className="btn-primary" 
+                            <button
+                                onClick={async () => await generateResultPDF({ ...reportData, targetSemester: 'Unit-III' })}
+                                className="btn-primary"
                                 style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', background: 'var(--accent)', borderColor: 'var(--accent)', fontSize: '0.85rem' }}
                                 title="Download only Unit-III Report"
                             >
@@ -171,9 +173,9 @@ const StudentResults = () => {
                         )}
 
                         {/* Cumulative Download */}
-                        <button 
-                            onClick={async () => await generateResultPDF(reportData)} 
-                            className="btn-primary" 
+                        <button
+                            onClick={async () => await generateResultPDF(reportData)}
+                            className="btn-primary"
                             style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px', fontSize: '0.85rem' }}
                             title="Download Full Yearly Progress Report"
                         >
@@ -190,7 +192,10 @@ const StudentResults = () => {
                         <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><BarChart3 size={20} /></div>
                         <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-muted)' }}>Aggregate Score</span>
                     </div>
-                    <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)' }}>{grandObtained}<span style={{ fontSize: '1rem', fontWeight: 500, opacity: 0.4 }}>/{grandFull}</span></div>
+                    <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)' }}>
+                        {isComplete ? grandObtained : emptyCell}
+                        <span style={{ fontSize: '1rem', fontWeight: 500, opacity: 0.4 }}>/{isComplete ? grandFull : '—'}</span>
+                    </div>
                 </div>
 
                 <div className="card" style={{ margin: 0, padding: '24px', border: '1px solid var(--border-soft)' }}>
@@ -198,20 +203,22 @@ const StudentResults = () => {
                         <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)' }}><Target size={20} /></div>
                         <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-muted)' }}>Percentage</span>
                     </div>
-                    <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)' }}>{percentage}%</div>
+                    <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)' }}>{percentage ? `${percentage}%` : emptyCell}</div>
                     <div style={{ height: '6px', background: 'var(--bg-main)', borderRadius: '10px', marginTop: '12px', overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.min(parseFloat(percentage), 100)}%`, height: '100%', background: 'var(--accent)', borderRadius: '10px' }}></div>
+                        <div style={{ width: `${Math.min(parseFloat(percentage || '0'), 100)}%`, height: '100%', background: 'var(--accent)', borderRadius: '10px' }}></div>
                     </div>
                 </div>
 
-                <div className="card" style={{ margin: 0, padding: '24px', border: '1px solid var(--border-soft)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><Users size={20} /></div>
-                        <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-muted)' }}>Class Rank</span>
+                {rank !== '-' && (
+                    <div className="card" style={{ margin: 0, padding: '24px', border: '1px solid var(--border-soft)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}><Users size={20} /></div>
+                            <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-muted)' }}>Class Rank</span>
+                        </div>
+                        <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)' }}>#{rank}</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginTop: '4px' }}>in {student.className}</div>
                     </div>
-                    <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-main)' }}>#{rank}</div>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginTop: '4px' }}>in {student.className}</div>
-                </div>
+                )}
 
                 <div className="card" style={{ margin: 0, padding: '24px', border: '1px solid var(--border-soft)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
@@ -314,10 +321,10 @@ const StudentResults = () => {
                                         <td style={{ ...rowStyle, color: 'var(--primary-bold)' }}>{u2MO || '—'}</td>
                                         <td style={rowStyle}>{u3FM || '—'}</td>
                                         <td style={{ ...rowStyle, color: 'var(--primary-bold)' }}>{u3MO || '—'}</td>
-                                        <td style={{ ...rowStyle }}>{gFM || '—'}</td>
-                                        <td style={{ ...rowStyle, color: 'var(--primary-bold)', fontSize: '1.05rem' }}>{gMO || '—'}</td>
+                                        <td style={{ ...rowStyle }}>{isComplete ? gFM : '—'}</td>
+                                        <td style={{ ...rowStyle, color: 'var(--primary-bold)', fontSize: '1.05rem' }}>{isComplete ? gMO : '—'}</td>
                                         <td style={rowStyle}>
-                                            {gFM > 0 && <span style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800, background: 'var(--primary-soft)', color: 'var(--primary-bold)' }}>{calculateGrade(gMO, gFM)}</span>}
+                                            {isComplete && gFM > 0 && <span style={{ padding: '3px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800, background: 'var(--primary-soft)', color: 'var(--primary-bold)' }}>{calculateGrade(gMO, gFM)}</span>}
                                         </td>
                                     </tr>
                                 );
@@ -329,10 +336,10 @@ const StudentResults = () => {
                 {/* Summary Footer */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1px', background: 'var(--border-soft)', borderTop: '2px solid var(--border-soft)' }}>
                     {[
-                        { label: 'Total Full Marks', value: grandFull },
-                        { label: 'Total Obtained Marks', value: grandObtained },
-                        { label: 'Percentage', value: `${percentage}%` },
-                        { label: 'Class Rank', value: rank === '1' ? 'FIRST (1st)' : rank === '2' ? 'SECOND (2nd)' : rank === '3' ? 'THIRD (3rd)' : `#${rank}` }
+                        { label: 'Total Full Marks', value: isComplete ? grandFull : '—' },
+                        { label: 'Total Obtained Marks', value: isComplete ? grandObtained : '—' },
+                        { label: 'Percentage', value: percentage ? `${percentage}%` : '—' },
+                        ...(rank !== '-' ? [{ label: 'Class Rank', value: rank === '1st' ? 'FIRST (1st)' : rank === '2nd' ? 'SECOND (2nd)' : rank === '3rd' ? 'THIRD (3rd)' : `#${rank}` }] : [])
                     ].map(item => (
                         <div key={item.label} style={{ padding: '20px 24px', background: 'var(--bg-card)' }}>
                             <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>{item.label}</div>

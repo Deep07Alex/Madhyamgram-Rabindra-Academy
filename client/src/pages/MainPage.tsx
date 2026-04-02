@@ -39,64 +39,38 @@ function MainPage() {
   const [topperSession, setTopperSession] = useState("2025-26");
 
   useEffect(() => {
-    // Fetch dynamic assets
-    api
-      .get("/system/hero-banner")
-      .then((res) => {
-        if (res.data.url) {
-          setHeroBanner(res.data.url);
-        } else {
-          setHeroBanner("/banner.png"); 
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to fetch hero banner:", err);
-        setHeroBanner("/banner.png");
-      });
+    // Fetch all dynamic assets in parallel to optimize initial load
+    Promise.all([
+      api.get("/system/hero-banner"),
+      api.get("/system/festival-banner/all"),
+      api.get("/toppers"),
+      api.get("/gallery"),
+      api.get("/notices"),
+      api.get("/resources"),
+      api.get("/alumni")
+    ]).then(([heroRes, festRes, topperRes, galleryRes, noticeRes, resourceRes, alumniRes]) => {
+      if (heroRes.data.url) setHeroBanner(heroRes.data.url);
+      else setHeroBanner("/banner.png");
 
-    api
-      .get("/system/festival-banner/all")
-      .then((res) => {
-        if (res.data.banners) setFestivalBanners(res.data.banners);
-      })
-      .catch((err) => console.error("Failed to fetch festival banners:", err));
+      if (festRes.data.banners) setFestivalBanners(festRes.data.banners);
+      if (topperRes.data.students) setToppers(topperRes.data.students);
+      if (topperRes.data.session) setTopperSession(topperRes.data.session);
 
-    api
-      .get("/toppers")
-      .then((res) => {
-        if (res.data.students) setToppers(res.data.students);
-        if (res.data.session) setTopperSession(res.data.session);
-      })
-      .catch((err) => console.error("Failed to fetch toppers:", err));
+      if (Array.isArray(galleryRes.data)) {
+        setGalleryItems(galleryRes.data.map((item: any) => ({
+          src: item.imageUrl,
+          caption: item.title,
+        })));
+      }
 
-    api
-      .get("/gallery")
-      .then((res) => {
-        if (Array.isArray(res.data)) {
-          setGalleryItems(
-            res.data.map((item: any) => ({
-              src: item.imageUrl,
-              caption: item.title,
-            })),
-          );
-        }
-      })
-      .catch((err) => console.error("Failed to fetch gallery:", err));
-
-    api
-      .get("/notices")
-      .then((res) => setNotices(res.data.filter((n: any) => n.type === "PUBLIC")))
-      .catch((err) => console.error("Failed to fetch notices:", err));
-
-    api
-      .get("/resources")
-      .then((res) => setResources(res.data))
-      .catch((err) => console.error("Failed to fetch resources:", err));
-
-    api
-      .get("/alumni")
-      .then((res) => setAlumni(res.data))
-      .catch((err) => console.error("Failed to fetch alumni photos:", err));
+      setNotices(noticeRes.data.filter((n: any) => n.type === "PUBLIC"));
+      setResources(resourceRes.data);
+      setAlumni(alumniRes.data);
+    }).catch(err => {
+      console.error("Initial data load failed:", err);
+      // Ensure fallbacks are set even on failure
+      setHeroBanner("/banner.png");
+    });
   }, []);
 
   return (

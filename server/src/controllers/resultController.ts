@@ -254,21 +254,43 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
             absent_days: absentCount
         };
 
-        // Calculate Rank in Class
+        // Calculate Rank in Class (Only if student has all 3 units AND ranked against others with all 3 units)
+        let myRank = '-';
+        
         const rankRes = await db.query(
-            `WITH StudentTotals AS (
-                SELECT "studentId", SUM(marks) as grand_total
+            `WITH StudentUnitCounts AS (
+                SELECT 
+                    "studentId",
+                    SUM(marks) as grand_total,
+                    COUNT(CASE WHEN semester = 'Unit-I' THEN 1 END) as u1_count,
+                    COUNT(CASE WHEN semester = 'Unit-II' THEN 1 END) as u2_count,
+                    COUNT(CASE WHEN semester = 'Unit-III' THEN 1 END) as u3_count
                 FROM "Result"
                 WHERE "academicYear" = $1 AND "studentId" IN (SELECT id FROM "Student" WHERE "classId" = $2)
                 GROUP BY "studentId"
+            ),
+            QualifiedStudents AS (
+                SELECT "studentId", grand_total,
+                       rank() OVER (ORDER BY grand_total DESC) as rank
+                FROM StudentUnitCounts
+                WHERE u1_count > 0 AND u2_count > 0 AND u3_count > 0
             )
-            SELECT "studentId", rank() OVER (ORDER BY grand_total DESC) as rank
-            FROM StudentTotals`,
-            [academicYear, student.classId]
+            SELECT rank FROM QualifiedStudents WHERE "studentId" = $3`,
+            [academicYear, student.classId, studentId]
         );
         
-        const rankInfo = rankRes.rows.find(r => r.studentId === studentId);
-        const myRank = rankInfo ? String(rankInfo.rank) : '-';
+        if (rankRes.rows.length > 0) {
+            const rankValue = parseInt(rankRes.rows[0].rank);
+            
+            // Only show rank 1 to 5
+            if (rankValue <= 5) {
+                myRank = String(rankValue);
+                // Add suffix like 1st, 2nd, etc.
+                const suffixes = ["th", "st", "nd", "rd"];
+                const v = rankValue % 100;
+                myRank += (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
+            }
+        }
 
         // Fetch Highest Marks per Subject in Class for the year/semester
         const highestMarksRes = await db.query(
@@ -397,6 +419,96 @@ export const deleteClassResults = async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Error in bulk class result deletion:', error);
         res.status(500).json({ message: 'Error in bulk class result deletion' });
+    }
+};
+
+/**
+ * Fetches class-wise rankings for admin dashboard.
+ * Shows top 5 students for each class based on yearly aggregate.
+ */
+export const getClassRankings = async (req: Request, res: Response) => {
+    try {
+        const academicYear = parseInt(req.query.academicYear as string || new Date().getFullYear().toString());
+        const showAll = req.query.all === 'true';
+
+        const query = `
+            WITH StudentTotals AS (
+                SELECT 
+                    s.id as "studentDbId", 
+                    s.name, 
+                    s."studentId" as "admissionId", 
+                    s."rollNumber" as "roll", 
+                    s."classId",
+                    c.name as "className",
+                    COUNT(CASE WHEN r.semester = 'Unit-I' THEN 1 END) as "unit1Count",
+                    SUM(CASE WHEN r.semester = 'Unit-I' THEN r.marks ELSE 0 END) as "unit1TotalRaw",
+                    SUM(CASE WHEN r.semester = 'Unit-I' THEN r."totalMarks" ELSE 0 END) as "unit1FMRaw",
+                    
+                    COUNT(CASE WHEN r.semester = 'Unit-II' THEN 1 END) as "unit2Count",
+                    SUM(CASE WHEN r.semester = 'Unit-II' THEN r.marks ELSE 0 END) as "unit2TotalRaw",
+                    SUM(CASE WHEN r.semester = 'Unit-II' THEN r."totalMarks" ELSE 0 END) as "unit2FMRaw",
+                    
+                    COUNT(CASE WHEN r.semester = 'Unit-III' THEN 1 END) as "unit3Count",
+                    SUM(CASE WHEN r.semester = 'Unit-III' THEN r.marks ELSE 0 END) as "unit3TotalRaw",
+                    SUM(CASE WHEN r.semester = 'Unit-III' THEN r."totalMarks" ELSE 0 END) as "unit3FMRaw",
+                    
+                    SUM(r.marks) as "rawGrandTotal",
+                    SUM(r."totalMarks") as "rawMaxGrandTotal"
+                FROM "Student" s
+                JOIN "Class" c ON s."classId" = c.id
+                LEFT JOIN "Result" r ON s.id = r."studentId" AND r."academicYear" = $1
+                GROUP BY s.id, c.id, c.name
+            ),
+            RankedStudents AS (
+                SELECT 
+                    st."studentDbId", st.name, st."admissionId", st.roll, st."classId", st."className",
+                    -- Individual Unit Totals: Show as 0 only if results exist (count > 0)
+                    CASE WHEN st."unit1Count" > 0 THEN st."unit1TotalRaw" ELSE NULL END as "unit1Total",
+                    CASE WHEN st."unit1Count" > 0 THEN st."unit1FMRaw" ELSE NULL END as "unit1FM",
+                    CASE WHEN st."unit2Count" > 0 THEN st."unit2TotalRaw" ELSE NULL END as "unit2Total",
+                    CASE WHEN st."unit2Count" > 0 THEN st."unit2FMRaw" ELSE NULL END as "unit2FM",
+                    CASE WHEN st."unit3Count" > 0 THEN st."unit3TotalRaw" ELSE NULL END as "unit3Total",
+                    CASE WHEN st."unit3Count" > 0 THEN st."unit3FMRaw" ELSE NULL END as "unit3FM",
+                    
+                    -- Aggregate Rank and Totals: Null/0 if any unit is missing
+                    CASE 
+                        WHEN st."unit1Count" > 0 AND st."unit2Count" > 0 AND st."unit3Count" > 0 
+                        THEN rank() OVER (PARTITION BY st."classId" ORDER BY st."rawGrandTotal" DESC) 
+                        ELSE NULL 
+                    END as "rank",
+                    CASE 
+                        WHEN st."unit1Count" > 0 AND st."unit2Count" > 0 AND st."unit3Count" > 0 
+                        THEN st."rawGrandTotal" 
+                        ELSE NULL 
+                    END as "grandTotal",
+                    CASE 
+                        WHEN st."unit1Count" > 0 AND st."unit2Count" > 0 AND st."unit3Count" > 0 
+                        THEN st."rawMaxGrandTotal" 
+                        ELSE NULL 
+                    END as "maxGrandTotal"
+                FROM StudentTotals st
+            )
+            SELECT * FROM RankedStudents 
+            WHERE ${showAll ? '1=1' : '"rank" IS NOT NULL AND "rank" <= 5'} 
+            ORDER BY "className", "rank" NULLS LAST, "grandTotal" DESC
+        `;
+        
+        const result = await db.query(query, [academicYear]);
+
+        // Group by class
+        const rankings: { [key: string]: any[] } = {};
+        result.rows.forEach(row => {
+            const className = row.className as string;
+            if (!rankings[className]) {
+                rankings[className] = [];
+            }
+            rankings[className]?.push(row);
+        });
+
+        res.json(rankings);
+    } catch (error) {
+        console.error('Error fetching class rankings:', error);
+        res.status(500).json({ message: 'Error fetching class rankings' });
     }
 };
 

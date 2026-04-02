@@ -559,12 +559,24 @@ const ManageAttendance = () => {
     const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
     const [search, setSearch] = useState('');
 
-    // ── Fetch students + attendance for date
-    const fetchStudentData = useCallback(async (silent = false) => {
-        if (viewMode !== 'daily') return;
-        if (!silent) { }
+    const fetchClasses = useCallback(async () => {
         try {
-            const [stuRes, attRes, clsRes] = await Promise.all([
+            const res = await api.get('/users/classes');
+            setClasses(res.data);
+        } catch (err) {
+            console.error('Failed to fetch classes');
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchClasses();
+    }, [fetchClasses]);
+
+    // ── Fetch students + attendance for date
+    const fetchStudentData = useCallback(async () => {
+        if (viewMode !== 'daily') return;
+        try {
+            const [stuRes, attRes] = await Promise.all([
                 api.get('/users/students', {
                     params: {
                         page,
@@ -575,23 +587,19 @@ const ManageAttendance = () => {
                 }),
                 api.get('/attendance/student', {
                     params: dateFilter ? { startDate: dateFilter, endDate: dateFilter } : {}
-                }),
-                api.get('/users/classes'),
+                })
             ]);
-
-            setClasses(clsRes.data);
 
             // Build a map: studentId → attendance record for the selected date
             const attMap: Record<string, any> = {};
             const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
             attRecords.forEach((a: any) => {
-                // Ensure we keep the newest record if multiple are returned (e.g. when All Dates is selected)
                 if (!attMap[a.studentId]) attMap[a.studentId] = a;
             });
 
             // Get class name lookup
             const classMap: Record<string, string> = {};
-            clsRes.data.forEach((c: any) => { classMap[c.id] = c.name; });
+            classes.forEach((c: any) => { classMap[c.id] = c.name; });
 
             const studentData = stuRes.data.students || [];
             setTotalCount(stuRes.data.total || 0);
@@ -616,13 +624,12 @@ const ManageAttendance = () => {
             setStudentRows(rows);
         } finally {
         }
-    }, [dateFilter, viewMode, showToast, page, limit, selectedClass, search]);
+    }, [dateFilter, viewMode, page, limit, selectedClass, search, classes]);
 
 
     // ── Fetch teachers + attendance for date ──────────────────────────────
-    const fetchTeacherData = useCallback(async (silent = false) => {
+    const fetchTeacherData = useCallback(async () => {
         if (viewMode !== 'daily') return;
-        if (!silent) { }
         try {
             const [teachRes, attRes] = await Promise.all([
                 api.get('/users/teachers', {
@@ -672,7 +679,7 @@ const ManageAttendance = () => {
     // ── Fetch Monthly Data ────────────────────────────────────────────────────
     const [monthlyDataMap, setMonthlyDataMap] = useState<Record<string, Record<string, any>>>({}); // personId -> { dateStr -> record }
 
-    const fetchMonthlyData = useCallback(async (silent = false) => {
+    const fetchMonthlyData = useCallback(async () => {
         if (viewMode !== 'monthly' || !monthFilter) return;
 
         // If students tab but no class selected, we only fetch classes list if needed and return
@@ -687,7 +694,6 @@ const ManageAttendance = () => {
             return;
         }
 
-        if (!silent) { }
         try {
             // Calculate start and end dates
             let startDate = `${monthFilter}-01`;
@@ -778,10 +784,10 @@ const ManageAttendance = () => {
     // Live real-time updates
     useServerEvents({
         'attendance:updated': () => {
-            fetchMonthlyData(true);
+            fetchMonthlyData();
             if (viewMode === 'daily') {
-                if (tab === 'students') fetchStudentData(true);
-                else fetchTeacherData(true);
+                if (tab === 'students') fetchStudentData();
+                else fetchTeacherData();
             }
         }
     });

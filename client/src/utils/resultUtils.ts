@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import type { UserOptions } from 'jspdf-autotable';
 
 export const generateResultPDF = async (data: any) => {
     try {
@@ -232,7 +233,7 @@ export const generateResultPDF = async (data: any) => {
                 ['Total Full Marks', totalFull.toString()],
                 ['Total Obtained Marks', totalObtained.toString()],
                 ['Percentage of Marks', `${totalFull ? ((totalObtained / totalFull) * 100).toFixed(2) : 0}%`],
-                ['Class Rank', `${rank === '1' ? 'FIRST (1st)' : rank === '2' ? 'SECOND (2nd)' : rank === '3' ? 'THIRD (3rd)' : (rank || '-').toString()}`]
+                ...(rank && rank !== '-' ? [['Class Rank', `${rank === '1st' ? 'FIRST (1st)' : rank === '2nd' ? 'SECOND (2nd)' : rank === '3rd' ? 'THIRD (3rd)' : rank.toString()}`]] : [])
             ],
             theme: 'grid',
             styles: { fontSize: 9, fontStyle: 'bold' },
@@ -290,3 +291,111 @@ function calculateGrade(marks: number, total: number) {
     if (p >= 30) return 'B';
     return 'C';
 }
+export const generateRankingsPDF = async (rankingsData: Record<string, any[]>, academicYear: number, isAllClasses: boolean = false) => {
+    try {
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const margin = 12;
+
+        const getLogoData = async () => {
+            try {
+                const response = await fetch('/RABINDRA_LOGO.jpeg');
+                if (!response.ok) return null;
+                const blob = await response.blob();
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(blob);
+                });
+            } catch (e) { return null; }
+        };
+
+        const logoData = await getLogoData();
+
+        const sortedClasses = Object.keys(rankingsData).sort();
+        
+        sortedClasses.forEach((className, pageIdx) => {
+            if (pageIdx > 0) doc.addPage();
+
+            // 1. Header
+            if (logoData) {
+                try { doc.addImage(logoData as string, 'JPEG', margin, margin, 20, 20); } catch (e) {}
+            }
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(16);
+            doc.text('MADHYAMGRAM RABINDRA ACADEMY', pageWidth / 2, margin + 8, { align: 'center' });
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text('Rabindra Nagar-Milanpally, P.O.-Ganganagar, P.S.-Madhyamgram, Kolkata-700132', pageWidth / 2, margin + 14, { align: 'center' });
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(14);
+            doc.text(`Classwise Rank for the session ${academicYear}`, pageWidth / 2, margin + 24, { align: 'center' });
+            
+            doc.line(margin, margin + 28, pageWidth - margin, margin + 28);
+
+            // 2. Class Banner
+            doc.setFillColor(240, 240, 240);
+            doc.rect(margin, margin + 30, pageWidth - (margin * 2), 10, 'F');
+            doc.setFontSize(12);
+            doc.text(`CLASS - ${className.toUpperCase()}`, pageWidth / 2, margin + 36.5, { align: 'center' });
+
+            // 3. Table
+            const students = rankingsData[className];
+            const tableData = students.map(s => [
+                s.admissionId || '—',
+                s.roll || '—',
+                s.name.toUpperCase(),
+                s.unit1Total || '—',
+                s.unit2Total || '—',
+                s.unit3Total || '—',
+                s.grandTotal || '—',
+                s.maxGrandTotal > 0 ? `${(s.grandTotal / s.maxGrandTotal * 100).toFixed(2)}%` : '—',
+                s.rank && s.rank <= 5 ? `${s.rank}${["th", "st", "nd", "rd"][(s.rank % 100 - 20) % 10] || ["th", "st", "nd", "rd"][s.rank % 100] || "th"}` : ''
+            ]);
+
+            autoTable(doc, {
+                startY: margin + 42,
+                head: [[
+                    'Admission Regn No.', 'Roll', 'NAME', 
+                    `Unit-I\n(FM:${students[0]?.unit1FM || '—'})`,
+                    `Unit-II\n(FM:${students[0]?.unit2FM || '—'})`,
+                    `Unit-III\n(FM:${students[0]?.unit3FM || '—'})`,
+                    `Total\n(FM:${students[0]?.maxGrandTotal || '—'})`,
+                    'Percentage', 'Rank'
+                ]],
+                body: tableData,
+                theme: 'grid',
+                headStyles: { 
+                    fillColor: [51, 51, 51], 
+                    textColor: 255, 
+                    fontSize: 8, 
+                    halign: 'center', 
+                    valign: 'middle',
+                    cellPadding: 2 
+                },
+                bodyStyles: { fontSize: 8, valign: 'middle', halign: 'center' },
+                columnStyles: {
+                    2: { halign: 'left', fontStyle: 'bold' }, // Name
+                    8: { fontStyle: 'bold' } // Rank
+                },
+                margin: { left: margin, right: margin }
+            } as UserOptions);
+
+            const finalY = (doc as any).lastAutoTable.finalY + 10;
+            if (finalY < doc.internal.pageSize.height - 20) {
+               doc.setFontSize(8);
+               doc.setFont('helvetica', 'italic');
+               doc.text(`Generated on ${new Date().toLocaleDateString()}`, margin, finalY);
+            }
+        });
+
+        const fileName = (isAllClasses || sortedClasses.length > 1) 
+            ? `All_Class_Rankings_${academicYear}.pdf`
+            : `Rankings_Class_${sortedClasses[0] || 'Unknown'}_${academicYear}.pdf`;
+            
+        doc.save(fileName);
+    } catch (err) {
+        console.error('PDF Generation Error:', err);
+    }
+};

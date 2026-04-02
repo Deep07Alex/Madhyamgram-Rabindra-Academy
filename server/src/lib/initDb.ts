@@ -378,15 +378,21 @@ export const initDb = async () => {
             CREATE INDEX IF NOT EXISTS "idx_student_id" ON "Student"("studentId");
             CREATE INDEX IF NOT EXISTS "idx_teacher_id" ON "Teacher"("teacherId");
             CREATE INDEX IF NOT EXISTS "idx_teacher_name" ON "Teacher"("name");
+            CREATE INDEX IF NOT EXISTS "idx_attendance_class_date" ON "Attendance"("classId", "date");
             CREATE INDEX IF NOT EXISTS "idx_attendance_date" ON "Attendance"("date");
             CREATE INDEX IF NOT EXISTS "idx_attendance_class" ON "Attendance"("classId");
             CREATE INDEX IF NOT EXISTS "idx_attendance_studentId" ON "Attendance"("studentId");
             CREATE INDEX IF NOT EXISTS "idx_attendance_date_student" ON "Attendance"("date", "studentId");
             CREATE INDEX IF NOT EXISTS "idx_result_student" ON "Result"("studentId");
+            CREATE INDEX IF NOT EXISTS "idx_result_academicYear" ON "Result"("academicYear");
+            CREATE INDEX IF NOT EXISTS "idx_result_student_exam_year" ON "Result"("studentId", "semester", "academicYear");
             CREATE INDEX IF NOT EXISTS "idx_result_student_exam" ON "Result"("studentId", "semester");
             CREATE INDEX IF NOT EXISTS "idx_homework_class" ON "Homework"("classId");
             CREATE INDEX IF NOT EXISTS "idx_submission_status" ON "Submission"("status");
             CREATE INDEX IF NOT EXISTS "idx_notice_createdAt" ON "Notice"("createdAt");
+            CREATE INDEX IF NOT EXISTS "idx_monthly_fee_student" ON "MonthlyFee"("studentId");
+            CREATE INDEX IF NOT EXISTS "idx_monthly_fee_year" ON "MonthlyFee"("academicYear");
+            CREATE INDEX IF NOT EXISTS "idx_admission_fee_student" ON "AdmissionFee"("studentId");
         `);
 
         console.log('Database finalized and ready. Running predefined Subject seeding...');
