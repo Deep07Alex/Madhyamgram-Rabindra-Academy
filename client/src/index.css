@@ -101,6 +101,7 @@
   margin: 0;
   padding: 0;
   font-family: 'Inter', sans-serif;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -125,6 +126,14 @@ body {
   color: var(--text-main);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+
+button {
+  transition: transform 0.1s ease-out !important;
+}
+
+button:active {
+  transform: scale(0.95) !important;
 }
 
 /* Custom Scrollbar - Premium Aesthetic */
@@ -1137,3 +1146,13 @@ textarea:focus {
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+
+/* Global Input Enhancement */
+input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+select {
+  cursor: pointer;
+}

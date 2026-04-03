@@ -14,8 +14,10 @@ import { ToastProvider } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { Loader2 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { Capacitor } from '@capacitor/core';
 
 // Lazy load components for production optimization
+const MobileApp = React.lazy(() => import('./mobile/MobileApp'));
 const Login = React.lazy(() => import('./pages/Login'));
 const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
 const TeacherDashboard = React.lazy(() => import('./pages/TeacherDashboard'));
@@ -70,6 +72,9 @@ const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, a
 };
 
 function App() {
+    // Check if running in a native context (Android/iOS via Capacitor)
+    const isNative = Capacitor.isNativePlatform();
+
     // Preload dashboards when the app mounts to ensure near-instant navigation
     React.useEffect(() => {
         const timer = setTimeout(() => {
@@ -81,6 +86,22 @@ function App() {
         return () => clearTimeout(timer);
     }, []);
 
+    // Return the optimized, purely native UI experience if running natively
+    if (isNative) {
+        return (
+            <ThemeProvider>
+                <ToastProvider>
+                    <AuthProvider>
+                        <React.Suspense fallback={<LoadingFallback />}>
+                            <MobileApp />
+                        </React.Suspense>
+                    </AuthProvider>
+                </ToastProvider>
+            </ThemeProvider>
+        );
+    }
+
+    // Web Application - Remains Completely Unaffected
     return (
         <ThemeProvider>
             <ToastProvider>

@@ -118,7 +118,7 @@ export const generateResultPDF = async (data: any) => {
         doc.setFont('helvetica', 'bold');
         doc.text(`Student Name :`, margin + 5, infoY + 10);
         doc.setFont('helvetica', 'normal');
-        doc.text((student.name || '').toUpperCase(), margin + 35, infoY + 10);
+        doc.text(student.name || '', margin + 35, infoY + 10);
         doc.setFont('helvetica', 'bold');
         doc.text(`Class :`, pageWidth / 2 + 10, infoY + 10);
         doc.setFont('helvetica', 'normal');
@@ -345,7 +345,7 @@ export const generateRankingsPDF = async (rankingsData: Record<string, any[]>, a
             const tableData = students.map(s => [
                 s.admissionId || '—',
                 s.roll || '—',
-                s.name.toUpperCase(),
+                s.name,
                 s.unit1Total || '—',
                 s.unit2Total || '—',
                 s.unit3Total || '—',

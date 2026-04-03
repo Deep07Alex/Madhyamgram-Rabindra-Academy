@@ -106,7 +106,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         setLoading(false);
-    }, [logout]);
+
+        const handleUnauthorized = () => {
+            showToast('Session expired.', 'error');
+            logout();
+            window.location.href = '#/login'; // Safely guide back via Hash router
+        };
+        window.addEventListener('auth:unauthorized', handleUnauthorized);
+        return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+    }, [logout, showToast]);
 
     // Capacitor Native Only: Handle Background Grace Period (5 minutes)
     useEffect(() => {

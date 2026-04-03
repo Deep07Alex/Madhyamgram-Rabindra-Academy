@@ -9,7 +9,7 @@
  */
 import React, { useState, useRef } from 'react';
 import { Camera, Upload, X, Loader2 } from 'lucide-react';
-import api from '../../services/api';
+import api, { getBaseUrl } from '../../services/api';
 
 interface PhotoUploadProps {
     value?: string;
@@ -98,7 +98,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({ value, currentUrl, onChange, 
                 {actualValue ? (
                     <>
                         <img 
-                            src={actualValue.startsWith('http') ? actualValue : `${import.meta.env.VITE_API_URL || ''}${actualValue}`} 
+                            src={actualValue.startsWith('http') ? actualValue : `${getBaseUrl()}${actualValue.startsWith('/') ? '' : '/'}${actualValue}`} 
                             alt="Preview" 
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />

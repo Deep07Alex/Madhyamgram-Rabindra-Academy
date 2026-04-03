@@ -42,17 +42,16 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 });
 
 // Response Interceptor:
-// Checks every outgoing response. If a 401 Unauthorized error is detected,
-// it means the session has expired; thus, we clear the token and redirect to login.
 api.interceptors.response.use((response: AxiosResponse) => {
     return response;
 }, (error: any) => {
-    if (error.response && error.response.status === 401) {
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('user');
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
-            window.location.href = '/';
-        }
+    const isLoginRequest = error.config?.url?.includes('/auth/login');
+
+    if (error.response && error.response.status === 401 && !isLoginRequest) {
+        const storage = getStorage();
+        storage.removeItem('token');
+        storage.removeItem('user');
+        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
     }
     return Promise.reject(error);
 });
