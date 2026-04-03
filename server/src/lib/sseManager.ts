@@ -57,6 +57,9 @@ export type SSEEventType =
     | 'attendance:updated'
     | 'system:config_updated'
     | 'gallery:updated'
+    | 'alumni:updated'
+    | 'toppers:updated'
+    | 'resources:updated'
     | 'user:created';
 
 /**

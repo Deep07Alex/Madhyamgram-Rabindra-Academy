@@ -15,8 +15,11 @@ const SOCKET_URL = Capacitor.isNativePlatform()
 export const socket = io(SOCKET_URL, {
     autoConnect: true,
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 1000,
+    reconnectionAttempts: Infinity, // Keep trying
+    reconnectionDelay: 2000,
+    transports: ['polling', 'websocket'], // Polling first is safer for mobile proxies
+    secure: true,
+    rejectUnauthorized: false // Often needed for institutional certs
 });
 
 // Debugging

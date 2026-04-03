@@ -12,6 +12,7 @@ import fs from 'fs';
 import sharp from 'sharp';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { db } from '../lib/db.js';
+import { broadcast } from '../lib/sseManager.js';
 
 const router = Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -34,7 +35,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage,
-    limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit (increased from 5MB)
+    limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit
     fileFilter: (req, file, cb) => {
         const allowedTypes = /jpeg|jpg|png|webp|avif/;
         const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -69,6 +70,7 @@ router.post('/hero-banner', authenticate, authorize(['ADMIN']), upload.single('b
             ['hero_banner_url', relativePath]
         );
         
+        broadcast('system:config_updated', { key: 'hero_banner_url', value: relativePath });
         res.json({ url: relativePath });
     } catch (error) {
         console.error('Hero Banner upload error:', error);
@@ -111,6 +113,7 @@ router.post('/festival-banner', authenticate, authorize(['ADMIN']), upload.singl
             ['festival_banner_url', relativePath]
         );
         
+        broadcast('system:config_updated', { key: 'festival_banner_url', value: relativePath });
         res.json({ url: relativePath });
     } catch (error) {
         console.error('Festival Banner upload error:', error);
@@ -164,6 +167,7 @@ router.post('/festival-banner/add', authenticate, authorize(['ADMIN']), upload.s
             [id, req.body.title || 'Special Occasion', relativePath]
         );
         
+        broadcast('system:config_updated', { key: 'festival_banners', action: 'added' });
         res.json(result.rows[0]);
     } catch (error) {
         console.error('Festival Banner creation error:', error);
@@ -199,6 +203,7 @@ router.patch('/festival-banner/:id', authenticate, authorize(['ADMIN']), upload.
             [title || 'Special Occasion', relativePath, id]
         );
         
+        broadcast('system:config_updated', { key: 'festival_banners', action: 'updated' });
         res.json(result.rows[0]);
     } catch (error) {
         console.error('Festival Banner update error:', error);
@@ -209,6 +214,7 @@ router.patch('/festival-banner/:id', authenticate, authorize(['ADMIN']), upload.
 router.delete('/festival-banner/:id', authenticate, authorize(['ADMIN']), async (req, res) => {
     try {
         await db.query('DELETE FROM "FestivalBanner" WHERE id = $1', [req.params.id]);
+        broadcast('system:config_updated', { key: 'festival_banners', action: 'deleted' });
         res.json({ message: 'Banner removed' });
     } catch (error) {
         console.error('Error deleting banner:', error);

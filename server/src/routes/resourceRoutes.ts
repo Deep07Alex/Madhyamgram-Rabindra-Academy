@@ -3,6 +3,7 @@ import { db } from '../lib/db.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';
 import { v4 as uuidv4 } from 'uuid';
+import { broadcast } from '../lib/sseManager.js';
 
 const router = Router();
 
@@ -32,7 +33,9 @@ router.post('/', authenticate, authorize(['ADMIN']), upload.single('file'), asyn
             'INSERT INTO "Resource" (id, title, category, "fileUrl") VALUES ($1, $2, $3, $4) RETURNING *',
             [id, title, category || 'General', fileUrl]
         );
-        res.status(201).json(result.rows[0]);
+        const record = result.rows[0];
+        broadcast('resources:updated', { action: 'created', id: record.id });
+        res.status(201).json(record);
     } catch (error) {
         console.error('Error creating resource:', error);
         res.status(500).json({ message: 'Error creating resource' });
@@ -54,7 +57,9 @@ router.patch('/:id', authenticate, authorize(['ADMIN']), upload.single('file'), 
             'UPDATE "Resource" SET title = $1, category = $2, "fileUrl" = $3 WHERE id = $4 RETURNING *',
             [title, category || 'General', fileUrl, id]
         );
-        res.json(result.rows[0]);
+        const record = result.rows[0];
+        broadcast('resources:updated', { action: 'updated', id: record.id });
+        res.json(record);
     } catch (error) {
         console.error('Error updating resource:', error);
         res.status(500).json({ message: 'Error updating resource' });
@@ -66,6 +71,7 @@ router.delete('/:id', authenticate, authorize(['ADMIN']), async (req, res) => {
     const { id } = req.params;
     try {
         await db.query('DELETE FROM "Resource" WHERE id = $1', [id]);
+        broadcast('resources:updated', { action: 'deleted', id });
         res.json({ message: 'Resource removed successfully' });
     } catch (error) {
         console.error('Error deleting resource:', error);

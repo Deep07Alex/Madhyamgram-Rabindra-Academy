@@ -13,6 +13,7 @@ import "./MainPage.css";
 import api, { getBaseUrl } from "../services/api";
 import ThemeToggle from "../components/common/ThemeToggle";
 import { useAuth } from "../context/AuthContext";
+import useServerEvents from "../hooks/useServerEvents";
 
 // Swiper imports
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -37,6 +38,75 @@ function MainPage() {
   const [alumni, setAlumni] = useState<any[]>([]);
   const [toppers, setToppers] = useState<any[]>([]);
   const [topperSession, setTopperSession] = useState("2025-26");
+
+  const fetchNotices = async () => {
+    try {
+      const res = await api.get("/notices");
+      setNotices(res.data.filter((n: any) => n.type === "PUBLIC"));
+    } catch (err) {
+      console.error("Failed to fetch notices:", err);
+    }
+  };
+
+  const fetchHeroBanner = async () => {
+    try {
+      const res = await api.get("/system/hero-banner");
+      if (res.data.url) setHeroBanner(res.data.url);
+    } catch (err) {
+      console.error("Failed to fetch hero banner:", err);
+    }
+  };
+
+  const fetchFestivalBanners = async () => {
+    try {
+      const res = await api.get("/system/festival-banner/all");
+      if (res.data.banners) setFestivalBanners(res.data.banners);
+    } catch (err) {
+      console.error("Failed to fetch festival banners:", err);
+    }
+  };
+
+  const fetchToppers = async () => {
+    try {
+      const res = await api.get("/toppers");
+      if (res.data.students) setToppers(res.data.students);
+      if (res.data.session) setTopperSession(res.data.session);
+    } catch (err) {
+      console.error("Failed to fetch toppers:", err);
+    }
+  };
+
+  const fetchGallery = async () => {
+    try {
+      const res = await api.get("/gallery");
+      if (Array.isArray(res.data)) {
+        setGalleryItems(res.data.map((item: any) => ({
+          src: item.imageUrl,
+          caption: item.title,
+        })));
+      }
+    } catch (err) {
+      console.error("Failed to fetch gallery:", err);
+    }
+  };
+
+  const fetchResources = async () => {
+    try {
+      const res = await api.get("/resources");
+      setResources(res.data);
+    } catch (err) {
+      console.error("Failed to fetch resources:", err);
+    }
+  };
+
+  const fetchAlumni = async () => {
+    try {
+      const res = await api.get("/alumni");
+      setAlumni(res.data);
+    } catch (err) {
+      console.error("Failed to fetch alumni:", err);
+    }
+  };
 
   useEffect(() => {
     // Fetch all dynamic assets in parallel to optimize initial load
@@ -72,6 +142,21 @@ function MainPage() {
       setHeroBanner("/banner.png");
     });
   }, []);
+
+  // Real-time Optimization:
+  // Automatically refreshes the UI sections when administrative changes occur.
+  useServerEvents({
+    'new_notice': () => fetchNotices(),
+    'notice_deleted': () => fetchNotices(),
+    'alumni:updated': () => fetchAlumni(),
+    'toppers:updated': () => fetchToppers(),
+    'resources:updated': () => fetchResources(),
+    'gallery:updated': () => fetchGallery(),
+    'system:config_updated': (data: any) => {
+        if (data.key === 'hero_banner_url') fetchHeroBanner();
+        else fetchFestivalBanners();
+    }
+  });
 
   return (
     <div className="main-page-wrapper">

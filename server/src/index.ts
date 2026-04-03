@@ -93,14 +93,23 @@ app.use(helmet({
     hsts: isProd ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false
 }));
 
-// 3. CORS
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:5173', 'http://localhost:3000'];
+// 3. CORS Configuration
+const allowedOrigins = [
+    'https://madhyamgramrabindraacademy.in',
+    'https://www.madhyamgramrabindraacademy.in',
+    'capacitor://localhost', // Android Native
+    'http://localhost',       // iOS/Android Dev
+    'http://localhost:5173',
+    'http://localhost:3000'
+];
+
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin) || !isProd) {
+        // Allow requests with no origin (like mobile apps or curl) or in whitelist
+        if (!origin || allowedOrigins.includes(origin) || (process.env.NODE_ENV !== 'production')) {
             callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            callback(new Error(`Not allowed by CORS: ${origin}`));
         }
     },
     credentials: true,
