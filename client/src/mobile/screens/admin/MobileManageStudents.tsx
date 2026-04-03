@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { FileOpener } from '@capawesome-team/capacitor-file-opener';
+import { Capacitor } from '@capacitor/core';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, User, ArrowLeft, Loader2, BookOpen, Plus, UserPlus, Upload, FileSpreadsheet, Trash2, Edit, Eye, EyeOff, Save, ChevronDown } from 'lucide-react';
+import { Search, User, ArrowLeft, Loader2, BookOpen, Plus, UserPlus, Upload, FileSpreadsheet, Trash2, Edit, Eye, EyeOff, Save, ChevronDown, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api, { getBaseUrl } from '../../../services/api';
 import { useDebounce } from '../../../hooks/useDebounce';
@@ -103,11 +106,10 @@ export default function MobileManageStudents() {
 
             await api.patch(`/users/students/${selectedStudent.id}`, updatePayload);
             setIsEditModalOpen(false);
-            setSelectedStudent(null);
             fetchStudents();
             showToast('Student updated successfully', 'success');
         } catch (error: any) {
-            showToast(error.response?.data?.message || 'Failed to update student', 'error');
+            showToast(error.response?.data?.message || 'Update failed', 'error');
         } finally {
             setIsUpdating(false);
         }
@@ -122,35 +124,25 @@ export default function MobileManageStudents() {
             setStudents(res.data?.students || []);
             setTotalPages(Math.ceil((res.data?.total || 0) / 20));
             setTotalStudents(res.data?.total || 0);
-        } catch (error) {
-            console.error("Failed to fetch students", error);
+        } catch (err) {
+            console.error('Failed to fetch students:', err);
         } finally {
             setIsLoading(false);
         }
     };
 
-    useEffect(() => {
-        if (activeTab === 'directory') fetchStudents();
-    }, [debouncedSearch, selectedClassId, page, activeTab]);
-
-    useEffect(() => {
-        setPage(1);
-    }, [debouncedSearch, selectedClassId]);
-
-    useEffect(() => {
-        const fetchClasses = async () => {
-            try {
-                const res = await api.get('/users/classes');
-                setClasses(res.data || []);
-                if (res.data?.length > 0 && !newUser.classId) {
-                    setNewUser(prev => ({ ...prev, classId: res.data[0].id }));
-                }
-            } catch (error) {
-                console.error("Failed to fetch classes", error);
+    const fetchClasses = async () => {
+        try {
+            const res = await api.get('/users/classes');
+            setClasses(res.data || []);
+            if (res.data.length > 0 && !newUser.classId) {
+                setNewUser(prev => ({ ...prev, classId: res.data[0].id }));
             }
-        };
-        fetchClasses();
-    }, []);
+        } catch (err) { }
+    };
+
+    useEffect(() => { fetchStudents(); }, [debouncedSearch, selectedClassId, page]);
+    useEffect(() => { fetchClasses(); }, []);
 
     const handleCreateStudent = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -214,6 +206,57 @@ export default function MobileManageStudents() {
             showToast(error.response?.data?.message || 'Bulk import failed', 'error');
         } finally {
             setIsImporting(false);
+        }
+    };
+
+    const blobToBase64 = (blob: Blob): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64data = reader.result as string;
+                resolve(base64data.split(',')[1]); // Only the base64 part
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    };
+
+    const downloadCredentials = async () => {
+        try {
+            const response = await api.get('/users/students/download-credentials', {
+                params: { classId: selectedClassId },
+                responseType: 'blob'
+            });
+            
+            const className = selectedClassId 
+                ? (classes.find((c: any) => c.id === selectedClassId)?.name || 'Class')
+                : 'All_Classes';
+            const fileName = `Student_Credentials_${className}.xlsx`;
+
+            if (Capacitor.isNativePlatform()) {
+                const base64 = await blobToBase64(response.data);
+                const savedFile = await Filesystem.writeFile({
+                    path: fileName,
+                    data: base64,
+                    directory: Directory.Documents,
+                    recursive: true
+                });
+
+                await FileOpener.openFile({ path: savedFile.uri });
+                showToast('File saved and opened successfully', 'success');
+            } else {
+                const url = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', fileName);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                showToast('Credentials downloaded successfully', 'success');
+            }
+        } catch (error: any) {
+            console.error('Failed to download credentials:', error);
+            showToast('Failed to download credentials', 'error');
         }
     };
 
@@ -289,7 +332,7 @@ export default function MobileManageStudents() {
                                     value={selectedClassId}
                                     onChange={e => setSelectedClassId(e.target.value)}
                                 >
-                                    <option value="" style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>Filter by Academic Class</option>
+                                    <option value="" style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>All Classes</option>
                                     {classes.map(c => <option key={c.id} value={c.id} style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>{c.name}</option>)}
                                 </select>
                                 <div style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--primary-bold)', display: 'flex', alignItems: 'center' }}>
@@ -298,42 +341,129 @@ export default function MobileManageStudents() {
                             </div>
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '4px 2px' }}>
                             {isLoading ? (
                                 <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><Loader2 className="animate-spin" color="var(--primary-bold)" /></div>
                             ) : students.length > 0 ? (
                                 students.map(student => (
-                                    <div key={student.id} style={{ backgroundColor: 'var(--bg-card)', padding: '16px', borderRadius: '16px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-soft)', display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-                                        <div style={{ width: '50px', height: '50px', borderRadius: '12px', overflow: 'hidden', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            {student.photo ? <img src={`${getBaseUrl()}${student.photo.startsWith('/') ? '' : '/'}${student.photo}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <User size={24} color="var(--primary-bold)" />}
-                                        </div>
-                                        <div style={{ flex: 1, overflow: 'hidden' }}>
-                                            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: 'var(--text-main)' }}>{student.name.toUpperCase()}</h3>
-                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
-                                                <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--primary-bold)' }}>{student.studentId}</span>
-                                                <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>•</span>
-                                                <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Roll {student.rollNumber}</span>
+                                    <div key={student.id} style={{
+                                        backgroundColor: 'var(--bg-card)',
+                                        padding: '20px',
+                                        borderRadius: '24px',
+                                        boxShadow: '0 10px 30px -15px rgba(0,0,0,0.3)',
+                                        border: '1px solid var(--border-soft)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '16px',
+                                        position: 'relative',
+                                        overflow: 'hidden'
+                                    }}>
+                                        {/* Top Section: Photo and Basic Info */}
+                                        <div style={{ display: 'flex', gap: '18px', alignItems: 'center' }}>
+                                            <div style={{
+                                                width: '68px',
+                                                height: '68px',
+                                                borderRadius: '20px',
+                                                overflow: 'hidden',
+                                                background: 'linear-gradient(135deg, var(--bg-soft) 0%, var(--border-soft) 100%)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                border: '2px solid var(--primary-soft)',
+                                                boxShadow: 'inset 0 0 10px rgba(0,0,0,0.1)'
+                                            }}>
+                                                {student.photo ? (
+                                                    <img src={`${getBaseUrl()}${student.photo.startsWith('/') ? '' : '/'}${student.photo}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    <User size={30} color="var(--primary-bold)" />
+                                                )}
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
-                                                <BookOpen size={12} color="var(--text-muted)" />
-                                                <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>{student.className}</span>
+
+                                            <div style={{ flex: 1, overflow: 'hidden' }}>
+                                                <h3 style={{
+                                                    margin: 0,
+                                                    fontSize: '18px',
+                                                    fontWeight: '900',
+                                                    color: 'var(--text-main)',
+                                                    fontFamily: 'Outfit',
+                                                    letterSpacing: '-0.02em',
+                                                    lineHeight: 1.2
+                                                }}>
+                                                    {student.name.toUpperCase()}
+                                                </h3>
+
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginTop: '6px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--primary-soft)', padding: '4px 10px', borderRadius: '8px' }}>
+                                                        <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--primary-bold)' }}>{student.studentId}</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-soft)', padding: '4px 10px', borderRadius: '8px', border: '1px solid var(--border-soft)' }}>
+                                                        <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Roll {student.rollNumber}</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                                                <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', background: 'var(--bg-soft)', padding: '4px 8px', borderRadius: '6px' }}>
-                                                    {visiblePasswords.has(student.id) ? (student.plainPassword || 'No Pass') : '••••••••'}
-                                                </span>
-                                                <button onClick={() => togglePasswordVisibility(student.id)} style={{ background: 'none', border: 'none', color: visiblePasswords.has(student.id) ? 'var(--primary-bold)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.2s' }}>
-                                                    {visiblePasswords.has(student.id) ? <EyeOff size={18} /> : <Eye size={18} />}
+
+                                            {/* Top Corner Actions */}
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                <button onClick={() => {
+                                                    setSelectedStudent(student);
+                                                    setEditData({ ...student });
+                                                    setIsEditModalOpen(true);
+                                                }} style={{ background: 'var(--warning-soft)', color: 'var(--warning)', border: 'none', width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
+                                                    <Edit size={18} />
                                                 </button>
                                             </div>
                                         </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                            <button onClick={() => {
-                                                setSelectedStudent(student);
-                                                setEditData({ ...student });
-                                                setIsEditModalOpen(true);
-                                            }} style={{ background: 'var(--warning-soft)', color: 'var(--warning)', border: 'none', padding: '8px', borderRadius: '8px' }}><Edit size={14} /></button>
-                                            <button onClick={() => setDeleteModal({ isOpen: true, id: student.id })} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', padding: '8px', borderRadius: '8px' }}><Trash2 size={14} /></button>
+
+                                        {/* Divider */}
+                                        <div style={{ height: '1px', background: 'linear-gradient(to right, transparent, var(--border-soft), transparent)' }} />
+
+                                        {/* Bottom Section: Meta Data */}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                        <BookOpen size={14} color="var(--primary-bold)" />
+                                                    </div>
+                                                    <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>{student.class?.name || student.className || 'Unknown Class'}</span>
+                                                </div>
+
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '10px',
+                                                        background: 'var(--bg-main)',
+                                                        padding: '6px 12px',
+                                                        borderRadius: '10px',
+                                                        border: '1px solid var(--border-soft)'
+                                                    }}>
+                                                        <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '0.05em', fontFamily: 'monospace' }}>
+                                                            {visiblePasswords.has(student.id) ? (student.plainPassword || 'NO PASS') : '••••••••'}
+                                                        </span>
+                                                        <button onClick={() => togglePasswordVisibility(student.id)} style={{ background: 'none', border: 'none', color: visiblePasswords.has(student.id) ? 'var(--primary-bold)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}>
+                                                            {visiblePasswords.has(student.id) ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={() => setDeleteModal({ isOpen: true, id: student.id })}
+                                                style={{
+                                                    background: '#fee2e2',
+                                                    color: '#ef4444',
+                                                    border: 'none',
+                                                    width: '48px',
+                                                    height: '48px',
+                                                    borderRadius: '14px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    boxShadow: '0 6px 20px rgba(239, 68, 68, 0.15)'
+                                                }}
+                                            >
+                                                <Trash2 size={20} />
+                                            </button>
                                         </div>
                                     </div>
                                 ))
@@ -408,51 +538,111 @@ export default function MobileManageStudents() {
                             </div>
 
                             {(() => {
-                                const selectedClass = classes.find((c: any) => c.id === newUser.classId);
-                                const showBanglarSikkha = selectedClass && selectedClass.grade >= 2;
-                                if (!showBanglarSikkha) return null;
-                                return (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                        <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Banglar Sikkha Portal ID</label>
-                                        <input type="text" placeholder="Enter Portal ID" style={{ padding: '12px', borderRadius: '10px', border: `1px solid ${registrationErrors.banglarSikkhaId ? '#ef4444' : 'var(--border-soft)'}`, background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={newUser.banglarSikkhaId} onChange={e => setNewUser({ ...newUser, banglarSikkhaId: e.target.value })} />
-                                        {registrationErrors.banglarSikkhaId && <span style={{ color: '#ef4444', fontSize: '10px', fontWeight: '700' }}>{registrationErrors.banglarSikkhaId}</span>}
-                                    </div>
-                                );
+                                const selectedClass = classes.find(c => c.id === newUser.classId);
+                                if (selectedClass && selectedClass.grade >= 2) {
+                                    return (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Banglar Sikkha ID *</label>
+                                            <input type="text" placeholder="Enter Registration ID" required style={{ padding: '12px', borderRadius: '10px', border: `1px solid ${registrationErrors.banglarSikkhaId ? '#ef4444' : 'var(--border-soft)'}`, background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={newUser.banglarSikkhaId} onChange={e => setNewUser({ ...newUser, banglarSikkhaId: e.target.value })} />
+                                            {registrationErrors.banglarSikkhaId && <span style={{ color: '#ef4444', fontSize: '10px', fontWeight: '700' }}>{registrationErrors.banglarSikkhaId}</span>}
+                                        </div>
+                                    );
+                                }
+                                return null;
                             })()}
 
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
-                                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Guardian Name</label>
-                                    <input type="text" placeholder="Optional" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={newUser.guardianName} onChange={e => setNewUser({ ...newUser, guardianName: e.target.value })} />
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
-                                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Date of Birth</label>
-                                    <input type="date" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={newUser.dob} onChange={e => setNewUser({ ...newUser, dob: e.target.value })} />
-                                </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Profile Photo</label>
+                                <PhotoUpload value={newUser.photo} onChange={(url: string) => setNewUser({ ...newUser, photo: url })} label="Upload Student Photo" uploadPath="/uploads/student-photo" />
                             </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Phone Number</label>
-                                <input type="tel" placeholder="Optional" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={newUser.phone} onChange={e => setNewUser({ ...newUser, phone: e.target.value })} />
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Full Address</label>
-                                <textarea placeholder="Optional" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none', resize: 'vertical', minHeight: '60px' }} value={newUser.address} onChange={e => setNewUser({ ...newUser, address: e.target.value })} />
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Student Photo</label>
-                                <PhotoUpload value={newUser.photo} onChange={url => setNewUser({ ...newUser, photo: url })} label="Upload Photo" uploadPath="/uploads/student-photo" />
-                            </div>
-
-                            <button type="submit" disabled={isSubmitting} style={{ marginTop: '12px', padding: '14px', borderRadius: '12px', border: 'none', background: 'var(--primary-bold)', color: '#fff', fontWeight: '800', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-                                {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <><Plus size={18} /> Enroll Student</>}
+                            <button type="submit" disabled={isSubmitting} style={{ marginTop: '10px', width: '100%', padding: '16px', borderRadius: '12px', border: 'none', background: 'var(--primary-bold)', color: '#fff', fontWeight: '800', fontSize: '15px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', opacity: isSubmitting ? 0.7 : 1 }}>
+                                {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
+                                Enroll Student
                             </button>
                         </form>
                     </motion.div>
                 ) : (
                     <motion.div key="system" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        
+                        <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-soft)' }}>
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
+                                <div style={{ background: 'var(--primary-soft)', padding: '8px', borderRadius: '10px', color: 'var(--primary-bold)' }}><FileSpreadsheet size={20} /></div>
+                                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: 'var(--text-main)' }}>Credential Management</h3>
+                            </div>
+                            <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>Generate an excel sheet with all student login IDs and passwords for distribution.</p>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <button
+                                    onClick={downloadCredentials}
+                                    style={{ 
+                                        width: '100%', 
+                                        padding: '14px', 
+                                        borderRadius: '12px', 
+                                        border: 'none', 
+                                        background: 'var(--primary-bold)', 
+                                        color: '#fff', 
+                                        fontWeight: '800', 
+                                        fontSize: '14px', 
+                                        display: 'flex', 
+                                        justifyContent: 'center', 
+                                        alignItems: 'center', 
+                                        gap: '10px' 
+                                    }}
+                                >
+                                    <Download size={18} /> Download All Credentials
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        // Standard headers and dummy data for the import template
+                                        const headers = ['CLASS', 'Roll', 'NAME', 'STUDENT ID IN BANGLAR SHIKSHA PORTAL', 'Admission Registration No.'];
+                                        const data = [['KG-I A', '2', 'SAMPLE STUDENT', '10000000000002', '901']];
+                                        
+                                        const XLSX = await import('xlsx');
+                                        const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
+                                        const workbook = XLSX.utils.book_new();
+                                        XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
+                                        
+                                        const fileName = 'Student_Import_Template.xlsx';
+
+                                        if (Capacitor.isNativePlatform()) {
+                                            try {
+                                                const b64 = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+                                                const savedFile = await Filesystem.writeFile({
+                                                    path: fileName,
+                                                    data: b64,
+                                                    directory: Directory.Documents,
+                                                    recursive: true
+                                                });
+                                                await FileOpener.openFile({ path: savedFile.uri });
+                                                showToast('Template downloaded and opened', 'success');
+                                            } catch (error) {
+                                                console.error('Failed to save template:', error);
+                                                showToast('Failed to save template', 'error');
+                                            }
+                                        } else {
+                                            XLSX.writeFile(workbook, fileName);
+                                        }
+                                    }}
+                                    style={{ 
+                                        width: '100%', 
+                                        padding: '14px', 
+                                        borderRadius: '12px', 
+                                        border: '1px solid var(--border-soft)', 
+                                        background: 'var(--bg-main)', 
+                                        color: 'var(--text-main)', 
+                                        fontWeight: '700', 
+                                        fontSize: '12px', 
+                                        display: 'flex', 
+                                        justifyContent: 'center', 
+                                        alignItems: 'center', 
+                                        gap: '8px' 
+                                    }}
+                                >
+                                    <FileSpreadsheet size={16} /> Get Enrollment Template
+                                </button>
+                            </div>
+                        </div>
 
                         <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-soft)' }}>
                             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
@@ -471,118 +661,41 @@ export default function MobileManageStudents() {
                             </div>
                         </div>
 
-                        <div style={{ padding: '24px', background: '#fee2e2', borderRadius: '16px', border: '1px solid #fca5a5' }}>
+                        <div style={{ background: '#fff1f1', padding: '24px', borderRadius: '16px', border: '1px solid #fee2e2' }}>
                             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
-                                <div style={{ background: '#fff', padding: '8px', borderRadius: '10px', color: '#ef4444' }}><Trash2 size={20} /></div>
-                                <h4 style={{ margin: 0, color: '#b91c1c', fontSize: '16px', fontWeight: '800' }}>Danger Zone</h4>
+                                <Trash2 size={20} color="#ef4444" />
+                                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#991b1b' }}>Danger Zone</h3>
                             </div>
-                            <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: '#991b1b', lineHeight: 1.5 }}>Wiping the database will remove all students permanently. It will also clear their attendance records and examination results permanently.</p>
-                            <button
-                                onClick={async () => {
-                                    if (window.confirm('Are you absolutely sure you want to wipe all students? This cannot be undone.')) {
-                                        try { await api.delete('/users/students/all'); showToast('Student database wiped', 'success'); fetchStudents(); }
-                                        catch (error: any) { showToast(error.response?.data?.message || 'Failed to wipe', 'error'); }
-                                    }
-                                }}
-                                style={{ width: '100%', padding: '14px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)', color: '#fff', fontWeight: '800', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
-                            >
+                            <p style={{ margin: '0 0 20px 0', fontSize: '12px', color: '#b91c1c', fontWeight: '500', lineHeight: 1.5 }}>Wiping the database will remove all students permanently. It will also clear their attendance records and examination results permanently.</p>
+                            <button onClick={() => setDeleteModal({ isOpen: true, id: 'all' })} style={{ width: '100%', padding: '16px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: '#fff', fontWeight: '800', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', boxShadow: '0 4px 12px rgba(220, 38, 38, 0.2)' }}>
                                 <Trash2 size={18} /> Wipe Database
                             </button>
                         </div>
-
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* Edit Modal */}
-            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Student Profile">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '10px 0' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Full Name</label>
-                        <input type="text" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.name} onChange={e => setEditData({ ...editData, name: e.target.value })} />
+            <Modal
+                isOpen={isEditModalOpen && !!selectedStudent}
+                onClose={() => { setIsEditModalOpen(false); setSelectedStudent(null); }}
+                title="Edit Student Profile"
+                footer={<button onClick={handleUpdateStudent} disabled={isUpdating} style={{ background: 'var(--primary-bold)', color: 'white', padding: '12px 24px', borderRadius: '12px', border: 'none', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px' }}>{isUpdating ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />} Update</button>}
+            >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <PhotoUpload value={editData.photo || ''} onChange={(url: string) => setEditData({ ...editData, photo: url })} label="Change Photo" uploadPath="/uploads/student-photo" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>Full Name</label>
+                        <input type="text" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)' }} value={editData.name} onChange={e => setEditData({ ...editData, name: e.target.value })} />
                     </div>
-
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
-                            <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)' }}>Admission No.</label>
-                            <input type="text" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.studentId} onChange={e => setEditData({ ...editData, studentId: e.target.value })} />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
-                            <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)' }}>Roll No.</label>
-                            <input type="text" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.rollNumber} onChange={e => setEditData({ ...editData, rollNumber: e.target.value })} />
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)' }}>Guardian Name</label>
-                        <input type="text" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.guardianName} onChange={e => setEditData({ ...editData, guardianName: e.target.value })} />
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)' }}>Phone Number</label>
-                        <input type="text" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.phone} onChange={e => setEditData({ ...editData, phone: e.target.value })} />
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)' }}>Class</label>
-                        <select style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.classId} onChange={e => setEditData({ ...editData, classId: e.target.value })}>
-                            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                    </div>
-
-                    {(() => {
-                        const selectedClass = classes.find(c => c.id === editData.classId);
-                        if (!selectedClass || selectedClass.grade < 2) return null;
-                        return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)' }}>Banglar Sikkha Portal ID</label>
-                                <input type="text" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.banglarSikkhaId} onChange={e => setEditData({ ...editData, banglarSikkhaId: e.target.value })} />
-                            </div>
-                        );
-                    })()}
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)' }}>Date of Birth</label>
-                        <input type="date" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.dob} onChange={e => setEditData({ ...editData, dob: e.target.value })} />
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)' }}>Full Address</label>
-                        <textarea style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none', minHeight: '80px' }} value={editData.address} onChange={e => setEditData({ ...editData, address: e.target.value })} />
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)' }}>Student Photo</label>
-                        <PhotoUpload
-                            value={editData.photo}
-                            onChange={(url: string) => setEditData({ ...editData, photo: url })}
-                            label="Change Photo"
-                            uploadPath="/uploads/student-photo"
-                        />
-                    </div>
-
-                    <button
-                        onPointerDown={(e) => {
-                            e.preventDefault(); // Prevents blur theft
-                            handleUpdateStudent();
-                        }}
-                        disabled={isUpdating}
-                        style={{ marginTop: '10px', padding: '14px', borderRadius: '12px', border: 'none', background: 'var(--primary-bold)', color: '#fff', fontWeight: '800', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', opacity: isUpdating ? 0.7 : 1 }}
-                    >
-                        {isUpdating ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                        {isUpdating ? 'Updating...' : 'Update Student Record'}
-                    </button>
                 </div>
             </Modal>
 
             <ConfirmModal
                 isOpen={deleteModal.isOpen}
                 onClose={() => setDeleteModal({ isOpen: false, id: '' })}
-                onConfirm={() => handleDeleteStudent(deleteModal.id)}
-                title="Delete Student?"
-                message="Are you sure you want to delete this student record? This action cannot be undone."
-                confirmText="Yes, Delete"
-                variant="danger"
+                onConfirm={() => deleteModal.id === 'all' ? api.delete('/users/students/all').then(() => fetchStudents()) : handleDeleteStudent(deleteModal.id)}
+                title={deleteModal.id === 'all' ? "Wipe All Students?" : "Delete Student?"}
+                message={deleteModal.id === 'all' ? "This will permanently delete EVERY student in the school. This cannot be undone." : "Are you sure you want to delete this student record?"}
             />
         </motion.div>
     );

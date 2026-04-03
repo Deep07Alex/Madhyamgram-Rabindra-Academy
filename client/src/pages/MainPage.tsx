@@ -222,10 +222,12 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
         />
         <div className="logo-text-wrapper">
           <h2 className="logo">MADHYAMGRAM RABINDRA ACADEMY</h2>
-          <p className="nav-tagline">Education ★ Culture ★ Art</p>
-          <div className="nav-info-row">
-            <span>UDISE: 19112601311</span>
-            <span>ESTD: 2005</span>
+          <div className="nav-tagline-mobile-row">
+            <p className="nav-tagline">Education ★ Culture ★ Art</p>
+            <div className="nav-info-row">
+              <span>UDISE: 19112601311</span>
+              <span>ESTD: 2005</span>
+            </div>
           </div>
         </div>
       </div>
@@ -233,8 +235,13 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
         className="landing-nav-toggle"
         onClick={onToggle}
         aria-label="Toggle navigation"
+        style={{ marginRight: '-10px' }}
       >
-        ☰
+        <div className="hamburger-icon-wrapper">
+          <div className="bar"></div>
+          <div className="bar"></div>
+          <div className="bar"></div>
+        </div>
       </button>
       <div className={"landing-nav-menu" + (open ? " open" : "")}>
         <a href="javascript:void(0)" onClick={() => handleNavClick("home")}>Home</a>
