@@ -17,6 +17,8 @@ export default function MobileAdminDashboard() {
     });
     const [isLoading, setIsLoading] = useState(true);
 
+    const [isScrollRestored, setIsScrollRestored] = useState(false);
+
     useEffect(() => {
         const fetchStats = async () => {
             try {
@@ -31,6 +33,29 @@ export default function MobileAdminDashboard() {
         fetchStats();
     }, []);
 
+    // Dedicated scroll restoration for Dashboard Index
+    useEffect(() => {
+        if (!isLoading) {
+            const container = document.getElementById('mobile-scroll-container');
+            const saved = sessionStorage.getItem('dashboard-scroll-pos');
+            
+            if (container && saved) {
+                container.scrollTop = parseInt(saved, 10);
+            }
+            
+            // Once we have set the scroll (even if 0), mark as restored to trigger animation
+            setIsScrollRestored(true);
+        }
+    }, [isLoading]);
+
+    const handleNavigation = (path: string) => {
+        const container = document.getElementById('mobile-scroll-container');
+        if (container) {
+            sessionStorage.setItem('dashboard-scroll-pos', container.scrollTop.toString());
+        }
+        navigate(path);
+    };
+
     if (isLoading) {
         return (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', flexDirection: 'column', gap: '16px' }}>
@@ -42,8 +67,12 @@ export default function MobileAdminDashboard() {
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ 
+                opacity: isScrollRestored ? 1 : 0, 
+                y: isScrollRestored ? 0 : 10 
+            }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
             exit={{ opacity: 0 }}
             style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}
         >
@@ -124,10 +153,10 @@ export default function MobileAdminDashboard() {
                     gridTemplateColumns: 'repeat(2, 1fr)',
                     gap: '12px'
                 }}>
-                    <QuickAction icon={Users} label="Manage Students" color="#3B82F6" onClick={() => navigate('/dashboard/students')} />
-                    <QuickAction icon={UserCircle} label="Manage Faculty" color="#10B981" onClick={() => navigate('/dashboard/faculty')} />
-                    <QuickAction icon={BookOpen} label="See Classes" color="#F59E0B" onClick={() => alert('See Classes module will open natively in the next sprint.')} />
-                    <QuickAction icon={ClipboardCheck} label="Attendance" color="#8B5CF6" onClick={() => alert('Attendance module will open natively in the next sprint.')} />
+                    <QuickAction icon={Users} label="Manage Students" color="#3B82F6" onClick={() => handleNavigation('/dashboard/students')} />
+                    <QuickAction icon={UserCircle} label="Manage Faculty" color="#10B981" onClick={() => handleNavigation('/dashboard/faculty')} />
+                    <QuickAction icon={BookOpen} label="See Classes" color="#F59E0B" onClick={() => handleNavigation('/dashboard/classes')} />
+                    <QuickAction icon={ClipboardCheck} label="Attendance" color="#8B5CF6" onClick={() => handleNavigation('/dashboard/attendance')} />
                     <QuickAction icon={FileText} label="Results" color="#EC4899" onClick={() => alert('Results module will open natively in the next sprint.')} />
                     <QuickAction icon={Banknote} label="Fees" color="#14B8A6" onClick={() => alert('Fees module will open natively in the next sprint.')} />
                     <QuickAction icon={BellRing} label="Notices" color="#EF4444" onClick={() => alert('Notices module will open natively in the next sprint.')} />

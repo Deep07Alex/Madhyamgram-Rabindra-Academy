@@ -2,20 +2,20 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
-import { getStorage } from '../../services/api';
+import { getPersistentStorage } from '../../services/api';
 
 export default function MobileIntroScreen() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        const storage = getStorage();
+        const storage = getPersistentStorage();
         if (storage.getItem('has_seen_onboarding')) {
             navigate('/', { replace: true });
         }
     }, [navigate]);
 
     const handleGetStarted = () => {
-        const storage = getStorage();
+        const storage = getPersistentStorage();
         storage.setItem('has_seen_onboarding', 'true');
         navigate('/', { replace: true });
     };

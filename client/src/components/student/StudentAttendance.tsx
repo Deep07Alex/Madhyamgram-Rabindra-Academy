@@ -99,7 +99,7 @@ const StudentAttendance = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
                             <h3>{stats.total}</h3>
-                            <p>Recorded Days</p>
+                            <p>Academic Sessions</p>
                         </div>
                         <Calendar size={24} color="var(--primary-bold)" opacity={0.5} />
                     </div>
@@ -215,18 +215,23 @@ const StudentAttendance = () => {
                                                             <XCircle size={12} /> ABSENT
                                                         </span>
                                                     )}
-                                                    {!record && (
+                                                    {!record && !isFuture && (
                                                         <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                                            {isToday ? (
-                                                                <span className="badge present" style={{ minWidth: '100px', justifyContent: 'center', gap: '6px', opacity: 0.8 }}>
-                                                                    <CheckCircle2 size={12} /> PRESENT
+                                                            {day.getDay() === 0 ? (
+                                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '500' }}>
+                                                                    Sunday (Off)
                                                                 </span>
                                                             ) : (
-                                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                                                    {isFuture ? 'Upcoming' : '—'}
+                                                                <span className="badge absent" style={{ minWidth: '100px', justifyContent: 'center', gap: '6px', opacity: 0.8 }}>
+                                                                    <XCircle size={12} /> ABSENT
                                                                 </span>
                                                             )}
                                                         </div>
+                                                    )}
+                                                    {!record && isFuture && (
+                                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                                            Upcoming
+                                                        </span>
                                                     )}
                                                 </div>
                                             )}

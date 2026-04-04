@@ -189,6 +189,9 @@ export const bulkUploadResults = async (req: Request, res: Response) => {
         }
 
         res.json({ message: `Successfully matched and uploaded ${resultsToInsert.length} mark entries.` });
+        
+        // Broadcast that results for this class have changed
+        broadcast('result_published', { classId, bulk: true });
     } catch (error) {
         console.error('Bulk upload error:', error);
         res.status(500).json({ message: 'Failed to process Excel file' });
@@ -416,6 +419,7 @@ export const deleteClassResults = async (req: Request, res: Response) => {
         );
 
         res.json({ message: `All records for the selected class in ${semester} (${academicYear}) have been cleared.` });
+        broadcast('result_published', { classId });
     } catch (error) {
         console.error('Error in bulk class result deletion:', error);
         res.status(500).json({ message: 'Error in bulk class result deletion' });

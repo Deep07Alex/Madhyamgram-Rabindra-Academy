@@ -94,6 +94,7 @@ const AdminDashboard = () => {
     // Real-time Event Handling:
     // Automatically refreshes dashboard statistics when relevant backend events occur.
     useServerEvents({
+        'focus': () => fetchStats(true),
         'connected': () => { if (import.meta.env.DEV) console.log('[SSE] Admin Control: Real-time link established'); },
         'attendance:updated': () => fetchStats(true),
         'user:created': () => fetchStats(true),

@@ -1,16 +1,18 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { FileOpener } from '@capawesome-team/capacitor-file-opener';
 import { Capacitor } from '@capacitor/core';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, User, ArrowLeft, Loader2, BookOpen, Plus, UserPlus, Upload, FileSpreadsheet, Trash2, Edit, Eye, EyeOff, Save, ChevronDown, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { App } from '@capacitor/app';
 import api, { getBaseUrl } from '../../../services/api';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { useToast } from '../../../context/ToastContext';
 import PhotoUpload from '../../../components/common/PhotoUpload';
 import ConfirmModal from '../../../components/common/ConfirmModal';
 import Modal from '../../../components/common/Modal';
+import useServerEvents from '../../../hooks/useServerEvents';
 
 export default function MobileManageStudents() {
     const navigate = useNavigate();
@@ -22,7 +24,6 @@ export default function MobileManageStudents() {
     // Directory State
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedClassId, setSelectedClassId] = useState<string>('');
-    const debouncedSearch = useDebounce(searchQuery, 400);
     const [students, setStudents] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
@@ -115,34 +116,103 @@ export default function MobileManageStudents() {
         }
     };
 
-    const fetchStudents = async () => {
-        setIsLoading(true);
+    const fetchStudents = useCallback(async (signal?: AbortSignal, silent = false) => {
+        if (!silent) setIsLoading(true);
         try {
             const res = await api.get('/users/students', {
-                params: { search: debouncedSearch, classId: selectedClassId, page: page, limit: 20 }
+                params: { search: searchQuery, classId: selectedClassId, page: page, limit: 20 },
+                signal
             });
             setStudents(res.data?.students || []);
             setTotalPages(Math.ceil((res.data?.total || 0) / 20));
             setTotalStudents(res.data?.total || 0);
-        } catch (err) {
+        } catch (err: any) {
+            if (err.name === 'CanceledError' || err.name === 'AbortError') return;
             console.error('Failed to fetch students:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [searchQuery, selectedClassId, page]);
+
+    // native back button handling
+    useEffect(() => {
+        const backListener = App.addListener('backButton', ({ canGoBack }) => {
+            if (isEditModalOpen) {
+                setIsEditModalOpen(false);
+                setSelectedStudent(null);
+            } else if (activeTab !== 'directory') {
+                setActiveTab('directory');
+            } else if (canGoBack) {
+                navigate(-1);
+            }
+        });
+
+        return () => {
+            backListener.then(l => l.remove());
+        }
+    }, [isEditModalOpen, activeTab, navigate]);
+
+    // Live Updates (Socket & SSE Sync)
+    useServerEvents({
+        'profile_updated': (data: any) => {
+            fetchStudents(undefined, true);
+            // Live-Sync: Update modal if currently editing this specific student
+            if (isEditModalOpen && selectedStudent?.id === data.studentId && data.updatedStudent) {
+                const s = data.updatedStudent;
+                setEditData({
+                    ...s,
+                    password: '',
+                    dob: s.dob ? new Date(s.dob).toISOString().split('T')[0] : '',
+                    email: s.email || '',
+                    guardianName: s.guardianName || '',
+                    phone: s.phone || '',
+                    address: s.address || '',
+                    photo: s.photo || '',
+                    banglarSikkhaId: s.banglarSikkhaId || ''
+                });
+            }
+        },
+        'user:created': () => fetchStudents(undefined, true),
+        'user:deleted': () => fetchStudents(undefined, true)
+    });
+
+    const fetchInitialData = async () => {
+        setIsLoading(true);
+        try {
+            const [clsRes, stuRes] = await Promise.all([
+                api.get('/users/classes'),
+                api.get('/users/students', { params: { search: searchQuery, classId: selectedClassId, page: page, limit: 20 } })
+            ]);
+            
+            setClasses(clsRes.data || []);
+            if (clsRes.data.length > 0 && !newUser.classId) {
+                setNewUser(prev => ({ ...prev, classId: clsRes.data[0].id }));
+            }
+            
+            setStudents(stuRes.data?.students || []);
+            setTotalPages(Math.ceil((stuRes.data?.total || 0) / 20));
+            setTotalStudents(stuRes.data?.total || 0);
+        } catch (err) {
+            console.error('Initialization failed:', err);
         } finally {
             setIsLoading(false);
         }
     };
 
-    const fetchClasses = async () => {
-        try {
-            const res = await api.get('/users/classes');
-            setClasses(res.data || []);
-            if (res.data.length > 0 && !newUser.classId) {
-                setNewUser(prev => ({ ...prev, classId: res.data[0].id }));
-            }
-        } catch (err) { }
-    };
+    // Parallel Initial Load
+    useEffect(() => { 
+        fetchInitialData(); 
+    }, []);
 
-    useEffect(() => { fetchStudents(); }, [debouncedSearch, selectedClassId, page]);
-    useEffect(() => { fetchClasses(); }, []);
+    // Subsequent updates (Debounced Search, Filter, Page)
+    useEffect(() => { 
+        const controller = new AbortController();
+        // Only run if not initial load (classes already exist)
+        if (classes.length > 0) {
+            fetchStudents(controller.signal, true); 
+        }
+        return () => controller.abort();
+    }, [searchQuery, selectedClassId, page]);
 
     const handleCreateStudent = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -313,7 +383,7 @@ export default function MobileManageStudents() {
                                         fontWeight: '500'
                                     }}
                                 />
-                                <Search size={20} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#ffffff' }} />
+                                <Search size={20} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                             </div>
                             <div style={{ position: 'relative' }}>
                                 <select
@@ -341,11 +411,44 @@ export default function MobileManageStudents() {
                             </div>
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '4px 2px' }}>
-                            {isLoading ? (
-                                <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><Loader2 className="animate-spin" color="var(--primary-bold)" /></div>
+                        {totalPages > 1 && (
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', padding: '8px 0', marginBottom: '8px' }}>
+                                <button
+                                    onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }}
+                                    disabled={page === 1}
+                                    style={{ padding: '8px 16px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-card)', color: page === 1 ? 'var(--text-muted)' : 'var(--text-main)', fontSize: '12px', fontWeight: '700', opacity: page === 1 ? 0.5 : 1 }}
+                                >
+                                    Previous
+                                </button>
+                                <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-main)' }}>
+                                    Page <span style={{ color: 'var(--primary-bold)' }}>{page}</span> of {totalPages}
+                                </span>
+                                <button
+                                    onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }}
+                                    disabled={page === totalPages}
+                                    style={{ padding: '8px 16px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-card)', color: page === totalPages ? 'var(--text-muted)' : 'var(--text-main)', fontSize: '12px', fontWeight: '700', opacity: page === totalPages ? 0.5 : 1 }}
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '4px 2px', position: 'relative' }}>
+                            {isLoading && students.length === 0 ? (
+                                <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                                        <Loader2 className="animate-spin" size={40} color="var(--primary-bold)" />
+                                        <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-muted)' }}>Loading Database...</span>
+                                    </div>
+                                </div>
                             ) : students.length > 0 ? (
-                                students.map(student => (
+                                <>
+                                    {isLoading && (
+                                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'var(--primary-soft)', overflow: 'hidden', borderRadius: '2px', zIndex: 10 }}>
+                                            <motion.div initial={{ x: '-100%' }} animate={{ x: '100%' }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} style={{ width: '50%', height: '100%', background: 'var(--primary-bold)' }} />
+                                        </div>
+                                    )}
+                                    {students.map(student => (
                                     <div key={student.id} style={{
                                         backgroundColor: 'var(--bg-card)',
                                         padding: '20px',
@@ -406,7 +509,16 @@ export default function MobileManageStudents() {
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                                 <button onClick={() => {
                                                     setSelectedStudent(student);
-                                                    setEditData({ ...student });
+                                                    setEditData({ 
+                                                        ...student,
+                                                        password: '',
+                                                        dob: student.dob ? new Date(student.dob).toISOString().split('T')[0] : '',
+                                                        email: student.email || '',
+                                                        guardianName: student.guardianName || '',
+                                                        phone: student.phone || '',
+                                                        address: student.address || '',
+                                                        banglarSikkhaId: student.banglarSikkhaId || ''
+                                                    });
                                                     setIsEditModalOpen(true);
                                                 }} style={{ background: 'var(--warning-soft)', color: 'var(--warning)', border: 'none', width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
                                                     <Edit size={18} />
@@ -465,8 +577,9 @@ export default function MobileManageStudents() {
                                                 <Trash2 size={20} />
                                             </button>
                                         </div>
-                                    </div>
-                                ))
+                                        </div>
+                                    ))}
+                                </>
                             ) : (
                                 <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '13px', fontWeight: '600' }}>No students found.</div>
                             )}
@@ -523,6 +636,7 @@ export default function MobileManageStudents() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                 <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Password (Optional)</label>
                                 <input type="text" placeholder="Leave empty for auto-generation" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} />
+                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' }}>Pattern: [Name]@ [Last 4 Digits of ID]</span>
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -542,14 +656,35 @@ export default function MobileManageStudents() {
                                 if (selectedClass && selectedClass.grade >= 2) {
                                     return (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                            <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Banglar Sikkha ID *</label>
-                                            <input type="text" placeholder="Enter Registration ID" required style={{ padding: '12px', borderRadius: '10px', border: `1px solid ${registrationErrors.banglarSikkhaId ? '#ef4444' : 'var(--border-soft)'}`, background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={newUser.banglarSikkhaId} onChange={e => setNewUser({ ...newUser, banglarSikkhaId: e.target.value })} />
+                                            <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Banglar Shiksha Portal ID</label>
+                                            <input type="text" placeholder="Enter Portal ID" style={{ padding: '12px', borderRadius: '10px', border: `1px solid ${registrationErrors.banglarSikkhaId ? '#ef4444' : 'var(--border-soft)'}`, background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={newUser.banglarSikkhaId} onChange={e => setNewUser({ ...newUser, banglarSikkhaId: e.target.value })} />
                                             {registrationErrors.banglarSikkhaId && <span style={{ color: '#ef4444', fontSize: '10px', fontWeight: '700' }}>{registrationErrors.banglarSikkhaId}</span>}
                                         </div>
                                     );
                                 }
                                 return null;
                             })()}
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Guardian Name (Optional)</label>
+                                <input type="text" placeholder="Enter Guardian Name" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={newUser.guardianName} onChange={e => setNewUser({ ...newUser, guardianName: e.target.value })} />
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Date of Birth (Optional)</label>
+                                    <input type="date" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={newUser.dob} onChange={e => setNewUser({ ...newUser, dob: e.target.value })} />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Phone (Optional)</label>
+                                    <input type="tel" placeholder="Enter Phone No" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={newUser.phone} onChange={e => setNewUser({ ...newUser, phone: e.target.value })} />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Full Address (Optional)</label>
+                                <textarea placeholder="Enter Complete Address" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none', minHeight: '80px', resize: 'none' }} value={newUser.address} onChange={e => setNewUser({ ...newUser, address: e.target.value })} />
+                            </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Profile Photo</label>
@@ -681,11 +816,74 @@ export default function MobileManageStudents() {
                 title="Edit Student Profile"
                 footer={<button onClick={handleUpdateStudent} disabled={isUpdating} style={{ background: 'var(--primary-bold)', color: 'white', padding: '12px 24px', borderRadius: '12px', border: 'none', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '10px' }}>{isUpdating ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />} Update</button>}
             >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '65vh', overflowY: 'auto', paddingRight: '4px' }}>
                     <PhotoUpload value={editData.photo || ''} onChange={(url: string) => setEditData({ ...editData, photo: url })} label="Change Photo" uploadPath="/uploads/student-photo" />
+                    
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>Full Name</label>
-                        <input type="text" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)' }} value={editData.name} onChange={e => setEditData({ ...editData, name: e.target.value })} />
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>Full Name *</label>
+                        <input type="text" placeholder="Enter Full Name" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.name} onChange={e => setEditData({ ...editData, name: e.target.value })} required />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>Admission Number (Login ID) *</label>
+                        <input type="text" placeholder="e.g. S-1042" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.studentId} onChange={e => setEditData({ ...editData, studentId: e.target.value })} required />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>Email Address</label>
+                        <input type="email" placeholder="Enter Email Address" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.email} onChange={e => setEditData({ ...editData, email: e.target.value })} />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                            <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>Roll Number *</label>
+                            <input type="text" placeholder="Enter Roll No" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.rollNumber} onChange={e => setEditData({ ...editData, rollNumber: e.target.value })} required />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                            <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>Assign Class *</label>
+                            <select style={{ padding: '12px', height: '43px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none', appearance: 'none' }} value={editData.classId} onChange={e => setEditData({ ...editData, classId: e.target.value })} required>
+                                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>New Password (Optional)</label>
+                        <input type="text" placeholder="Leave empty to keep current password" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.password} onChange={e => setEditData({ ...editData, password: e.target.value })} />
+                    </div>
+
+                    {(() => {
+                        const selectedClass = classes.find(c => c.id === editData.classId);
+                        if (selectedClass && selectedClass.grade >= 2) {
+                            return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>Banglar Shiksha Portal ID</label>
+                                    <input type="text" placeholder="Enter Portal ID" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.banglarSikkhaId} onChange={e => setEditData({ ...editData, banglarSikkhaId: e.target.value })} />
+                                </div>
+                            );
+                        }
+                        return null;
+                    })()}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>Guardian Name</label>
+                        <input type="text" placeholder="Enter Guardian Name" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.guardianName} onChange={e => setEditData({ ...editData, guardianName: e.target.value })} />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                            <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>Date of Birth</label>
+                            <input type="date" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.dob} onChange={e => setEditData({ ...editData, dob: e.target.value })} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                            <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>Phone Number (Optional)</label>
+                            <input type="tel" placeholder="Enter Phone No" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.phone} onChange={e => setEditData({ ...editData, phone: e.target.value })} />
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>Full Address</label>
+                        <textarea placeholder="Enter Complete Address" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none', minHeight: '80px', resize: 'none' }} value={editData.address} onChange={e => setEditData({ ...editData, address: e.target.value })} />
                     </div>
                 </div>
             </Modal>

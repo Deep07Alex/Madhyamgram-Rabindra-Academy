@@ -133,23 +133,26 @@ const StudentDashboard = () => {
         }
     }, [pathname, unreadCount, refreshData]);
 
-    // Live Auto-Refresh (Silent background polling every 3 seconds for resilience)
-    useEffect(() => {
-        const intervalId = setInterval(() => {
-            refreshData(true);
-        }, 3000);
-        return () => clearInterval(intervalId);
-    }, [refreshData]);
-
     const { showToast } = useToast();
+    const [isReadyForToasts, setIsReadyForToasts] = useState(false);
+
+    // Startup Delay - Silences "Ghost" notifications during login:
+    // When the school's SSE connection starts, the server often broadcasts recent events
+    // to ensure no state is lost. This delay prevents those replayed events from 
+    // triggering toast alerts right away.
+    useEffect(() => {
+        const timer = setTimeout(() => setIsReadyForToasts(true), 3000);
+        return () => clearTimeout(timer);
+    }, []);
 
     // Real-time Event Subscriptions:
     // Listens for academic updates (homework, results, notices) and triggers silent refreshes.
     useServerEvents({
+        'focus': () => refreshData(true),
         'connected': () => { if (import.meta.env.DEV) console.log('[SSE] System confirmed: Live connection established'); },
         'attendance:updated': () => refreshData(true),
         'homework_created': (_data: any) => {
-            showToast('📚 New Academic Task assigned! Check your dashboard.', 'info');
+            if (isReadyForToasts) showToast('📚 New Academic Task assigned! Check your dashboard.', 'info');
             refreshData(true);
         },
         'homework_submitted': (data: any) => {
@@ -165,13 +168,13 @@ const StudentDashboard = () => {
         },
         'homework_deleted': () => refreshData(true),
         'new_notice': () => {
-            showToast('🔔 New School Announcement posted!', 'info');
+            if (isReadyForToasts) showToast('🔔 New School Announcement posted!', 'info');
             refreshData(true);
         },
         'notice_deleted': () => refreshData(true),
         'profile_updated': () => refreshData(true),
         'result_published': () => {
-            showToast('🎓 New academic record published!', 'success');
+            if (isReadyForToasts) showToast('🎓 New academic record published!', 'success');
             refreshData(true);
         },
         'class:updated': () => refreshData(true)

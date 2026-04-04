@@ -13,6 +13,7 @@ import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import ConfirmModal from '../common/ConfirmModal';
 import { GraduationCap, Trash2, Plus, Loader2, BookOpen, X } from 'lucide-react';
+import useServerEvents from '../../hooks/useServerEvents';
 
 const ManageClasses = () => {
     const [classes, setClasses] = useState<any[]>([]);
@@ -49,6 +50,10 @@ const ManageClasses = () => {
         fetchData(controller.signal);
         return () => controller.abort();
     }, []);
+
+    useServerEvents({
+        'class:updated': () => fetchData()
+    });
 
     const handleCreateClass = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -235,22 +240,25 @@ const ManageClasses = () => {
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                                         <input 
                                             type="number" 
-                                            defaultValue={c.monthlyFee} 
+                                            value={c.monthlyFee || 0} 
                                             onWheel={e => e.currentTarget.blur()}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setClasses(prev => prev.map(item => item.id === c.id ? { ...item, monthlyFee: val } : item));
+                                            }}
                                             onBlur={async (e) => {
                                                 const fee = e.target.value;
-                                                if (fee === c.monthlyFee?.toString()) return;
                                                 try {
                                                     await api.patch(`/users/classes/${c.id}`, { 
                                                         name: c.name, 
                                                         grade: c.grade, 
-                                                        monthlyFee: fee 
+                                                        monthlyFee: parseFloat(fee) || 0 
                                                     });
-                                                    showToast(`Fee for ${c.name} updated successfully!`, 'success');
+                                                    showToast(`Fee for ${c.name} updated!`, 'success');
                                                     fetchData();
                                                 } catch (err) {
-                                                    console.error('Failed to update fee', err);
-                                                    showToast('Failed to update fee. Check server connection.', 'error');
+                                                    showToast('Failed to update fee', 'error');
+                                                    fetchData(); // Rollback to server state
                                                 }
                                             }}
                                             style={{ width: '80px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', textAlign: 'center', fontWeight: '800' }}

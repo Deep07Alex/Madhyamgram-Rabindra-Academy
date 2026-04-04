@@ -34,6 +34,7 @@ export type SSEEventType =
     | 'gallery:updated'
     | 'alumni:updated'
     | 'toppers:updated'
+    | 'focus'
     | 'resources:updated';
 
 type EventHandlers = Partial<Record<SSEEventType, (data: any) => void>>;
@@ -51,11 +52,11 @@ const useServerEvents = (handlers: EventHandlers) => {
         const dispatchEvent = (type: string, data: any) => {
             const now = Date.now();
             const lastTime = lastEventsRef.current[type] || 0;
-            
+
             // Deduplicate: Don't process same event multiple times within 250ms
             if (now - lastTime < 250) return;
             lastEventsRef.current[type] = now;
-            
+
             // Execute the handler from the latest render
             const handler = (handlersRef.current as any)[type];
             if (handler) {
@@ -66,18 +67,26 @@ const useServerEvents = (handlers: EventHandlers) => {
 
         // 1. WebSocket Listeners (Primary)
         const eventTypes = Object.keys(handlersRef.current) as SSEEventType[];
+        const wsHandlers: Record<string, (data: any) => void> = {};
+
         eventTypes.forEach(type => {
-            socket.on(type, (data: any) => dispatchEvent(type, data));
+            const h = (data: any) => dispatchEvent(type, data);
+            wsHandlers[type] = h;
+            socket.on(type, h);
         });
 
         // 2. SSE Listeners (Backup - Extremely reliable on Mobile/Hiding tabs)
         // Ensure absolute URL with /api prefix for production
         const baseUrl = getBaseUrl();
-        const sseUrl = baseUrl.includes('/api') 
-            ? `${baseUrl}/events` 
+        const sseUrl = baseUrl.includes('/api')
+            ? `${baseUrl}/events`
             : `${baseUrl}/api/events`;
-        
-        const eventSource = new EventSource(sseUrl, { withCredentials: true });
+
+        const storage = sessionStorage; // Use raw session storage to avoid dependency loops
+        const token = storage.getItem('token');
+        const sseUrlWithAuth = token ? `${sseUrl}?token=${token}` : sseUrl;
+
+        const eventSource = new EventSource(sseUrlWithAuth, { withCredentials: true });
 
         eventTypes.forEach(type => {
             eventSource.addEventListener(type, (e: any) => {
@@ -89,6 +98,15 @@ const useServerEvents = (handlers: EventHandlers) => {
                 }
             });
         });
+
+        // 3. Focus Recovery: Auto-refresh only when a specific 'focus' handler is active
+        const handleFocus = () => {
+            if ((handlersRef.current as any)['focus']) {
+                console.log('[LiveSync] App/Tab focused - triggering refresh via focus event');
+                dispatchEvent('focus', { focus: true });
+            }
+        };
+        window.addEventListener('focus', handleFocus);
 
         // Room Management (only if logged in)
         if (user) {
@@ -106,7 +124,10 @@ const useServerEvents = (handlers: EventHandlers) => {
 
         return () => {
             clearInterval(checkInterval);
-            eventTypes.forEach(type => socket.off(type));
+            window.removeEventListener('focus', handleFocus);
+            eventTypes.forEach(type => {
+                if (wsHandlers[type]) socket.off(type, wsHandlers[type]);
+            });
             eventSource.close();
             if (user) {
                 socket.emit('leave_room', `user:${user.id}`);
@@ -116,7 +137,7 @@ const useServerEvents = (handlers: EventHandlers) => {
                 }
             }
         };
-    }, [user, Object.keys(handlers).length]); // Only re-bind if number of events changes
+    }, [user?.id, JSON.stringify(Object.keys(handlers).sort())]); // Anchor connection to User ID for extreme stability
 };
 
 export default useServerEvents;

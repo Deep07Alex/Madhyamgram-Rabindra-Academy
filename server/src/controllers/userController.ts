@@ -44,7 +44,7 @@ export const getStudents = async (req: AuthRequest, res: Response) => {
         }
 
         const countQuery = query.replace('s.*, row_to_json(c.*) as class', 'COUNT(*) as total');
-        
+
         query += ` ORDER BY c.grade ASC, CAST(s."rollNumber" AS INTEGER) ASC NULLS LAST`;
         query += ` LIMIT $${paramCount++} OFFSET $${paramCount++}`;
         params.push(Number(limit), offset);
@@ -79,7 +79,7 @@ export const getTeachers = async (req: Request, res: Response) => {
     try {
         const { page = 1, limit = 20, search = '', filter = '' } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
-        
+
         // Staff filter logic: these designations are considered Non-Teaching/Special Staff
         const staffDesignations = ['NON-TEACHING STAFF', 'KARATE TEACHER', 'DANCE TEACHER'];
         const staffListStr = staffDesignations.map(d => `'${d}'`).join(',');
@@ -211,7 +211,7 @@ export const createClass = async (req: Request, res: Response) => {
             `INSERT INTO "Class" (id, name, grade, "monthlyFee") VALUES ($1, $2, $3, $4) RETURNING *`,
             [id, name, parseInt(grade as string), parseFloat(monthlyFee as string) || 0]
         );
-        
+
         // Add subjects if provided
         if (subjects && Array.isArray(subjects)) {
             for (const s of subjects) {
@@ -222,7 +222,7 @@ export const createClass = async (req: Request, res: Response) => {
                 );
             }
         }
-        
+
         await client.query('COMMIT');
         broadcast('class:updated', { id });
         res.status(201).json(newClassRes.rows[0]);
@@ -250,12 +250,12 @@ export const updateClass = async (req: Request, res: Response) => {
             await client.query('ROLLBACK');
             return res.status(404).json({ message: 'Class not found' });
         }
-        
+
         // Sync subjects: update existing, insert new, delete removed, and cascade name changes
         if (subjects && Array.isArray(subjects)) {
             const existingRes = await client.query(`SELECT id, name FROM "Subject" WHERE "classId" = $1`, [id]);
             const existingSubjects = existingRes.rows;
-            
+
             for (const s of subjects) {
                 if (!s.name) continue;
                 if (s.id) {
@@ -263,9 +263,9 @@ export const updateClass = async (req: Request, res: Response) => {
                     if (oldSub && oldSub.name !== s.name) {
                         // Cascade rename for safety. We only do this if the name string actually changed.
                         // (Use ON CONFLICT DO NOTHING or just simple updates since these tables reference string subjects)
-                        await client.query(`UPDATE "Result" SET subject = $1 WHERE "classId" = $2 AND subject = $3`, [s.name, id, oldSub.name]).catch(() => {});
-                        await client.query(`UPDATE "Homework" SET subject = $1 WHERE "classId" = $2 AND subject = $3`, [s.name, id, oldSub.name]).catch(() => {});
-                        await client.query(`UPDATE "Attendance" SET subject = $1 WHERE "classId" = $2 AND subject = $3`, [s.name, id, oldSub.name]).catch(() => {});
+                        await client.query(`UPDATE "Result" SET subject = $1 WHERE "classId" = $2 AND subject = $3`, [s.name, id, oldSub.name]).catch(() => { });
+                        await client.query(`UPDATE "Homework" SET subject = $1 WHERE "classId" = $2 AND subject = $3`, [s.name, id, oldSub.name]).catch(() => { });
+                        await client.query(`UPDATE "Attendance" SET subject = $1 WHERE "classId" = $2 AND subject = $3`, [s.name, id, oldSub.name]).catch(() => { });
                     }
                     await client.query(
                         `UPDATE "Subject" SET name = $1, "fullMarks" = $2 WHERE id = $3 AND "classId" = $4`,
@@ -278,7 +278,7 @@ export const updateClass = async (req: Request, res: Response) => {
                     );
                 }
             }
-            
+
             // Delete removed subjects
             const incomingIds = subjects.filter(s => s.id).map(s => s.id);
             const toDelete = existingSubjects.filter(ex => !incomingIds.includes(ex.id));
@@ -287,10 +287,10 @@ export const updateClass = async (req: Request, res: Response) => {
                 await client.query(`DELETE FROM "Subject" WHERE id = ANY($1)`, [deleteIds]);
             }
         } else if (subjects !== undefined) {
-             // If subjects was explicitly passed as empty array from frontend
-             await client.query(`DELETE FROM "Subject" WHERE "classId" = $1`, [id]);
+            // If subjects was explicitly passed as empty array from frontend
+            await client.query(`DELETE FROM "Subject" WHERE "classId" = $1`, [id]);
         }
-        
+
         await client.query('COMMIT');
         broadcast('class:updated', { id });
         res.json(result.rows[0]);
@@ -313,7 +313,7 @@ export const deleteStudent = async (req: Request, res: Response) => {
         // Explicitly clear fees (just in case cascade is missing)
         await db.query(`DELETE FROM "MonthlyFee" WHERE "studentId" = $1`, [id]);
         await db.query(`DELETE FROM "AdmissionFee" WHERE "studentId" = $1`, [id]);
-        
+
         await db.query(`DELETE FROM "Student" WHERE id = $1`, [id]);
         broadcast('user:deleted', { id, role: 'STUDENT' });
         res.json({ message: 'Student and related records deleted successfully' });
@@ -346,7 +346,7 @@ export const deleteAllStudents = async (req: Request, res: Response) => {
         // Explicitly clear all fee records
         await db.query(`DELETE FROM "MonthlyFee"`);
         await db.query(`DELETE FROM "AdmissionFee"`);
-        
+
         await db.query(`DELETE FROM "Student"`);
         broadcast('user:deleted', { all: true, role: 'STUDENT' });
         res.json({ message: 'All students and fee records deleted successfully' });
@@ -371,7 +371,7 @@ export const deleteClass = async (req: Request, res: Response) => {
 
 // Enroll a single student
 export const enrollStudent = async (req: Request, res: Response) => {
-    const { 
+    const {
         name, studentId, rollNumber, banglarSikkhaId, email, password, classId,
         guardianName, dob, address, phone
     } = req.body;
@@ -429,7 +429,7 @@ export const enrollStudent = async (req: Request, res: Response) => {
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
         `;
-        
+
         const result = await db.query(query, [
             id, finalId, hashedPassword, finalPassword, name, email || null,
             rollNumber, banglarSikkhaId || null, classId,
@@ -481,9 +481,9 @@ export const validateStudentEnrollment = async (req: Request, res: Response) => 
                 const numericPart = finalId.slice(2).replace(/\s/g, '');
                 finalId = `S-${numericPart}`;
             }
-            
+
             const check = await db.query(
-                `SELECT id FROM "Student" WHERE "studentId" = $1 ${currentStudentId ? 'AND id != $2' : ''} LIMIT 1`, 
+                `SELECT id FROM "Student" WHERE "studentId" = $1 ${currentStudentId ? 'AND id != $2' : ''} LIMIT 1`,
                 currentStudentId ? [finalId, currentStudentId] : [finalId]
             );
             return res.json({ exists: check.rows.length > 0, message: check.rows.length > 0 ? `Admission number (${(value as string).trim()}) already exist` : '' });
@@ -491,7 +491,7 @@ export const validateStudentEnrollment = async (req: Request, res: Response) => 
 
         if (type === 'banglarSikkhaId') {
             const check = await db.query(
-                `SELECT id FROM "Student" WHERE "banglarSikkhaId" = $1 ${currentStudentId ? 'AND id != $2' : ''} LIMIT 1`, 
+                `SELECT id FROM "Student" WHERE "banglarSikkhaId" = $1 ${currentStudentId ? 'AND id != $2' : ''} LIMIT 1`,
                 currentStudentId ? [value, currentStudentId] : [value]
             );
             return res.json({ exists: check.rows.length > 0, message: check.rows.length > 0 ? `Bangla Sikkhar id (${(value as string).trim()}) already exist` : '' });
@@ -522,38 +522,38 @@ export const validateTeacherEnrollment = async (req: Request, res: Response) => 
             const val = (value as string).trim();
             // Check both Teacher and Admin tables
             const checkTeacher = await db.query(
-                `SELECT id FROM "Teacher" WHERE "teacherId" = $1 ${currentTeacherId ? 'AND id != $2' : ''} LIMIT 1`, 
+                `SELECT id FROM "Teacher" WHERE "teacherId" = $1 ${currentTeacherId ? 'AND id != $2' : ''} LIMIT 1`,
                 currentTeacherId ? [val, currentTeacherId] : [val]
             );
-            
+
             const checkAdmin = await db.query(
-                `SELECT id FROM "Admin" WHERE "adminId" = $1 ${currentTeacherId ? 'AND id != $2' : ''} LIMIT 1`, 
+                `SELECT id FROM "Admin" WHERE "adminId" = $1 ${currentTeacherId ? 'AND id != $2' : ''} LIMIT 1`,
                 currentTeacherId ? [val, currentTeacherId] : [val]
             );
 
             const exists = checkTeacher.rows.length > 0 || checkAdmin.rows.length > 0;
-            return res.json({ 
-                exists, 
-                message: exists ? `${val} already present` : '' 
+            return res.json({
+                exists,
+                message: exists ? `${val} already present` : ''
             });
         }
 
         if (type === 'aadhar') {
             const val = (value as string).trim();
             const checkTeacher = await db.query(
-                `SELECT id FROM "Teacher" WHERE "aadhar" = $1 ${currentTeacherId ? 'AND id != $2' : ''} LIMIT 1`, 
+                `SELECT id FROM "Teacher" WHERE "aadhar" = $1 ${currentTeacherId ? 'AND id != $2' : ''} LIMIT 1`,
                 currentTeacherId ? [val, currentTeacherId] : [val]
             );
-            
+
             const checkAdmin = await db.query(
-                `SELECT id FROM "Admin" WHERE "aadhar" = $1 ${currentTeacherId ? 'AND id != $2' : ''} LIMIT 1`, 
+                `SELECT id FROM "Admin" WHERE "aadhar" = $1 ${currentTeacherId ? 'AND id != $2' : ''} LIMIT 1`,
                 currentTeacherId ? [val, currentTeacherId] : [val]
             );
 
             const exists = checkTeacher.rows.length > 0 || checkAdmin.rows.length > 0;
-            return res.json({ 
-                exists, 
-                message: exists ? `Aadhar number already exists` : '' 
+            return res.json({
+                exists,
+                message: exists ? `Aadhar number already exists` : ''
             });
         }
 
@@ -570,7 +570,7 @@ export const validateTeacherEnrollment = async (req: Request, res: Response) => 
  */
 export const updateStudent = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { 
+    const {
         name, studentId, rollNumber, banglarSikkhaId, email, password, photo,
         guardianName, dob, address, phone
     } = req.body;
@@ -585,9 +585,9 @@ export const updateStudent = async (req: Request, res: Response) => {
             params.push(name);
         }
         if (email !== undefined) {
-             const safeEmail = (email && email.trim()) ? email.trim() : null;
-             updateQuery += `"email" = $${paramCount++}, `;
-             params.push(safeEmail);
+            const safeEmail = (email && email.trim()) ? email.trim() : null;
+            updateQuery += `"email" = $${paramCount++}, `;
+            params.push(safeEmail);
         }
         if (studentId) {
             // Ensure uppercase S- prefix and trim
@@ -674,7 +674,7 @@ export const updateStudent = async (req: Request, res: Response) => {
 
         const updatedStudent = result.rows[0];
         // Emit live update events (Global broadcast handles all relevant views)
-        broadcast('profile_updated', { studentId: id });
+        broadcast('profile_updated', { studentId: id, updatedStudent });
 
         res.json({ message: 'Student updated successfully', student: updatedStudent });
     } catch (error: any) {
@@ -693,7 +693,7 @@ export const updateStudent = async (req: Request, res: Response) => {
  */
 export const updateTeacher = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { 
+    const {
         name, teacherId, phone, aadhar, designation, joiningDate, isTeaching, password,
         photo, address, dob, qualification, extraQualification, caste, email
     } = req.body;
@@ -725,14 +725,14 @@ export const updateTeacher = async (req: Request, res: Response) => {
             params.push(name);
         }
         if (email !== undefined) {
-             const safeEmail = (email && email.trim()) ? email.trim() : null;
-             updateQuery += `"email" = $${paramCount++}, `;
-             params.push(safeEmail);
+            const safeEmail = (email && email.trim()) ? email.trim() : null;
+            updateQuery += `"email" = $${paramCount++}, `;
+            params.push(safeEmail);
         }
         if (teacherId !== undefined) {
-             const safeTeacherId = (teacherId && teacherId.trim()) ? teacherId.trim() : null;
-             updateQuery += `"${idField}" = $${paramCount++}, `;
-             params.push(safeTeacherId);
+            const safeTeacherId = (teacherId && teacherId.trim()) ? teacherId.trim() : null;
+            updateQuery += `"${idField}" = $${paramCount++}, `;
+            params.push(safeTeacherId);
         }
         if (phone !== undefined) {
             const safePhone = (phone && phone.trim()) ? phone.trim() : null;
@@ -752,7 +752,7 @@ export const updateTeacher = async (req: Request, res: Response) => {
             updateQuery += `"joiningDate" = $${paramCount++}, `;
             params.push(joiningDate);
         }
-        
+
         // Only Teacher table has isTeaching
         if (isTeaching !== undefined && role === 'TEACHER') {
             updateQuery += `"isTeaching" = $${paramCount++}, `;
@@ -795,13 +795,13 @@ export const updateTeacher = async (req: Request, res: Response) => {
         params.push(id);
 
         const result = await db.query(updateQuery, params);
-        
+
         if (result.rowCount === 0) {
             return res.status(404).json({ message: 'Update failed' });
         }
 
         const updatedUser = result.rows[0];
-        broadcast('profile_updated', { teacherId: id, role });
+        broadcast('profile_updated', { teacherId: id, role, updatedUser });
         res.json({ message: 'Faculty updated successfully', teacher: updatedUser });
     } catch (error: any) {
         console.error('Update teacher error:', error);
@@ -846,9 +846,9 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
         const normalize = (val: any) => val ? val.toString().toUpperCase().replace(/[^A-Z0-9]/g, '').trim() : "";
 
         // Cache for classes to avoid redundant DB calls and handle auto-creation in-batch
-        const classes = (classesRes.rows as any[]).map(c => ({ ...c, norm: normalize(c.name) })).sort((a,b) => b.name.length - a.name.length);
+        const classes = (classesRes.rows as any[]).map(c => ({ ...c, norm: normalize(c.name) })).sort((a, b) => b.name.length - a.name.length);
         const existingStudentIds = new Set(existingIdsRes.rows.map(r => r.studentId.toUpperCase()));
-        
+
         const MANDATORY_HEADERS = [
             'CLASS',
             'Roll',
@@ -864,7 +864,7 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
         const getMappedClassId = (rawName: any) => {
             if (!rawName) return undefined;
             const normExcel = normalize(rawName);
-            
+
             // 1. Exact Match (Prioritize)
             let found = classes.find(c => c.norm === normExcel);
             if (found) return found.id;
@@ -891,21 +891,21 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
         for (const sheetName of workbook.SheetNames) {
             const worksheet = workbook.Sheets[sheetName];
             if (!worksheet) continue;
-            
+
             const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
             if (rawData.length === 0) continue;
-            
+
             const headersRaw = (rawData[0] as any[]).map(h => (h || "").toString().replace(/\s+/g, ' ').trim()).filter(h => h !== "");
             const headersNorm = headersRaw.map(h => h.toUpperCase());
             const mandatoryNorm = MANDATORY_HEADERS.map(h => h.toUpperCase());
-            
+
             const missing = mandatoryNorm.filter(h => !headersNorm.includes(h));
             const extra = headersNorm.filter(h => !mandatoryNorm.includes(h));
-            
+
             // If this sheet doesn't even have the core headers, skip it (could be Sheet2/3)
             // But if it HAS headers but they are wrong (extra/missing), we should decide: skip or error?
             // Safer to skip sheets that don't look like our data at all.
-            if (missing.length === mandatoryNorm.length) continue; 
+            if (missing.length === mandatoryNorm.length) continue;
 
             // If it LOOKS like a student sheet but format is wrong, error out.
             if (missing.length > 0 || extra.length > 0) {
@@ -917,7 +917,7 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
             if (!data || data.length === 0) continue;
 
             const usedRollsInSheet = new Set<string>();
-            let lastValidClassId = ""; 
+            let lastValidClassId = "";
             let lastValidClassName = "";
 
             for (const [index, row] of (data as any[]).entries()) {
@@ -933,7 +933,7 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
                         if (cellVal && cellVal.length > 2 && cellVal.length < 25) {
                             const normCell = normalize(cellVal);
                             if (normCell === 'CLASS' || normCell === 'GRADE' || normCell === 'SL') continue;
-                            
+
                             const detectedId = getMappedClassId(cellVal);
                             if (detectedId) {
                                 lastValidClassId = detectedId;
@@ -952,7 +952,7 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
 
                     // SKIP HEADING/STRUCTURAL ROWS
                     if (!studentName || studentName.toUpperCase() === 'NAME' || !admissionNoRaw) {
-                        continue; 
+                        continue;
                     }
 
                     if (!classId) {
@@ -962,15 +962,15 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
                     let rollNumber = (row['Roll'] || "").toString().trim() || '0';
                     const banglarSikkhaId = (row['STUDENT ID IN BANGLAR SHIKSHA PORTAL'] || "").toString().trim();
 
-                    let admissionNo = admissionNoRaw.toString().replace(/[^0-9]/g, ''); 
+                    let admissionNo = admissionNoRaw.toString().replace(/[^0-9]/g, '');
                     if (!admissionNo) throw new Error(`Admission No "${admissionNoRaw}" must contain digits.`);
 
                     let studentId = `S-${admissionNo}`;
                     const upperStudentId = studentId.toUpperCase();
-                    
+
                     if (existingStudentIds.has(upperStudentId)) {
                         results.skipped++;
-                        continue; 
+                        continue;
                     }
 
                     const rollKey = `${classId}-${rollNumber}`;
@@ -986,6 +986,11 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
                     const transformedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
                     const password = `${transformedName}@${admissionNo}`;
 
+                    const guardianName = (row['GUARDIAN NAME'] || row['FATHER NAME'] || "").toString().trim();
+                    const phone = (row['PHONE'] || row['MOBILE'] || "").toString().trim();
+                    const address = (row['ADDRESS'] || "").toString().trim();
+                    const dobRaw = (row['DOB'] || row['DATE OF BIRTH'] || "").toString().trim();
+
                     validStudents.push({
                         id: crypto.randomUUID(),
                         studentId,
@@ -993,7 +998,11 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
                         name: studentName,
                         rollNumber,
                         classId,
-                        banglarSikkhaId: (banglarSikkhaId && banglarSikkhaId !== "0") ? banglarSikkhaId : null
+                        banglarSikkhaId: (banglarSikkhaId && banglarSikkhaId !== "0") ? banglarSikkhaId : null,
+                        guardianName,
+                        phone,
+                        address,
+                        dob: dobRaw ? new Date(dobRaw).toISOString().split('T')[0] : null
                     });
 
                     existingStudentIds.add(upperStudentId);
@@ -1033,9 +1042,9 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
                     const base = idx * 12;
                     placeholders.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12})`);
                     values.push(
-                        st.id, st.studentId, st.hashedPassword, st.password, 
+                        st.id, st.studentId, st.hashedPassword, st.password,
                         st.name, st.rollNumber, st.classId, st.banglarSikkhaId,
-                        null, null, null, null
+                        st.guardianName || null, st.dob || null, st.address || null, st.phone || null
                     );
                 });
 
@@ -1050,10 +1059,10 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
                         const markerId = staffCheck.rows[0].id;
                         const attendanceValues: any[] = [];
                         const attendancePlaceholders: string[] = [];
-                        
+
                         validStudents.forEach((st, idx) => {
                             const base = idx * 5;
-                            attendancePlaceholders.push(`($${base+1}, $${base+2}, 'PRESENT', $${base+3}, $${base+4}, $${base+5}, 'FULL DAY SESSION')`);
+                            attendancePlaceholders.push(`($${base + 1}, $${base + 2}, 'PRESENT', $${base + 3}, $${base + 4}, $${base + 5}, 'FULL DAY SESSION')`);
                             attendanceValues.push(crypto.randomUUID(), todayDate, st.id, markerId, st.classId);
                         });
 
@@ -1109,7 +1118,7 @@ export const updateUserPassword = async (req: Request, res: Response) => {
         `;
 
         const result = await db.query(updateQuery, [hashedPassword, password, id]);
-        
+
         if (result.rowCount === 0 && type === 'teacher') {
             // Try updating Admin table
             const adminUpdateQuery = `
@@ -1152,7 +1161,7 @@ export const downloadStudentCredentials = async (req: AuthRequest, res: Response
         query += ` ORDER BY c.grade ASC, CAST(s."rollNumber" AS INTEGER) ASC`;
 
         const studentsRes = await db.query(query, params);
-        
+
         const data = studentsRes.rows.map(row => ({
             'Class': row.className,
             'Roll Number': row.rollNumber,
@@ -1164,9 +1173,9 @@ export const downloadStudentCredentials = async (req: AuthRequest, res: Response
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(data);
         XLSX.utils.book_append_sheet(wb, ws, "Student Credentials");
-        
+
         const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-        
+
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', 'attachment; filename=student_credentials.xlsx');
         res.send(buffer);

@@ -28,6 +28,8 @@ export const addClient = (res: Response, userId?: string, role?: string) => {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no', // Critical: Prevents Nginx from buffering the live stream
+        'Content-Encoding': 'none'  // Critical: Prevents compression from buffering the live stream
     });
 
     res.write('retry: 10000\n\n');

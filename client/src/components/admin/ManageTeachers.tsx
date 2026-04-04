@@ -31,11 +31,10 @@ const ManageTeachers = () => {
     const { showToast } = useToast();
     const [searchQuery, setSearchQuery] = useState('');
     const [page, setPage] = useState(1);
-    const debouncedSearch = useDebounce(searchQuery, 500);
 
     const { data: teachersData, refetch: refreshTeachers } = useFetch<any>('/users/teachers', {
         params: {
-            search: debouncedSearch,
+            search: searchQuery,
             page: page,
             limit: 20
         }
@@ -51,12 +50,32 @@ const ManageTeachers = () => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: '' });
 
-    useServerEvents({ 'profile_updated': refreshTeachers });
+    useServerEvents({ 
+        'profile_updated': (data: any) => {
+            refreshTeachers();
+            // Live-Sync: If we have an edit modal open for this faculty member on ANOTHER device, sync the fields!
+            if (isEditModalOpen && selectedTeacher?.id === data.teacherId && data.updatedUser) {
+                const u = data.updatedUser;
+                setEditData({
+                    ...u,
+                    password: '', 
+                    joiningDate: u.joiningDate ? new Date(u.joiningDate).toISOString().split('T')[0] : '',
+                    // Ensure optional fields are handled correctly
+                    email: u.email || '',
+                    phone: u.phone || '',
+                    aadhar: u.aadhar || '',
+                    address: u.address || '',
+                    qualification: u.qualification || '',
+                    extraQualification: u.extraQualification || ''
+                });
+            }
+        }
+    });
 
     // Reset to page 1 when search changes
     useEffect(() => {
         setPage(1);
-    }, [debouncedSearch]);
+    }, [searchQuery]);
 
     const [newUser, setNewUser] = useState({
         name: '', email: '', teacherId: '', password: '',

@@ -27,19 +27,18 @@ const ManageStudents = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedClassId, setSelectedClassId] = useState<string>('');
     const [page, setPage] = useState(1);
-    const debouncedSearch = useDebounce(searchQuery, 500);
 
     const { data: studentsData, refetch: refreshStudents } = useFetch<any>('/users/students', {
-        params: { 
-            classId: selectedClassId, 
-            search: debouncedSearch,
+        params: {
+            classId: selectedClassId,
+            search: searchQuery,
             page: page,
             limit: 20
         }
     });
 
     const { data: classesData } = useFetch<any[]>('/users/classes');
-    
+
     // Handle new response format
     const students = studentsData?.students || [];
     const totalStudents = studentsData?.total || 0;
@@ -167,7 +166,27 @@ const ManageStudents = () => {
         }
     }, [classes]);
 
-    useServerEvents({ 'profile_updated': refreshStudents });
+    useServerEvents({
+        'profile_updated': (data: any) => {
+            refreshStudents();
+            // Live-Sync: If someone else edits the student we are currently looking at, update our modal too!
+            if (isEditModalOpen && selectedStudent?.id === data.studentId && data.updatedStudent) {
+                const s = data.updatedStudent;
+                setEditData({
+                    ...s,
+                    password: '', 
+                    dob: s.dob ? new Date(s.dob).toISOString().split('T')[0] : '',
+                    email: s.email || '',
+                    guardianName: s.guardianName || '',
+                    phone: s.phone || '',
+                    address: s.address || '',
+                    banglarSikkhaId: s.banglarSikkhaId || ''
+                });
+            }
+        },
+        'user:created': () => refreshStudents(),
+        'user:deleted': () => refreshStudents()
+    });
 
     const handleCreateStudent = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -179,10 +198,10 @@ const ManageStudents = () => {
 
             await api.post('/users/students/enroll', payload);
             showToast('Student enrolled successfully', 'success');
-            setNewUser({ 
-                password: '', name: '', email: '', rollNumber: '', studentId: '', 
+            setNewUser({
+                password: '', name: '', email: '', rollNumber: '', studentId: '',
                 banglarSikkhaId: '', classId: classes[0]?.id || '', photo: '',
-                guardianName: '', dob: '', address: '', phone: '' 
+                guardianName: '', dob: '', address: '', phone: ''
             });
             refreshStudents();
         } catch (error: any) {
@@ -303,11 +322,11 @@ const ManageStudents = () => {
                 params: { classId: selectedClassId },
                 responseType: 'blob'
             });
-            
+
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            const className = selectedClassId 
+            const className = selectedClassId
                 ? (classes.find((c: any) => c.id === selectedClassId)?.name || 'Class')
                 : 'All_Classes';
             link.setAttribute('download', `Student_Credentials_${className}.xlsx`);
@@ -324,7 +343,7 @@ const ManageStudents = () => {
     // Reset to page 1 when search or class changes
     useEffect(() => {
         setPage(1);
-    }, [debouncedSearch, selectedClassId]);
+    }, [searchQuery, selectedClassId]);
 
     return (
         <div className="manage-section">
@@ -493,7 +512,7 @@ const ManageStudents = () => {
 
                         return (
                             <div className="form-group">
-                                <label>Banglar Sikkha Portal ID</label>
+                                <label>Banglar Sikkha Portal ID (Optional)</label>
                                 <input
                                     type="text"
                                     placeholder="Enter Portal ID"
@@ -584,15 +603,15 @@ const ManageStudents = () => {
                             icon={<School size={16} />}
                             placeholder="All Classes"
                         />
-                        <button 
+                        <button
                             onClick={downloadCredentials}
                             className="btn-secondary"
-                            style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '8px', 
-                                padding: '10px 16px', 
-                                fontSize: '0.85rem', 
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '10px 16px',
+                                fontSize: '0.85rem',
                                 fontWeight: 700,
                                 background: 'var(--primary-bold)',
                                 color: 'white',
@@ -622,6 +641,56 @@ const ManageStudents = () => {
                         </div>
                     </div>
                 </div>
+
+                {totalPages > 1 && (
+                    <div style={{
+                        display: 'flex', justifyContent: 'center', alignItems: 'center',
+                        gap: '16px',
+                        padding: '12px 20px', borderRadius: 'var(--radius-lg)',
+                        background: 'transparent',
+                        marginBottom: '16px'
+                    }}>
+                        <button
+                            onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }}
+                            disabled={page === 1}
+                            style={{
+                                padding: '8px 16px', borderRadius: '30px',
+                                border: '1px solid var(--border-soft)',
+                                background: 'var(--bg-card)',
+                                cursor: page === 1 ? 'not-allowed' : 'pointer',
+                                opacity: page === 1 ? 0.3 : 1,
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                fontSize: '0.8rem', fontWeight: '800', color: 'var(--text-main)',
+                                transition: 'all 0.2s',
+                                boxShadow: 'var(--shadow-sm)'
+                            }}
+                        >
+                            <ChevronLeft size={16} /> Previous
+                        </button>
+
+                        <span style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: '800', margin: '0 8px' }}>
+                            Page <span style={{ color: 'var(--primary-bold)' }}>{page}</span> of {totalPages}
+                        </span>
+
+                        <button
+                            onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }}
+                            disabled={page === totalPages}
+                            style={{
+                                padding: '8px 16px', borderRadius: '30px',
+                                border: '1px solid var(--border-soft)',
+                                background: 'var(--bg-card)',
+                                cursor: page === totalPages ? 'not-allowed' : 'pointer',
+                                opacity: page === totalPages ? 0.3 : 1,
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                fontSize: '0.8rem', fontWeight: '800', color: 'var(--text-main)',
+                                transition: 'all 0.2s',
+                                boxShadow: 'var(--shadow-sm)'
+                            }}
+                        >
+                            Next <ChevronRight size={16} />
+                        </button>
+                    </div>
+                )}
 
                 <div className="table-responsive">
                     <table className="data-table">

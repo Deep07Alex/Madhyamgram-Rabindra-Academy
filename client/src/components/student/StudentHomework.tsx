@@ -46,6 +46,7 @@ const StudentHomework = () => {
 
     // Live: refresh on assignment changes and on own submission
     useServerEvents({
+        'focus': fetchAssignments,
         'homework_created': fetchAssignments,
         'homework_deleted': (data: any) => {
             fetchAssignments();
@@ -56,6 +57,8 @@ const StudentHomework = () => {
             }
         },
         'homework_submitted': fetchAssignments,
+        'homework_graded': fetchAssignments,
+        'homework_updated': fetchAssignments,
     });
 
     const handleSubmit = async (e: React.FormEvent) => {

@@ -1,24 +1,52 @@
-import { Outlet, useNavigate } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { LogOut, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
 import { useAuth } from '../../context/AuthContext';
 
+// Global scroll position cache (simple outside-component state)
+const scrollCache: Record<string, number> = {};
+
 export default function MobileDashboardLayout() {
     const navigate = useNavigate();
+    const location = useLocation();
     const { logout } = useAuth();
     const { theme, toggleTheme } = useTheme();
+    const scrollRef = useRef<HTMLDivElement>(null);
 
     const handleLogout = () => {
         logout();
         navigate('/');
     };
 
+    // Scroll Persistence Logic
+    useEffect(() => {
+        const currentPath = location.pathname;
+        const container = scrollRef.current;
 
+        // Restore scroll on mount/path change
+        if (container && scrollCache[currentPath]) {
+            container.scrollTop = scrollCache[currentPath];
+        }
+
+        const handleScroll = () => {
+            if (container) {
+                scrollCache[currentPath] = container.scrollTop;
+            }
+        };
+
+        // Save scroll position when navigating away or scrolling
+        container?.addEventListener('scroll', handleScroll);
+
+        return () => {
+            container?.removeEventListener('scroll', handleScroll);
+        };
+    }, [location.pathname]);
 
     return (
         <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-main)' }}>
-            {/* Header */}
+            {/* Header stays fixed at top */}
             <div style={{ 
                 padding: '20px 24px', 
                 backgroundColor: 'var(--primary)', 
@@ -82,8 +110,12 @@ export default function MobileDashboardLayout() {
                 </div>
             </div>
 
-            {/* Scrollable Content Area */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+            {/* Scrollable Content Area with Persistence Ref */}
+            <div 
+                id="mobile-scroll-container"
+                ref={scrollRef}
+                style={{ flex: 1, overflowY: 'auto', padding: '20px' }}
+            >
                 <Outlet />
             </div>
         </div>

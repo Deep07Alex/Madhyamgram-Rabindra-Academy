@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, UserCircle, ArrowLeft, Loader2, Phone, Plus, UserPlus, Trash2, Edit, Eye, EyeOff } from 'lucide-react';
+import { Search, UserCircle, ArrowLeft, Loader2, Phone, Plus, UserPlus, Trash2, Edit, Eye, EyeOff, Save, Fingerprint, MapPin, GraduationCap, Calendar, Users as UsersIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api, { getBaseUrl } from '../../../services/api';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { useToast } from '../../../context/ToastContext';
 import PhotoUpload from '../../../components/common/PhotoUpload';
 import ConfirmModal from '../../../components/common/ConfirmModal';
+import Modal from '../../../components/common/Modal';
+import useServerEvents from '../../../hooks/useServerEvents';
 
 const DESIGNATIONS = ['PRINCIPAL', 'HEAD MISTRESS', 'A. TEACHER', 'KARATE TEACHER', 'DANCE TEACHER', 'NON-TEACHING STAFF'];
 const CASTES = ['GENERAL', 'SC', 'ST', 'OBC-A', 'OBC-B'];
@@ -19,7 +21,6 @@ export default function MobileManageTeachers() {
     
     // Directory State
     const [searchQuery, setSearchQuery] = useState('');
-    const debouncedSearch = useDebounce(searchQuery, 400);
     const [teachers, setTeachers] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
@@ -27,6 +28,31 @@ export default function MobileManageTeachers() {
     const [totalPages, setTotalPages] = useState(1);
     const [totalTeachers, setTotalTeachers] = useState(0);
     const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; id: string }>({ isOpen: false, id: '' });
+    const [selectedTeacher, setSelectedTeacher] = useState<any | null>(null);
+    const [editData, setEditData] = useState<any>({});
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isUpdating, setIsUpdating] = useState(false);
+
+    // Live Updates
+    useServerEvents({ 
+        'profile_updated': (data: any) => {
+            fetchTeachers();
+            if (isEditModalOpen && selectedTeacher?.id === data.teacherId && data.updatedUser) {
+                const u = data.updatedUser;
+                setEditData({
+                    ...u,
+                    password: '', 
+                    joiningDate: u.joiningDate ? new Date(u.joiningDate).toISOString().split('T')[0] : '',
+                    email: u.email || '',
+                    phone: u.phone || '',
+                    aadhar: u.aadhar || '',
+                    address: u.address || '',
+                    qualification: u.qualification || '',
+                    extraQualification: u.extraQualification || ''
+                });
+            }
+        }
+    });
 
     // Enroll State
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,7 +91,7 @@ export default function MobileManageTeachers() {
     const fetchTeachers = async () => {
         setIsLoading(true);
         try {
-            const res = await api.get('/users/teachers', { params: { search: debouncedSearch, page: page, limit: 20 } });
+            const res = await api.get('/users/teachers', { params: { search: searchQuery, page: page, limit: 20 } });
             setTeachers(res.data?.teachers || []);
             setTotalPages(Math.ceil((res.data?.total || 0) / 20));
             setTotalTeachers(res.data?.total || 0);
@@ -78,11 +104,38 @@ export default function MobileManageTeachers() {
 
     useEffect(() => {
         if (activeTab === 'directory') fetchTeachers();
-    }, [debouncedSearch, activeTab, page]);
+    }, [searchQuery, activeTab, page]);
 
     useEffect(() => {
         setPage(1);
-    }, [debouncedSearch]);
+    }, [searchQuery]);
+
+    const handleUpdateTeacher = async () => {
+        if (!selectedTeacher) return;
+        setIsUpdating(true);
+        try {
+            const { password, plainPassword, id, ...updatePayload } = editData;
+            
+            // Auto-generate password on update as requested
+            const cleanName = (updatePayload.name || '').trim().toLowerCase().replace(/\s+/g, '');
+            const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+            const aadhar = updatePayload.aadhar || '';
+            const teacherId = updatePayload.teacherId || '';
+            const suffixDigits = (aadhar && aadhar.length >= 4) ? aadhar.slice(-4) : teacherId.replace(/\D/g, '').slice(-4);
+            updatePayload.password = `${capitalizedName}@${suffixDigits || '0000'}`;
+
+            await api.patch(`/users/teachers/${selectedTeacher.id}`, updatePayload);
+            showToast('Faculty member updated successfully', 'success');
+            setIsEditModalOpen(false);
+            setSelectedTeacher(null);
+            fetchTeachers();
+        } catch (error: any) {
+            console.error('Failed to update faculty:', error);
+            showToast(error.response?.data?.message || 'Failed to update faculty', 'error');
+        } finally {
+            setIsUpdating(false);
+        }
+    };
 
     const handleCreateTeacher = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -205,7 +258,11 @@ export default function MobileManageTeachers() {
                                             )}
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                            <button onClick={() => alert('Editing via mobile coming soon.')} style={{ background: 'var(--warning-soft)', color: 'var(--warning)', border: 'none', padding: '8px', borderRadius: '8px' }}><Edit size={14} /></button>
+                                            <button onClick={() => {
+                                                setSelectedTeacher(teacher);
+                                                setEditData({ ...teacher });
+                                                setIsEditModalOpen(true);
+                                            }} style={{ background: 'var(--warning-soft)', color: 'var(--warning)', border: 'none', padding: '8px', borderRadius: '8px' }}><Edit size={14} /></button>
                                             <button onClick={() => setDeleteModal({ isOpen: true, id: teacher.id })} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', padding: '8px', borderRadius: '8px' }}><Trash2 size={14} /></button>
                                         </div>
                                     </div>
@@ -330,6 +387,88 @@ export default function MobileManageTeachers() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            <Modal
+                isOpen={isEditModalOpen && !!selectedTeacher}
+                onClose={() => { setIsEditModalOpen(false); setSelectedTeacher(null); }}
+                title="Edit Faculty Profile"
+                footer={<button onClick={handleUpdateTeacher} disabled={isUpdating} style={{ width: '100%', background: 'var(--primary-bold)', color: 'white', padding: '16px', borderRadius: '12px', border: 'none', fontWeight: '800', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', fontSize: '15px' }}>{isUpdating ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />} Update Profile</button>}
+            >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '4px' }}>
+                    <div style={{ background: 'var(--bg-soft)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border-soft)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                        <PhotoUpload value={editData.photo || ''} onChange={(url: string) => setEditData({ ...editData, photo: url })} label="Change Photo" uploadPath="/uploads/teacher-photo" />
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)' }}>{editData.name}</div>
+                            <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--primary-bold)', marginTop: '2px' }}>{editData.teacherId}</div>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary-bold)' }}>
+                            <UsersIcon size={16} />
+                            <span style={{ fontSize: '13px', fontWeight: '800' }}>Personal & Professional</span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Full Name *</label>
+                            <input type="text" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.name || ''} onChange={e => setEditData({ ...editData, name: e.target.value })} required />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Email Address</label>
+                                <input type="email" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.email || ''} onChange={e => setEditData({ ...editData, email: e.target.value })} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Contact No *</label>
+                                <input type="tel" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.phone || ''} onChange={e => setEditData({ ...editData, phone: e.target.value })} required />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}><Fingerprint size={12} /> Aadhar No</label>
+                                <input type="text" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.aadhar || ''} onChange={e => setEditData({ ...editData, aadhar: e.target.value })} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Designation *</label>
+                                <select style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.designation || ''} onChange={e => setEditData({ ...editData, designation: e.target.value })}>
+                                    {DESIGNATIONS.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Caste Category</label>
+                                <select style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.caste || 'GENERAL'} onChange={e => setEditData({ ...editData, caste: e.target.value })}>
+                                    {CASTES.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={12} /> Joining Date</label>
+                                <input type="date" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.joiningDate ? new Date(editData.joiningDate).toISOString().split('T')[0] : ''} onChange={e => setEditData({ ...editData, joiningDate: e.target.value })} />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={12} /> Residential Address</label>
+                            <textarea style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none', minHeight: '80px', resize: 'none' }} value={editData.address || ''} onChange={e => setEditData({ ...editData, address: e.target.value })} />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}><GraduationCap size={12} /> Academic Qual.</label>
+                                <input type="text" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.qualification || ''} onChange={e => setEditData({ ...editData, qualification: e.target.value })} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Extra Certs</label>
+                                <input type="text" style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border-soft)', background: 'var(--bg-main)', color: 'var(--text-main)', outline: 'none' }} value={editData.extraQualification || ''} onChange={e => setEditData({ ...editData, extraQualification: e.target.value })} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Modal>
 
             <ConfirmModal 
                 isOpen={deleteModal.isOpen} 

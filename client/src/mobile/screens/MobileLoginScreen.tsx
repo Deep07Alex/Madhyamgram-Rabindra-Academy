@@ -254,7 +254,7 @@ export default function MobileLoginScreen() {
                             cursor: 'pointer'
                         }}
                     >
-                        {isLoading ? <Loader2 className="animate-spin" size={22} /> : getButtonText()} {'>'}
+                        {isLoading ? <Loader2 className="animate-spin" size={22} /> : getButtonText()}
                     </motion.button>
                 </motion.form>
 

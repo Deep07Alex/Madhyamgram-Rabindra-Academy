@@ -102,8 +102,9 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
             ) as session_union
         `;
         const sessionParams: any[] = [];
+        sessionQuery += ` WHERE EXTRACT(DOW FROM date) != 0 `;
         if (startDate && endDate) {
-            sessionQuery += ` WHERE date >= $1 AND date <= $2 `;
+            sessionQuery += ` AND date >= $1 AND date <= $2 `;
             sessionParams.push(new Date(startDate as string).toLocaleDateString('en-CA'));
             sessionParams.push(new Date(endDate as string).toLocaleDateString('en-CA'));
         }
@@ -113,8 +114,10 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
         const sessionDates = allSessionsRes.rows.map(r => new Date(r.session_date).toLocaleDateString('en-CA'));
 
         // 2. Add today's date if not already in session dates (Virtual Presence for Today)
-        const todayStr = new Date().toLocaleDateString('en-CA');
-        if (!sessionDates.includes(todayStr)) {
+        // 2. Add today's date if not Sunday and not already in session dates
+        const today = new Date();
+        const todayStr = today.toLocaleDateString('en-CA');
+        if (today.getDay() !== 0 && !sessionDates.includes(todayStr)) {
             sessionDates.unshift(todayStr); // Add today as a potential session date
         }
         const totalSessions = sessionDates.length;
@@ -157,7 +160,7 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
         if (!targetStudentId && (!targetStudentIds || targetStudentIds.length === 0)) {
             return res.json({
                 records: realRecords,
-                totalSessions: realRecords.length
+                totalSessions: totalSessions
             });
         }
 
@@ -177,13 +180,13 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
                 return recordMap.get(dateStr);
             }
 
-            // Generate virtual PRESENT record
+            // Generate virtual ABSENT record
             return {
                 id: `virtual-${dateStr}`,
                 date: dateStr,
-                status: 'PRESENT',
+                status: 'ABSENT',
                 studentId: targetStudentId,
-                subject: 'Full Day Session',
+                subject: 'No Record',
                 isVirtual: true // Flag for debugging if needed
             };
         }).filter(Boolean);

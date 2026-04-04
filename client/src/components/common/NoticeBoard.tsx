@@ -9,6 +9,7 @@
 import { useState, useEffect } from 'react';
 import { BellRing, Calendar, Globe, Lock, Megaphone } from 'lucide-react';
 import api from '../../services/api';
+import useServerEvents from '../../hooks/useServerEvents';
 
 interface Notice {
     id: string;
@@ -22,6 +23,11 @@ interface Notice {
 const NoticeBoard = () => {
     const [notices, setNotices] = useState<Notice[]>([]);
     const [loading, setLoading] = useState(true);
+
+    useServerEvents({
+        'new_notice': () => fetchNotices(),
+        'notice_deleted': () => fetchNotices()
+    });
 
     useEffect(() => {
         fetchNotices();

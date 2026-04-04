@@ -120,6 +120,7 @@ const TeacherDashboard = () => {
     }, [pathname, unreadCount]);
 
     useServerEvents({
+        'focus': () => refreshData(true),
         'attendance:updated': () => refreshData(true),
         'new_notice': () => refreshData(true),
         'system:config_updated': (data: any) => {

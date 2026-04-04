@@ -89,13 +89,13 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
                                 SELECT date::date FROM "Attendance"
                                 UNION
                                 SELECT date::date FROM "TeacherAttendance"
-                            ) as all_dates) as global_sessions,
-                            (SELECT COUNT(*) FROM "Attendance" WHERE "studentId" = $1 AND status = 'ABSENT') as student_absences
+                            ) as all_dates WHERE EXTRACT(DOW FROM date) != 0) as global_sessions,
+                            (SELECT COUNT(*) FROM "Attendance" WHERE "studentId" = $1 AND status = 'PRESENT') as student_present
                     )
                     SELECT 
                         CASE 
                             WHEN global_sessions = 0 THEN 100
-                            ELSE GREATEST(0, (1.0 - (student_absences::float / GREATEST(global_sessions, 1))) * 100)
+                            ELSE (student_present::float / GREATEST(global_sessions, 1)) * 100
                         END as rate
                     FROM Stats
                 `, [userId]),
@@ -156,8 +156,8 @@ export const getUnifiedDashboardData = async (req: AuthRequest, res: Response) =
                                 SELECT date::date FROM "Attendance"
                                 UNION
                                 SELECT date::date FROM "TeacherAttendance"
-                            ) as all_dates) as global_sessions,
-                            (SELECT COUNT(*) FROM "Attendance" WHERE "studentId" = $1 AND status = 'ABSENT') as student_absences,
+                            ) as all_dates WHERE EXTRACT(DOW FROM date) != 0) as global_sessions,
+                            (SELECT COUNT(*) FROM "Attendance" WHERE "studentId" = $1 AND status = 'PRESENT') as student_present,
                             (SELECT AVG(marks / NULLIF("totalMarks", 0) * 100) FROM "Result" WHERE "studentId" = $1) as average_grade,
                             (SELECT COUNT(DISTINCT subject) FROM (
                                 SELECT subject FROM "Result" WHERE "studentId" = $1
@@ -166,7 +166,7 @@ export const getUnifiedDashboardData = async (req: AuthRequest, res: Response) =
                             ) as subjects) as active_subjects
                     )
                     SELECT 
-                        CASE WHEN global_sessions = 0 THEN 100 ELSE GREATEST(0, (1.0 - (student_absences::float / GREATEST(global_sessions, 1))) * 100) END as attendance_rate,
+                        CASE WHEN global_sessions = 0 THEN 100 ELSE (student_present::float / GREATEST(global_sessions, 1)) * 100 END as attendance_rate,
                         average_grade,
                         active_subjects
                     FROM Stats

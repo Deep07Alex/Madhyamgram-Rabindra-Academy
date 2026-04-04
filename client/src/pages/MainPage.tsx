@@ -8,9 +8,11 @@
  * - Admission information
  * - Responsive navigation
  */
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, memo, useCallback } from "react";
+import { App } from "@capacitor/app";
 import "./MainPage.css";
 import api, { getBaseUrl } from "../services/api";
+import { Capacitor } from "@capacitor/core";
 import ThemeToggle from "../components/common/ThemeToggle";
 import { useAuth } from "../context/AuthContext";
 import useServerEvents from "../hooks/useServerEvents";
@@ -39,34 +41,34 @@ function MainPage() {
   const [toppers, setToppers] = useState<any[]>([]);
   const [topperSession, setTopperSession] = useState("2025-26");
 
-  const fetchNotices = async () => {
+  const fetchNotices = useCallback(async () => {
     try {
       const res = await api.get("/notices");
       setNotices(res.data.filter((n: any) => n.type === "PUBLIC"));
     } catch (err) {
       console.error("Failed to fetch notices:", err);
     }
-  };
+  }, []);
 
-  const fetchHeroBanner = async () => {
+  const fetchHeroBanner = useCallback(async () => {
     try {
       const res = await api.get("/system/hero-banner");
       if (res.data.url) setHeroBanner(res.data.url);
     } catch (err) {
       console.error("Failed to fetch hero banner:", err);
     }
-  };
+  }, []);
 
-  const fetchFestivalBanners = async () => {
+  const fetchFestivalBanners = useCallback(async () => {
     try {
       const res = await api.get("/system/festival-banner/all");
       if (res.data.banners) setFestivalBanners(res.data.banners);
     } catch (err) {
       console.error("Failed to fetch festival banners:", err);
     }
-  };
+  }, []);
 
-  const fetchToppers = async () => {
+  const fetchToppers = useCallback(async () => {
     try {
       const res = await api.get("/toppers");
       if (res.data.students) setToppers(res.data.students);
@@ -74,9 +76,9 @@ function MainPage() {
     } catch (err) {
       console.error("Failed to fetch toppers:", err);
     }
-  };
+  }, []);
 
-  const fetchGallery = async () => {
+  const fetchGallery = useCallback(async () => {
     try {
       const res = await api.get("/gallery");
       if (Array.isArray(res.data)) {
@@ -88,25 +90,25 @@ function MainPage() {
     } catch (err) {
       console.error("Failed to fetch gallery:", err);
     }
-  };
+  }, []);
 
-  const fetchResources = async () => {
+  const fetchResources = useCallback(async () => {
     try {
       const res = await api.get("/resources");
       setResources(res.data);
     } catch (err) {
       console.error("Failed to fetch resources:", err);
     }
-  };
+  }, []);
 
-  const fetchAlumni = async () => {
+  const fetchAlumni = useCallback(async () => {
     try {
       const res = await api.get("/alumni");
       setAlumni(res.data);
     } catch (err) {
       console.error("Failed to fetch alumni:", err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     // Fetch all dynamic assets in parallel to optimize initial load
@@ -158,6 +160,25 @@ function MainPage() {
     }
   });
 
+  // Hardware Back Button:
+  // If the mobile menu is open, the back button should close it first.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const backListener = App.addListener('backButton', () => {
+      if (navOpen) {
+        setNavOpen(false);
+      } else {
+        // If menu is closed, let the app naturally exit or go back
+        window.history.back();
+      }
+    });
+
+    return () => {
+      backListener.then(l => l.remove());
+    };
+  }, [navOpen]);
+
   return (
     <div className="main-page-wrapper">
       <Navbar open={navOpen} onToggle={() => setNavOpen(!navOpen)} />
@@ -192,6 +213,9 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
 
   const getDashboardPath = () => {
     if (!user) return "/login";
+    // Native (Capacitor) uses a unified dashboard path
+    if (Capacitor.isNativePlatform()) return "/dashboard";
+    
     if (user.role === "ADMIN") return "/admin/dashboard";
     if (user.role === "TEACHER") return "/teacher/dashboard";
     if (user.role === "STUDENT") return "/student/dashboard";

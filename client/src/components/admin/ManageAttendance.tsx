@@ -299,11 +299,14 @@ const InlineTimeEdit = React.memo(({
 });
 
 
-const MonthlySummaryDisplay = React.memo(({ personId, dataMap }: { personId: string; dataMap: Record<string, Record<string, any>> }) => {
+const MonthlySummaryDisplay = React.memo(({ personId, dataMap, totalSessions, type = 'student' }: { personId: string; dataMap: Record<string, Record<string, any>>, totalSessions: number, type?: 'student' | 'teacher' }) => {
     const records = dataMap[personId] || {};
     const days = Object.values(records);
     const absent = days.filter((r: any) => r.status === 'ABSENT').length;
-    const present = days.filter((r: any) => r.status === 'PRESENT').length;
+
+    // Virtual Presence Logic: Only applicable for Students
+    // Total Present = Total Sessions - Absents (marked non-present)
+    const present = type === 'student' ? (totalSessions - absent) : days.filter((r: any) => r.status === 'PRESENT').length;
 
     return (
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -319,9 +322,6 @@ const MonthlySummaryDisplay = React.memo(({ personId, dataMap }: { personId: str
                     <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#ef4444' }}>{absent} Absent</span>
                 </div>
             )}
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg-main)', padding: '2px 8px', borderRadius: '4px' }}>
-                {days.length} markings
-            </span>
         </div>
     );
 });
@@ -331,13 +331,15 @@ const StudentAttendanceRow = React.memo(({
     viewMode,
     dateFilter,
     monthlyDataMap,
-    fetchStudentData
+    fetchStudentData,
+    totalSessions
 }: {
     row: StudentRow,
     viewMode: 'daily' | 'monthly',
     dateFilter: string,
     monthlyDataMap: any,
-    fetchStudentData: any
+    fetchStudentData: any,
+    totalSessions: number
 }) => {
     return (
         <tr style={{ borderBottom: '1px solid var(--border-soft)', transition: 'background 0.15s' }}
@@ -376,7 +378,7 @@ const StudentAttendanceRow = React.memo(({
                         </div>
                     )
                 ) : (
-                    <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} />
+                    <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} totalSessions={totalSessions} type="student" />
                 )}
             </td>
         </tr>
@@ -389,14 +391,16 @@ const TeacherAttendanceRow = React.memo(({
     dateFilter,
     monthlyDataMap,
     fetchTeacherData,
-    tab
+    tab,
+    totalSessions
 }: {
     row: TeacherRow,
     viewMode: 'daily' | 'monthly',
     dateFilter: string,
     monthlyDataMap: any,
     fetchTeacherData: any,
-    tab: string
+    tab: string,
+    totalSessions: number
 }) => {
     return (
         <tr style={{ borderBottom: '1px solid var(--border-soft)', transition: 'background 0.15s' }}
@@ -462,7 +466,7 @@ const TeacherAttendanceRow = React.memo(({
                         </div>
                     )
                 ) : (
-                    <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} />
+                    <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} totalSessions={totalSessions} type="teacher" />
                 )}
             </td>
             <td style={{ padding: '14px 20px' }}>
@@ -498,6 +502,7 @@ const ManageAttendance = () => {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
+    const [totalSessions, setTotalSessions] = useState(0);
     const limit = 20;
 
     // Student state
@@ -544,6 +549,14 @@ const ManageAttendance = () => {
         'system:config_updated': (data: any) => {
             if (data.key === 'attendance_override') {
                 setAttendanceStatus(data.value);
+            }
+        },
+        'attendance:updated': () => {
+            if (viewMode === 'daily') {
+                if (tab === 'students') fetchStudentData();
+                else fetchTeacherData();
+            } else {
+                fetchMonthlyData();
             }
         }
     });
@@ -726,6 +739,7 @@ const ManageAttendance = () => {
                 const studentData = stuRes.data.students || [];
                 setTotalCount(stuRes.data.total || 0);
                 setTotalPages(stuRes.data.totalPages || 1);
+                setTotalSessions(attRes.data.totalSessions || 0);
 
                 setMonthlyDataMap(matrix);
                 setStudentRows(studentData.map((s: any) => ({
@@ -1026,6 +1040,7 @@ const ManageAttendance = () => {
                                             dateFilter={dateFilter}
                                             monthlyDataMap={monthlyDataMap}
                                             fetchStudentData={fetchStudentData}
+                                            totalSessions={totalSessions}
                                         />
                                     ) : (
                                         <TeacherAttendanceRow
@@ -1036,6 +1051,7 @@ const ManageAttendance = () => {
                                             monthlyDataMap={monthlyDataMap}
                                             fetchTeacherData={fetchTeacherData}
                                             tab={tab}
+                                            totalSessions={totalSessions}
                                         />
                                     )
                                 )) : (

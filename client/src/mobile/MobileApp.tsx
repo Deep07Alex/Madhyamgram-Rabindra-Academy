@@ -5,13 +5,15 @@ import MobileDashboardLayout from './components/MobileDashboardLayout';
 import MobileAdminDashboard from './screens/admin/MobileAdminDashboard';
 import MobileIntroScreen from './screens/MobileIntroScreen';
 import MainPage from '../pages/MainPage';
-import { getStorage } from '../services/api';
+import { getPersistentStorage } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Loader2 } from 'lucide-react';
 import MobileStudentDashboard from './screens/MobileStudentDashboard';
 import MobileTeacherDashboard from './screens/MobileTeacherDashboard';
 import MobileManageStudents from './screens/admin/MobileManageStudents';
 import MobileManageTeachers from './screens/admin/MobileManageTeachers';
+import MobileManageClasses from './screens/admin/MobileManageClasses';
+import MobileManageAttendance from './screens/admin/MobileManageAttendance';
 import '../index.css';
 
 const LoadingFallback = () => (
@@ -21,7 +23,7 @@ const LoadingFallback = () => (
 );
 
 const RootRedirector = () => {
-    const storage = getStorage();
+    const storage = getPersistentStorage();
     if (!storage.getItem('has_seen_onboarding')) {
         return <Navigate to="/intro" replace />;
     }
@@ -58,6 +60,8 @@ const AnimatedRoutes = () => {
                     <Route index element={<DashboardIndex />} />
                     <Route path="students" element={<MobileManageStudents />} />
                     <Route path="faculty" element={<MobileManageTeachers />} />
+                    <Route path="classes" element={<MobileManageClasses />} />
+                    <Route path="attendance" element={<MobileManageAttendance />} />
                 </Route>
             </Routes>
         </AnimatePresence>

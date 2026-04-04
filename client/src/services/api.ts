@@ -11,10 +11,11 @@ import axios from 'axios';
 import type { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import { Capacitor } from '@capacitor/core';
 
-// Helper to determine storage type
-// Native: Use localStorage for persistence across app switches
-// Web: Use sessionStorage for security (logout on refresh)
-export const getStorage = () => (Capacitor.isNativePlatform() ? localStorage : sessionStorage);
+// Helper for session-based storage (for authentication data)
+export const getStorage = () => sessionStorage;
+
+// Helper for persistent storage (for preferences like onboarding flags)
+export const getPersistentStorage = () => localStorage;
 
 // Helper to get the absolute production URL (Critical for Native Android support)
 export const getBaseUrl = () => {

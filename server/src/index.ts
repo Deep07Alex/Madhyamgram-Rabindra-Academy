@@ -58,7 +58,14 @@ if (!fs.existsSync(teacherUploadDir)) fs.mkdirSync(teacherUploadDir, { recursive
 
 // 1. Logging and Performance
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
-app.use(compression({ level: 6, threshold: 1024 })); // Professional compression tier
+app.use(compression({ 
+    level: 6, 
+    threshold: 1024,
+    filter: (req, res) => {
+        if (req.headers['accept'] === 'text/event-stream') return false; // Never compress SSE
+        return compression.filter(req, res);
+    }
+})); // Professional compression tier
 app.disable('x-powered-by'); // Security optimization
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
