@@ -155,8 +155,8 @@ function MainPage() {
     'resources:updated': () => fetchResources(),
     'gallery:updated': () => fetchGallery(),
     'system:config_updated': (data: any) => {
-        if (data.key === 'hero_banner_url') fetchHeroBanner();
-        else fetchFestivalBanners();
+      if (data.key === 'hero_banner_url') fetchHeroBanner();
+      else fetchFestivalBanners();
     }
   });
 
@@ -215,7 +215,7 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
     if (!user) return "/login";
     // Native (Capacitor) uses a unified dashboard path
     if (Capacitor.isNativePlatform()) return "/dashboard";
-    
+
     if (user.role === "ADMIN") return "/admin/dashboard";
     if (user.role === "TEACHER") return "/teacher/dashboard";
     if (user.role === "STUDENT") return "/student/dashboard";
@@ -225,8 +225,8 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const handleNavClick = (id: string) => {
     if (open) onToggle(); // Close mobile menu
     if (id === "home") {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
     }
     const element = document.getElementById(id);
     if (element) {
@@ -303,7 +303,7 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
 function Hero({ bannerUrl }: { bannerUrl: string }) {
   const baseUrl = getBaseUrl();
   const fullUrl = bannerUrl
-    ? (bannerUrl.startsWith("/") ? `${baseUrl}${bannerUrl}` : bannerUrl) + `?t=${Date.now()}`
+    ? (bannerUrl.startsWith("/") ? `${baseUrl}${bannerUrl}` : bannerUrl)
     : "";
 
   return (
@@ -312,7 +312,7 @@ function Hero({ bannerUrl }: { bannerUrl: string }) {
         <img
           src={fullUrl}
           alt="School building"
-          loading="eager"
+          loading="lazy"
           fetchPriority="high"
           onError={(e) => {
             e.currentTarget.src = "/banner.png";
@@ -371,8 +371,12 @@ function ToppersSection({ students, session }: { students: any[], session: strin
                   </div>
                   <div className="topper-avatar-wrapper">
                     <img
-                      src={topper.photo ? `${baseUrl}${topper.photo}` : (topper.gender === 'boy' ? "/student_topper_boy.png" : "/student_topper_girl.png")}
+                      src={topper.photo
+                        ? (topper.photo.startsWith("/") ? `${baseUrl}${topper.photo}` : topper.photo)
+                        : (topper.gender === 'boy' ? "/student_topper_boy.png" : "/student_topper_girl.png")
+                      }
                       alt={topper.name}
+                      loading="lazy"
                       style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
                     />
                   </div>
@@ -425,7 +429,7 @@ function FestivalSection({ banners }: { banners: any[] | null }) {
           className="festival-swiper"
         >
           {displayBanners.map((banner, idx) => {
-            const fullUrl = (banner.imageUrl.startsWith("/") ? `${baseUrl}${banner.imageUrl}` : banner.imageUrl) + `?t=${Date.now()}`;
+            const fullUrl = (banner.imageUrl.startsWith("/") ? `${baseUrl}${banner.imageUrl}` : banner.imageUrl);
             return (
               <SwiperSlide key={idx}>
                 <div className="festival-slide-content">
@@ -479,7 +483,7 @@ function Gallery({ items }: { items: GalleryItem[] }) {
           className="gallery-swiper"
         >
           {items.map((item, idx) => {
-            const imgSrc = (item.src.startsWith("/") ? `${baseUrl}${item.src}` : item.src) + `?t=${Date.now()}`;
+            const imgSrc = (item.src.startsWith("/") ? `${baseUrl}${item.src}` : item.src);
             return (
               <SwiperSlide key={idx}>
                 <div className="gallery-card">
@@ -550,7 +554,7 @@ function NoticeAndResources({ notices, resources }: { notices: any[]; resources:
                   {resources.map((res) => (
                     <a
                       key={res.id}
-                      href={`${baseUrl}${res.fileUrl}`}
+                      href={res.fileUrl.startsWith("/") ? `${baseUrl}${res.fileUrl}` : res.fileUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="resource-card"
@@ -603,10 +607,14 @@ function AlumniGallery({ photos }: { photos: any[] }) {
             {visiblePhotos.map((photo) => (
               <div key={photo.id} className="alumni-card">
                 <div className="alumni-image-wrapper">
-                  <img src={`${baseUrl}${photo.imageUrl}`} alt={photo.title} />
+                  <img
+                    src={(photo.imageUrl.startsWith("/") ? `${baseUrl}${photo.imageUrl}` : photo.imageUrl)}
+                    alt={photo.title}
+                    loading="lazy"
+                  />
                   <div className="alumni-overlay">
                     <a
-                      href={`${baseUrl}${photo.imageUrl}`}
+                      href={(photo.imageUrl.startsWith("/") ? `${baseUrl}${photo.imageUrl}` : photo.imageUrl)}
                       download
                       target="_blank"
                       rel="noopener noreferrer"

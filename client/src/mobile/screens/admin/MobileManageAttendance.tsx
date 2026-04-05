@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
     ArrowLeft, Loader2, Search,
@@ -92,11 +92,21 @@ const MonthlyStrip = ({ personId, dataMap, totalSessions = 0, type = 'student', 
     const percentage = Math.round((present / denominator) * 100);
 
     return (
-        <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-soft)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
+        <div style={{
+            marginTop: '12px',
+            padding: '12px',
+            borderRadius: '16px',
+            background: 'var(--bg-soft)',
+            border: '1px solid var(--border-soft)',
+            width: '100%'
+        }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                 <div>
                     <p style={{ margin: 0, fontSize: '9px', fontWeight: '900', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Monthly Insight</p>
-                    <p style={{ margin: '2px 0 0 0', fontSize: '15px', fontWeight: '900', color: 'var(--text-main)' }}>{percentage}% <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700' }}>Attendance</span></p>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '18px', fontWeight: '900', color: 'var(--text-main)', fontFamily: 'Outfit' }}>
+                        {percentage}% 
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', marginLeft: '6px' }}>Attendance</span>
+                    </p>
                 </div>
                 <div style={{ background: 'var(--primary-soft)', padding: '4px 10px', borderRadius: '8px', border: '1px solid var(--primary-bold)10' }}>
                     <span style={{ fontSize: '11px', fontWeight: '900', color: 'var(--primary-bold)' }}>
@@ -104,7 +114,7 @@ const MonthlyStrip = ({ personId, dataMap, totalSessions = 0, type = 'student', 
                     </span>
                 </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '4px', maxWidth: '180px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '100%' }}>
                 {cells}
             </div>
         </div>
@@ -139,6 +149,10 @@ export default function MobileManageAttendance() {
     const [totalPages, setTotalPages] = useState(1);
     const debouncedSearch = useDebounce(search, 600);
     const limit = 15;
+
+    // --- Performance Optimization: State Locking ---
+    // Used to prevent flickering when local updates and server broadcasts collide
+    const pendingUpdates = useRef<Set<string>>(new Set());
 
     // ── Fetch Config & Classes ──
     useEffect(() => {
@@ -270,7 +284,7 @@ export default function MobileManageAttendance() {
                     matrix[a.teacherId][d] = a;
                 });
                 setMonthlyDataMap(matrix);
-                setTotalSessions(0);
+                setTotalSessions(foundDates.size);
                 setSessionDates(Array.from(foundDates));
                 setTeacherRows(teachRes.data.teachers.map((t: any) => ({ ...t, attendanceId: null, status: null, date: null, reason: null })));
                 setTotalPages(teachRes.data.totalPages);
@@ -293,12 +307,32 @@ export default function MobileManageAttendance() {
     }, [tab, viewMode, dateFilter, monthFilter, selectedClass, debouncedSearch, page, fetchStudentData, fetchTeacherData, fetchMonthlyData]);
 
     useServerEvents({
-        'attendance:updated': () => {
-            if (viewMode === 'daily') {
-                if (tab === 'students') fetchStudentData(true);
-                else fetchTeacherData(true);
+        'attendance:updated': (data: any) => {
+            const dateStr = dateFilter;
+            
+            // OPTIMIZATION: If this app instance is currently "Locking" this ID (waiting for its own update to finish),
+            // then ignore the incoming broadcast to prevent flickering.
+            if (data && (pendingUpdates.current.has(data.studentId) || pendingUpdates.current.has(data.teacherId))) {
+               return; 
+            }
+
+            // Optimization: If the update is for the currently viewed date, update local state immediately
+            if (data && data.status && data.date === dateStr) {
+                if (data.studentId) {
+                    setStudentRows(prev => prev.map(s => s.id === data.studentId ? { ...s, status: data.status, attendanceId: data.attendanceId || s.attendanceId } : s));
+                } else if (data.teacherId) {
+                    setTeacherRows(prev => prev.map(t => t.id === data.teacherId ? { ...t, status: data.status, attendanceId: data.attendanceId || t.attendanceId } : t));
+                }
             } else {
-                fetchMonthlyData();
+                // Fallback: silent re-fetch with stabilization delay if needed
+                setTimeout(() => {
+                    if (viewMode === 'daily') {
+                        if (tab === 'students') fetchStudentData(true);
+                        else fetchTeacherData(true);
+                    } else {
+                        fetchMonthlyData(true);
+                    }
+                }, 300);
             }
         },
         'system:config_updated': (data) => {
@@ -308,6 +342,9 @@ export default function MobileManageAttendance() {
 
     const handleMarkAttendance = async (personId: string, currentStatus: any, attId: string | null, classId?: string) => {
         const newStatus = currentStatus === 'PRESENT' ? 'ABSENT' : 'PRESENT';
+
+        // 🛡️ LOCK: Prevent flickering by ignoring broadcasts for this ID while we update it
+        pendingUpdates.current.add(personId);
 
         // Optimistic UI Update - Flip status instantly on screen
         if (tab === 'students') {
@@ -343,6 +380,11 @@ export default function MobileManageAttendance() {
                 setTeacherRows(prev => prev.map(t => t.id === personId ? { ...t, status: currentStatus } : t));
             }
             showToast('Update failed', 'error');
+        } finally {
+            // UNLOCK: Give the network/broadcasts a second to settle before re-enabling sync for this ID
+            setTimeout(() => {
+                pendingUpdates.current.delete(personId);
+            }, 1500);
         }
     };
 
@@ -476,10 +518,21 @@ export default function MobileManageAttendance() {
                         )}
                         {tab === 'students' ? (
                             studentRows.map(row => (
-                                <div key={row.id} style={{ backgroundColor: 'var(--bg-card)', padding: '16px', borderRadius: '20px', border: '1px solid var(--border-soft)', boxShadow: 'var(--shadow-sm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div style={{ flex: 1 }}>
-                                        <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: 'var(--text-main)' }}>{row.name}</h3>
-                                        <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}>Roll: {row.rollNumber} • {row.className}</p>
+                                <div key={row.id} style={{ 
+                                    backgroundColor: 'var(--bg-card)', 
+                                    padding: '16px', 
+                                    borderRadius: '24px', 
+                                    border: '1px solid var(--border-soft)', 
+                                    boxShadow: 'var(--shadow-sm)', 
+                                    display: 'flex', 
+                                    flexDirection: viewMode === 'monthly' ? 'column' : 'row',
+                                    justifyContent: 'space-between', 
+                                    alignItems: viewMode === 'monthly' ? 'flex-start' : 'center',
+                                    gap: viewMode === 'monthly' ? '4px' : '12px'
+                                }}>
+                                    <div style={{ flex: 1, width: '100%' }}>
+                                        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '900', color: 'var(--text-main)', fontFamily: 'Outfit' }}>{row.name}</h3>
+                                        <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700' }}>Roll: {row.rollNumber} • {row.className || 'Active'}</p>
                                     </div>
                                     {viewMode === 'daily' ? (
                                         <div
@@ -494,27 +547,35 @@ export default function MobileManageAttendance() {
                                             {row.status}
                                         </div>
                                     ) : (
-                                        <div style={{ width: '100%' }}>
-                                            <MonthlyStrip personId={row.id} dataMap={monthlyDataMap} totalSessions={totalSessions} type="student" sessionDates={sessionDates} />
-                                        </div>
+                                        <MonthlyStrip personId={row.id} dataMap={monthlyDataMap} totalSessions={totalSessions} type="student" sessionDates={sessionDates} />
                                     )}
                                 </div>
                             ))
                         ) : (
                             teacherRows.map(row => (
-                                <div key={row.id} style={{ backgroundColor: 'var(--bg-card)', padding: '16px', borderRadius: '20px', border: '1px solid var(--border-soft)', boxShadow: 'var(--shadow-sm)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                                <div key={row.id} style={{ 
+                                    backgroundColor: 'var(--bg-card)', 
+                                    padding: '16px', 
+                                    borderRadius: '24px', 
+                                    border: '1px solid var(--border-soft)', 
+                                    boxShadow: 'var(--shadow-sm)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '4px'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                                         <div style={{ flex: 1 }}>
-                                            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: 'var(--text-main)' }}>{row.name}</h3>
+                                            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '900', color: 'var(--text-main)', fontFamily: 'Outfit' }}>{row.name}</h3>
                                             <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: 'var(--primary-bold)', fontWeight: '800' }}>{row.designation}</p>
                                         </div>
                                         {viewMode === 'daily' && (
                                             <div
                                                 onClick={() => handleMarkAttendance(row.id, row.status, row.attendanceId)}
                                                 style={{
-                                                    padding: '6px 12px', borderRadius: '100px', fontSize: '10px', fontWeight: '900', cursor: 'pointer',
+                                                    padding: '6px 14px', borderRadius: '100px', fontSize: '10px', fontWeight: '900', cursor: 'pointer',
                                                     background: row.status === 'PRESENT' ? '#dcfce7' : row.status === 'ABSENT' ? '#fee2e2' : 'var(--bg-soft)',
-                                                    color: row.status === 'PRESENT' ? '#16a34a' : row.status === 'ABSENT' ? '#dc2626' : 'var(--text-muted)'
+                                                    color: row.status === 'PRESENT' ? '#16a34a' : row.status === 'ABSENT' ? '#dc2626' : 'var(--text-muted)',
+                                                    border: `1px solid ${row.status === 'PRESENT' ? '#16a34a30' : row.status === 'ABSENT' ? '#dc262630' : 'var(--border-soft)'}`
                                                 }}
                                             >
                                                 {row.status}
@@ -522,14 +583,24 @@ export default function MobileManageAttendance() {
                                         )}
                                     </div>
                                     {viewMode === 'daily' ? (
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-soft)' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <Clock size={12} color="var(--text-muted)" />
-                                                <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-main)' }}>{row.arrivalTime || '—'}</span>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-soft)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <Clock size={14} color="var(--text-muted)" />
+                                                </div>
+                                                <div>
+                                                    <p style={{ margin: 0, fontSize: '8px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>ARRIVAL</p>
+                                                    <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-main)' }}>{row.arrivalTime || '—:—'}</span>
+                                                </div>
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '2px solid var(--text-muted)' }} />
-                                                <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-main)' }}>{row.departureTime || '—'}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--bg-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <div style={{ width: '12px', height: '12px', borderRadius: '4px', border: '2px solid var(--text-muted)' }} />
+                                                </div>
+                                                <div>
+                                                    <p style={{ margin: 0, fontSize: '8px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>DEPARTURE</p>
+                                                    <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-main)' }}>{row.departureTime || '—:—'}</span>
+                                                </div>
                                             </div>
                                         </div>
                                     ) : (

@@ -60,12 +60,12 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
             );
         }
 
-        broadcast('attendance:updated', { studentId, date: attendanceDateStr });
-        sendToUser(studentId, 'attendance:updated', { date: attendanceDateStr });
-        sendToRole('ADMIN', 'attendance:updated', { studentId, date: attendanceDateStr });
+        broadcast('attendance:updated', { studentId, date: attendanceDateStr, status });
+        sendToUser(studentId, 'attendance:updated', { date: attendanceDateStr, status });
+        sendToRole('ADMIN', 'attendance:updated', { studentId, date: attendanceDateStr, status });
         
         // Live Update - Mirroring the "Force Open/Close" Technique (Dual-stack Sockets + SSE)
-        broadcast('attendance:updated', { studentId, date: attendanceDateStr });
+        broadcast('attendance:updated', { studentId, date: attendanceDateStr, status });
 
         res.status(200).json(attendanceRes.rows[0]);
     } catch (error) {
@@ -269,12 +269,12 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
             );
         }
 
-        broadcast('attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr });
-        sendToUser(targetTeacherId, 'attendance:updated', { date: attendanceDateStr });
-        sendToRole('ADMIN', 'attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr });
+        broadcast('attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr, status: status || 'PRESENT' });
+        sendToUser(targetTeacherId, 'attendance:updated', { date: attendanceDateStr, status: status || 'PRESENT' });
+        sendToRole('ADMIN', 'attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr, status: status || 'PRESENT' });
 
         // Live Update - Mirroring the "Force Open/Close" Technique (Dual-stack Sockets + SSE)
-        broadcast('attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr });
+        broadcast('attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr, status: status || 'PRESENT' });
 
         res.status(200).json(attendanceRes.rows[0]);
     } catch (error) {
@@ -314,7 +314,7 @@ export const updateStudentAttendance = async (req: AuthRequest, res: Response) =
             const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
             // Live Update - Mirroring the "Force Open/Close" Technique (Dual-stack Sockets + SSE)
-            broadcast('attendance:updated', { studentId: sid, date: dStr });
+            broadcast('attendance:updated', { studentId: sid, date: dStr, status });
         } catch (err) {
             console.error('Live update broadcast failed (student):', err);
         }
@@ -384,7 +384,7 @@ export const updateTeacherAttendance = async (req: AuthRequest, res: Response) =
             const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
             // Live Update - Mirroring the "Force Open/Close" Technique (Dual-stack Sockets + SSE)
-            broadcast('attendance:updated', { teacherId: tid, date: dStr });
+            broadcast('attendance:updated', { teacherId: tid, date: dStr, status });
         } catch (err) {
             console.error('Live update broadcast failed (teacher):', err);
         }

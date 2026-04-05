@@ -551,12 +551,26 @@ const ManageAttendance = () => {
                 setAttendanceStatus(data.value);
             }
         },
-        'attendance:updated': () => {
-            if (viewMode === 'daily') {
-                if (tab === 'students') fetchStudentData();
-                else fetchTeacherData();
+        'attendance:updated': (data: any) => {
+            const dateStr = dateFilter;
+            
+            // Optimization: If update is for the currently viewed date, update local state immediately
+            if (data && data.status && data.date === dateStr) {
+                if (data.studentId) {
+                    setStudentRows(prev => prev.map(s => s.id === data.studentId ? { ...s, status: data.status, attendanceId: data.attendanceId || s.attendanceId } : s));
+                } else if (data.teacherId) {
+                    setTeacherRows(prev => prev.map(t => t.id === data.teacherId ? { ...t, status: data.status, attendanceId: data.attendanceId || t.attendanceId } : t));
+                }
             } else {
-                fetchMonthlyData();
+                // Fallback: silent re-fetch with stabilization delay if needed
+                setTimeout(() => {
+                    if (viewMode === 'daily') {
+                        if (tab === 'students') fetchStudentData();
+                        else fetchTeacherData();
+                    } else {
+                        fetchMonthlyData();
+                    }
+                }, 300);
             }
         }
     });
