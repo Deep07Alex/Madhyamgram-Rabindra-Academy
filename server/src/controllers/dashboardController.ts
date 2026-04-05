@@ -8,7 +8,28 @@ import { Response } from 'express';
 import { db } from '../lib/db.js';
 import { AuthRequest } from '../middleware/auth.js';
 
-// REMOVED statsCache to ensure 100% real-time data sync
+// Performance Cache: Dashboard statistics are heavy, so we cache them 
+// periodically or until cleared by data updates.
+const dashCache = new Map<string, { data: any, expires: number }>();
+const DASH_TTL = 10 * 60 * 1000; // 10 minutes
+
+// Helper to get global school session count (Expensive SQL optimized with cache)
+let globalSessionCountCache: { count: number, expires: number } | null = null;
+async function getGlobalSessions() {
+    if (globalSessionCountCache && Date.now() < globalSessionCountCache.expires) {
+        return globalSessionCountCache.count;
+    }
+    const res = await db.query(`
+        SELECT COUNT(DISTINCT date) as count FROM (
+            SELECT date::date FROM "Attendance"
+            UNION
+            SELECT date::date FROM "TeacherAttendance"
+        ) as all_dates WHERE EXTRACT(DOW FROM date) != 0
+    `);
+    const count = parseInt(res.rows[0].count, 10);
+    globalSessionCountCache = { count, expires: Date.now() + (30 * 60 * 1000) }; // 30 mins
+    return count;
+}
 
 /**
  * Generates high-level statistics for the dashboard.
@@ -139,8 +160,16 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
  */
 export const getUnifiedDashboardData = async (req: AuthRequest, res: Response) => {
     const { id: userId, role } = req.user!;
+    const cacheKey = `unified_${userId}_${role}`;
+    
+    // Check local server cache first
+    const cached = dashCache.get(cacheKey);
+    if (cached && Date.now() < cached.expires) {
+        return res.json(cached.data);
+    }
 
     try {
+        const global_sessions = await getGlobalSessions();
         const [configRes] = await Promise.all([
             db.query('SELECT value FROM "SystemConfig" WHERE key = $1', ['attendance_override'])
         ]);
@@ -152,11 +181,6 @@ export const getUnifiedDashboardData = async (req: AuthRequest, res: Response) =
                 db.query(`
                     WITH Stats AS (
                         SELECT 
-                            (SELECT COUNT(DISTINCT date) FROM (
-                                SELECT date::date FROM "Attendance"
-                                UNION
-                                SELECT date::date FROM "TeacherAttendance"
-                            ) as all_dates WHERE EXTRACT(DOW FROM date) != 0) as global_sessions,
                             (SELECT COUNT(*) FROM "Attendance" WHERE "studentId" = $1 AND status = 'PRESENT') as student_present,
                             (SELECT AVG(marks / NULLIF("totalMarks", 0) * 100) FROM "Result" WHERE "studentId" = $1) as average_grade,
                             (SELECT COUNT(DISTINCT subject) FROM (
@@ -165,11 +189,7 @@ export const getUnifiedDashboardData = async (req: AuthRequest, res: Response) =
                                 SELECT h.subject FROM "Homework" h JOIN "Student" s ON h."classId" = s."classId" WHERE s.id = $1
                             ) as subjects) as active_subjects
                     )
-                    SELECT 
-                        CASE WHEN global_sessions = 0 THEN 100 ELSE (student_present::float / GREATEST(global_sessions, 1)) * 100 END as attendance_rate,
-                        average_grade,
-                        active_subjects
-                    FROM Stats
+                    SELECT * FROM Stats
                 `, [userId]),
                 db.query(`
                     SELECT n.* FROM "Notice" n
@@ -198,18 +218,22 @@ export const getUnifiedDashboardData = async (req: AuthRequest, res: Response) =
 
             const profile = { ...profileRes.rows[0], role: 'STUDENT' };
             const stats = statsRes.rows[0];
-            
-            return res.json({
+            const resultData = {
                 profile,
                 stats: {
-                    attendanceRate: Math.round(parseFloat(stats.attendance_rate || '100')),
+                    attendanceRate: Math.round(
+                        global_sessions === 0 ? 100 : (parseInt(stats.student_present || '0', 10) / Math.max(global_sessions, 1)) * 100
+                    ),
                     averageGrade: Math.round(parseFloat(stats.average_grade || '0')),
                     activeSubjects: parseInt(stats.active_subjects || '0')
                 },
                 notices: noticeRes.rows,
                 assignments: homeworkRes.rows,
                 config: { attendance_override: attendanceOverride }
-            });
+            };
+
+            dashCache.set(cacheKey, { data: resultData, expires: Date.now() + DASH_TTL });
+            return res.json(resultData);
         }
 
         if (role === 'TEACHER') {

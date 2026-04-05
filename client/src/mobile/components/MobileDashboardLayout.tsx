@@ -20,14 +20,23 @@ export default function MobileDashboardLayout() {
         navigate('/');
     };
 
-    // Scroll Persistence Logic
+    // Enhanced Scroll Persistence Logic for Elite UI
     useEffect(() => {
-        const currentPath = location.pathname;
         const container = scrollRef.current;
+        if (!container) return;
 
         // Restore scroll on mount/path change
-        if (container && scrollCache[currentPath]) {
-            container.scrollTop = scrollCache[currentPath];
+        const currentPath = location.pathname;
+        if (scrollCache[currentPath] !== undefined) {
+            // Use a micro-task to ensure children are rendered before scrolling
+            setTimeout(() => {
+                if (container) {
+                    container.scrollTo({
+                        top: scrollCache[currentPath],
+                        behavior: 'auto'
+                    });
+                }
+            }, 50);
         }
 
         const handleScroll = () => {
@@ -36,11 +45,14 @@ export default function MobileDashboardLayout() {
             }
         };
 
-        // Save scroll position when navigating away or scrolling
-        container?.addEventListener('scroll', handleScroll);
+        container.addEventListener('scroll', handleScroll, { passive: true });
 
+        // Save position on cleanup as well
         return () => {
-            container?.removeEventListener('scroll', handleScroll);
+            if (container) {
+                scrollCache[currentPath] = container.scrollTop;
+                container.removeEventListener('scroll', handleScroll);
+            }
         };
     }, [location.pathname]);
 

@@ -15,6 +15,8 @@ import MobileManageStudents from './screens/admin/MobileManageStudents';
 import MobileManageTeachers from './screens/admin/MobileManageTeachers';
 import MobileManageClasses from './screens/admin/MobileManageClasses';
 import MobileManageAttendance from './screens/admin/MobileManageAttendance';
+import MobileManageResults from './screens/admin/MobileManageResults';
+import MobileManageFees from './screens/admin/MobileManageFees';
 import '../index.css';
 
 const LoadingFallback = () => (
@@ -75,6 +77,8 @@ const AnimatedRoutes = () => {
                     <Route path="faculty" element={<MobileManageTeachers />} />
                     <Route path="classes" element={<MobileManageClasses />} />
                     <Route path="attendance" element={<MobileManageAttendance />} />
+                    <Route path="results" element={<MobileManageResults />} />
+                    <Route path="fees" element={<MobileManageFees />} />
                 </Route>
             </Routes>
         </AnimatePresence>

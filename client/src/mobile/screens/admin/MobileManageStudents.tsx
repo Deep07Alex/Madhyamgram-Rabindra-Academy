@@ -136,13 +136,13 @@ export default function MobileManageStudents() {
 
     // native back button handling
     useEffect(() => {
-        const backListener = App.addListener('backButton', ({ canGoBack }) => {
+        const backListener = App.addListener('backButton', () => {
             if (isEditModalOpen) {
                 setIsEditModalOpen(false);
                 setSelectedStudent(null);
             } else if (activeTab !== 'directory') {
                 setActiveTab('directory');
-            } else if (canGoBack) {
+            } else {
                 navigate(-1);
             }
         });

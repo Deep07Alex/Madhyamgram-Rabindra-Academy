@@ -7,6 +7,8 @@ import { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import crypto from 'crypto';
 
+import sharp from 'sharp';
+
 /**
  * Uploads a new image to the gallery with an optional title and description.
  */
@@ -16,7 +18,20 @@ export const uploadGalleryImage = async (req: Request, res: Response) => {
 
         let imageUrl = null;
         if (req.file) {
-            imageUrl = `/uploads/${req.file.filename}`;
+            const fileName = req.file.filename.split('.')[0];
+            const optimizedFilename = `gallery-${fileName}-${Date.now()}.webp`;
+            const optimizedPath = path.join(__dirname, '../../uploads', optimizedFilename);
+
+            // OPTIMIZATION: Resize to max 1200px width and convert to WebP
+            await sharp(req.file.path)
+                .resize(1200, null, { withoutEnlargement: true })
+                .webp({ quality: 80 })
+                .toFile(optimizedPath);
+
+            // Delete raw original
+            fs.unlinkSync(req.file.path);
+            
+            imageUrl = `/uploads/${optimizedFilename}`;
         } else {
             return res.status(400).json({ message: 'Image file is required' });
         }
@@ -60,7 +75,25 @@ export const updateGalleryImage = async (req: Request, res: Response) => {
         const currentResult = await db.query('SELECT "imageUrl" FROM "Gallery" WHERE id = $1', [id]);
         if (currentResult.rowCount === 0) return res.status(404).json({ message: 'Gallery image not found' });
         
-        const imageUrl = req.file ? `/uploads/${req.file.filename}` : currentResult.rows[0].imageUrl;
+        let imageUrl = currentResult.rows[0].imageUrl;
+        
+        if (req.file) {
+            const fileName = req.file.filename.split('.')[0];
+            const optimizedFilename = `gallery-${fileName}-${Date.now()}.webp`;
+            const optimizedPath = path.join(__dirname, '../../uploads', optimizedFilename);
+
+            await sharp(req.file.path)
+                .resize(1200, null, { withoutEnlargement: true })
+                .webp({ quality: 80 })
+                .toFile(optimizedPath);
+
+            fs.unlinkSync(req.file.path);
+            imageUrl = `/uploads/${optimizedFilename}`;
+
+            // Delete old physical file
+            const oldPath = path.join(__dirname, '../../', currentResult.rows[0].imageUrl);
+            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
 
         const updateRes = await db.query(
             `UPDATE "Gallery" SET title = $1, description = $2, "imageUrl" = $3 WHERE id = $4 RETURNING *`,

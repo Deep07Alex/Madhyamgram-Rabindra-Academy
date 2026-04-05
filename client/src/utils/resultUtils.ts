@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { UserOptions } from 'jspdf-autotable';
+import { Capacitor } from '@capacitor/core';
 
 export const generateResultPDF = async (data: any) => {
     try {
@@ -273,6 +274,10 @@ export const generateResultPDF = async (data: any) => {
         const finalFileName = isSingleUnit 
             ? `${(student.name || 'Report').replace(/\s+/g, '_')}_Progress_Report_ONLY_${targetSemester.replace('-', '_')}_${data.academicYear}.pdf`
             : `${(student.name || 'Report').replace(/\s+/g, '_')}_Progress_Report_${data.academicYear}.pdf`;
+        
+        if (Capacitor.isNativePlatform()) {
+            return doc;
+        }
 
         doc.save(finalFileName);
     } catch (err) {
@@ -394,6 +399,10 @@ export const generateRankingsPDF = async (rankingsData: Record<string, any[]>, a
             ? `All_Class_Rankings_${academicYear}.pdf`
             : `Rankings_Class_${sortedClasses[0] || 'Unknown'}_${academicYear}.pdf`;
             
+        if (Capacitor.isNativePlatform()) {
+            return { doc, fileName };
+        }
+
         doc.save(fileName);
     } catch (err) {
         console.error('PDF Generation Error:', err);

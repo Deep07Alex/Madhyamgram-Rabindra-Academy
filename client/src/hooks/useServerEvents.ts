@@ -51,16 +51,24 @@ const useServerEvents = (handlers: EventHandlers) => {
         // Ensures events from both WebSocket and SSE are handled consistently.
         const dispatchEvent = (type: string, data: any) => {
             const now = Date.now();
-            const lastTime = lastEventsRef.current[type] || 0;
+            
+            // Granular Deduplication:
+            // For high-frequency events like attendance, we deduplicate by ID to allow rapid updates
+            // of DIFFERENT records while still blocking exact duplicates from Socket+SSE.
+            const dedupeKey = (type === 'attendance:updated')
+                ? `${type}:${data.studentId || data.teacherId}:${data.date}:${data.status}`
+                : type;
+                
+            const lastTime = lastEventsRef.current[dedupeKey] || 0;
 
-            // Deduplicate: Don't process same event multiple times within 250ms
-            if (now - lastTime < 250) return;
-            lastEventsRef.current[type] = now;
+            // Exact Duplicates: Don't process the same specific record update within 400ms
+            if (now - lastTime < 400) return;
+            lastEventsRef.current[dedupeKey] = now;
 
             // Execute the handler from the latest render
             const handler = (handlersRef.current as any)[type];
             if (handler) {
-                console.log(`[LiveSync] Received event: ${type}`, data);
+                if (import.meta.env.DEV) console.log(`[LiveSync] Processing: ${type}`, data);
                 handler(data);
             }
         };

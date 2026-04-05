@@ -324,7 +324,7 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
  */
 export const getResults = async (req: AuthRequest, res: Response) => {
     try {
-        const { studentId, semester, academicYear } = req.query;
+        const { studentId, semester, academicYear, classId } = req.query;
         let query = `
             SELECT r.*, row_to_json(s.*) as student
             FROM "Result" r
@@ -352,6 +352,11 @@ export const getResults = async (req: AuthRequest, res: Response) => {
         if (academicYear) {
             query += ` AND r."academicYear" = $${paramCount++}`;
             params.push(parseInt(academicYear as string));
+        }
+
+        if (classId) {
+            query += ` AND s."classId" = $${paramCount++}`;
+            params.push(classId);
         }
 
         query += ` ORDER BY r."createdAt" DESC`;
@@ -434,8 +439,9 @@ export const getClassRankings = async (req: Request, res: Response) => {
     try {
         const academicYear = parseInt(req.query.academicYear as string || new Date().getFullYear().toString());
         const showAll = req.query.all === 'true';
+        const { classId } = req.query;
 
-        const query = `
+        let query = `
             WITH StudentTotals AS (
                 SELECT 
                     s.id as "studentDbId", 
@@ -461,6 +467,8 @@ export const getClassRankings = async (req: Request, res: Response) => {
                 FROM "Student" s
                 JOIN "Class" c ON s."classId" = c.id
                 LEFT JOIN "Result" r ON s.id = r."studentId" AND r."academicYear" = $1
+                WHERE 1=1
+                ${classId ? 'AND s."classId" = $2' : ''}
                 GROUP BY s.id, c.id, c.name
             ),
             RankedStudents AS (
@@ -497,7 +505,12 @@ export const getClassRankings = async (req: Request, res: Response) => {
             ORDER BY "className", "rank" NULLS LAST, "grandTotal" DESC
         `;
         
-        const result = await db.query(query, [academicYear]);
+        const params: any[] = [academicYear];
+        if (classId) {
+            params.push(classId);
+        }
+
+        const result = await db.query(query, params);
 
         // Group by class
         const rankings: { [key: string]: any[] } = {};
