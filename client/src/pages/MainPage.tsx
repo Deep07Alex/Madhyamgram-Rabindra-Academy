@@ -270,7 +270,7 @@ function Navbar({ open, onToggle }: { open: boolean; onToggle: () => void }) {
       <div className={"landing-nav-menu" + (open ? " open" : "")}>
         <a href="javascript:void(0)" onClick={() => handleNavClick("home")}>Home</a>
         <a href="javascript:void(0)" onClick={() => handleNavClick("notice-resources")}>Admission</a>
-        <a href="javascript:void(0)" onClick={() => handleNavClick("notice")}>Upcoming Festivals</a>
+        <a href="javascript:void(0)" onClick={() => handleNavClick("notice")}>Upcoming Events</a>
         <a href="javascript:void(0)" onClick={() => handleNavClick("gallery")}>Gallery</a>
         <a href="javascript:void(0)" onClick={() => handleNavClick("contact")}>Contact</a>
         <div
@@ -412,7 +412,7 @@ function FestivalSection({ banners }: { banners: any[] | null }) {
     <section id="notice" className="landing-section notice">
       <div className="section-header" style={{ textAlign: "center", marginBottom: "40px", display: "flex", flexDirection: "column", alignItems: "center" }}>
         <span className="section-badge">Seasonal</span>
-        <h2>Upcoming Festivals</h2>
+        <h2>Upcoming Events</h2>
         <div className="section-divider"></div>
       </div>
       <div className="festival-slider-wrapper">
