@@ -56,6 +56,9 @@ const StudentAttendance = () => {
     }, [fetchAttendance]);
 
     const handlePrevMonth = () => {
+        // Institutional Launch Lock: Prevent navigation before January 2026
+        if (currentYear === 2026 && currentMonth === 0) return;
+
         if (currentMonth === 0) {
             setCurrentMonth(11);
             setCurrentYear(prev => prev - 1);
@@ -143,7 +146,13 @@ const StudentAttendance = () => {
                         <button
                             onClick={handlePrevMonth}
                             className="btn-view-details btn-sm"
-                            style={{ padding: '6px', minWidth: 'auto' }}
+                            style={{ 
+                                padding: '6px', 
+                                minWidth: 'auto',
+                                opacity: (currentYear === 2026 && currentMonth === 0) ? 0.3 : 1,
+                                cursor: (currentYear === 2026 && currentMonth === 0) ? 'not-allowed' : 'pointer'
+                            }}
+                            disabled={currentYear === 2026 && currentMonth === 0}
                             title="Previous Month"
                         >
                             <ChevronLeft size={18} />
@@ -215,24 +224,32 @@ const StudentAttendance = () => {
                                                             <XCircle size={12} /> ABSENT
                                                         </span>
                                                     )}
-                                                    {!record && !isFuture && (
-                                                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                                            {day.getDay() === 0 ? (
-                                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '500' }}>
-                                                                    Sunday (Off)
-                                                                </span>
-                                                            ) : (
-                                                                <span className="badge absent" style={{ minWidth: '100px', justifyContent: 'center', gap: '6px', opacity: 0.8 }}>
-                                                                    <XCircle size={12} /> ABSENT
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                    {!record && isFuture && (
-                                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                                            Upcoming
-                                                        </span>
-                                                    )}
+                                                     {!record && !isFuture && (
+                                                         <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                                             {day.getDay() === 0 ? (
+                                                                 <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '500' }}>
+                                                                     Sunday (Off)
+                                                                 </span>
+                                                             ) : (
+                                                                 <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                                                     No Record
+                                                                 </span>
+                                                             )}
+                                                         </div>
+                                                     )}
+                                                     {!record && isFuture && (
+                                                         <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                                             {day.getDay() === 0 ? (
+                                                                 <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '500' }}>
+                                                                     Sunday (Off)
+                                                                 </span>
+                                                             ) : (
+                                                                 <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                                                     Upcoming
+                                                                 </span>
+                                                             )}
+                                                         </div>
+                                                     )}
                                                 </div>
                                             )}
                                         </td>
@@ -240,7 +257,7 @@ const StudentAttendance = () => {
                                             {record?.subject ? (
                                                 <span className="badge" style={{ background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-soft)' }}>{record.subject}</span>
                                             ) : (
-                                                record ? <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Full Day</span> : null
+                                                record ? <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>FULL DAY SESSION</span> : null
                                             )}
                                         </td>
                                     </tr>

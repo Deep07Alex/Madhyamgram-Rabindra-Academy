@@ -493,7 +493,23 @@ export default function MobileManageAttendance() {
                         <input
                             type={viewMode === 'daily' ? 'date' : 'month'}
                             value={viewMode === 'daily' ? dateFilter : monthFilter}
-                            onChange={e => viewMode === 'daily' ? setDateFilter(e.target.value) : setMonthFilter(e.target.value)}
+                            onChange={e => {
+                                const val = e.target.value;
+                                if (viewMode === 'daily') {
+                                    if (val && val < '2026-01-01') {
+                                        setDateFilter('2026-01-01');
+                                    } else {
+                                        setDateFilter(val);
+                                    }
+                                } else {
+                                    if (val && val < '2026-01') {
+                                        setMonthFilter('2026-01');
+                                    } else {
+                                        setMonthFilter(val);
+                                    }
+                                }
+                            }}
+                            min={viewMode === 'daily' ? '2026-01-01' : '2026-01'}
                             style={{ width: '100%', height: '100%', padding: '10px 12px', borderRadius: '16px', border: '1px solid var(--border-soft)', background: 'var(--bg-card)', fontSize: '12px', fontWeight: '900', color: 'var(--text-main)', boxShadow: 'var(--shadow-sm)' }}
                         />
                     </div>

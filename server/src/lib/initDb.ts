@@ -256,6 +256,14 @@ export const initDb = async () => {
                 "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            -- SchoolSession Table (Performance Registry)
+            CREATE TABLE IF NOT EXISTS "SchoolSession" (
+                "id" SERIAL PRIMARY KEY,
+                "date" DATE UNIQUE NOT NULL,
+                "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS "idx_school_session_date" ON "SchoolSession"("date" DESC);
+
             -- SystemConfig Table
             CREATE TABLE IF NOT EXISTS "SystemConfig" (
                 "key" TEXT PRIMARY KEY,
@@ -385,6 +393,8 @@ export const initDb = async () => {
             CREATE INDEX IF NOT EXISTS "idx_attendance_date_student" ON "Attendance"("date", "studentId");
             CREATE INDEX IF NOT EXISTS "idx_result_student" ON "Result"("studentId");
             CREATE INDEX IF NOT EXISTS "idx_result_academicYear" ON "Result"("academicYear");
+            CREATE INDEX IF NOT EXISTS "idx_result_semester" ON "Result"("semester");
+            CREATE INDEX IF NOT EXISTS "idx_result_composite_lookup" ON "Result"("academicYear", "semester", "studentId");
             CREATE INDEX IF NOT EXISTS "idx_result_student_exam_year" ON "Result"("studentId", "semester", "academicYear");
             CREATE INDEX IF NOT EXISTS "idx_result_student_exam" ON "Result"("studentId", "semester");
             CREATE INDEX IF NOT EXISTS "idx_homework_class" ON "Homework"("classId");

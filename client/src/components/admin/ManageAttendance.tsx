@@ -126,7 +126,7 @@ const InlineStatusEdit = React.memo(({
                 if (type === 'student') {
                     await api.post('/attendance/student', {
                         date, status, studentId: personId,
-                        classId: classId || '', subject: 'Full Day Record'
+                        classId: classId || '', subject: 'FULL DAY SESSION'
                     });
                 } else {
                     await api.post('/attendance/teacher', { date, status, reason, teacherId: personId });
@@ -968,13 +968,31 @@ const ManageAttendance = () => {
                 {viewMode === 'daily' ? (
                     <div style={{ position: 'relative' }}>
                         <CalendarDays size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                        <input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)}
+                        <input type="date" value={dateFilter} 
+                            min="2026-01-01"
+                            onChange={e => {
+                                const val = e.target.value;
+                                if (val && val < '2026-01-01') {
+                                    setDateFilter('2026-01-01');
+                                } else {
+                                    setDateFilter(val);
+                                }
+                            }}
                             style={{ ...inputStyle, paddingLeft: '36px', width: '160px' }} />
                     </div>
                 ) : (
                     <div style={{ position: 'relative' }}>
                         <CalendarDays size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                        <input type="month" value={monthFilter} onChange={e => setMonthFilter(e.target.value)}
+                        <input type="month" value={monthFilter} 
+                            min="2026-01"
+                            onChange={e => {
+                                const val = e.target.value;
+                                if (val && val < '2026-01') {
+                                    setMonthFilter('2026-01');
+                                } else {
+                                    setMonthFilter(val);
+                                }
+                            }}
                             style={{ ...inputStyle, paddingLeft: '36px', width: '160px' }} />
                     </div>
                 )}

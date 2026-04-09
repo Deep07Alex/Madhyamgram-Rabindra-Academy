@@ -31,6 +31,9 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
     try {
         const attendanceDateStr = new Date(date).toLocaleDateString('en-CA');
 
+        // REGISTRY SYNC: Ensure this date is marked as a valid school session
+        await db.query(`INSERT INTO "SchoolSession" (date) VALUES ($1) ON CONFLICT DO NOTHING`, [attendanceDateStr]);
+
         // Ensure we only have one record per student per calendar date
         const existingCheck = await db.query(
             `SELECT id FROM "Attendance" 
@@ -60,12 +63,31 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
             );
         }
 
-        broadcast('attendance:updated', { studentId, date: attendanceDateStr, status });
-        sendToUser(studentId, 'attendance:updated', { date: attendanceDateStr, status });
-        sendToRole('ADMIN', 'attendance:updated', { studentId, date: attendanceDateStr, status });
+        broadcast('attendance:updated', { 
+            studentId, 
+            date: attendanceDateStr, 
+            status, 
+            attendanceId: attendanceRes.rows[0].id 
+        });
+        sendToUser(studentId, 'attendance:updated', { 
+            date: attendanceDateStr, 
+            status,
+            attendanceId: attendanceRes.rows[0].id
+        });
+        sendToRole('ADMIN', 'attendance:updated', { 
+            studentId, 
+            date: attendanceDateStr, 
+            status,
+            attendanceId: attendanceRes.rows[0].id
+        });
         
         // Live Update - Mirroring the "Force Open/Close" Technique (Dual-stack Sockets + SSE)
-        broadcast('attendance:updated', { studentId, date: attendanceDateStr, status });
+        broadcast('attendance:updated', { 
+            studentId, 
+            date: attendanceDateStr, 
+            status,
+            attendanceId: attendanceRes.rows[0].id
+        });
 
         res.status(200).json(attendanceRes.rows[0]);
     } catch (error) {
@@ -91,24 +113,18 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
     }
 
     try {
-        // 1. Get all unique school session dates in the requested range
-        // This makes the history grow "one by one" as requested while staying performant
-        let sessionQuery = `
-            SELECT DISTINCT date::date as session_date 
-            FROM (
-                SELECT date::date FROM "Attendance"
-                UNION
-                SELECT date::date FROM "TeacherAttendance"
-            ) as session_union
-        `;
-        const sessionParams: any[] = [];
-        sessionQuery += ` WHERE EXTRACT(DOW FROM date) != 0 `;
-        if (startDate && endDate) {
-            sessionQuery += ` AND date >= $1 AND date <= $2 `;
-            sessionParams.push(new Date(startDate as string).toLocaleDateString('en-CA'));
-            sessionParams.push(new Date(endDate as string).toLocaleDateString('en-CA'));
-        }
-        sessionQuery += ` ORDER BY session_date DESC`;
+        // Institutional Launch Lock: January 2026 Minimum
+        const minLaunchDate = '2026-01-01';
+        let finalStartDate = startDate ? (new Date(startDate as string).toLocaleDateString('en-CA')) : minLaunchDate;
+        let finalEndDate = endDate ? (new Date(endDate as string).toLocaleDateString('en-CA')) : new Date().toLocaleDateString('en-CA');
+
+        if (finalStartDate < minLaunchDate) finalStartDate = minLaunchDate;
+
+        // 1. Get unique school session dates from the Registry (Blazing Fast compared to Scanning all Attendance)
+        let sessionQuery = `SELECT date::date as session_date FROM "SchoolSession" WHERE date >= $1 AND date <= $2 `;
+        const sessionParams: any[] = [finalStartDate, finalEndDate];
+        
+        sessionQuery += ` ORDER BY date DESC`;
 
         const allSessionsRes = await db.query(sessionQuery, sessionParams);
         const sessionDates = allSessionsRes.rows.map(r => new Date(r.session_date).toLocaleDateString('en-CA'));
@@ -180,13 +196,13 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
                 return recordMap.get(dateStr);
             }
 
-            // Generate virtual ABSENT record
+            // Generate virtual PRESENT record (Institutional Default)
             return {
                 id: `virtual-${dateStr}`,
                 date: dateStr,
-                status: 'ABSENT',
+                status: 'PRESENT',
                 studentId: targetStudentId,
-                subject: 'No Record',
+                subject: 'FULL DAY SESSION',
                 isVirtual: true // Flag for debugging if needed
             };
         }).filter(Boolean);
@@ -220,6 +236,9 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
 
     try {
         const attendanceDateStr = new Date(date || new Date()).toLocaleDateString('en-CA');
+
+        // REGISTRY SYNC: Ensure this date is marked as a valid school session
+        await db.query(`INSERT INTO "SchoolSession" (date) VALUES ($1) ON CONFLICT DO NOTHING`, [attendanceDateStr]);
 
         const existingCheck = await db.query(
             `SELECT id, "arrivalTime", "departureTime" FROM "TeacherAttendance" 
@@ -269,12 +288,31 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
             );
         }
 
-        broadcast('attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr, status: status || 'PRESENT' });
-        sendToUser(targetTeacherId, 'attendance:updated', { date: attendanceDateStr, status: status || 'PRESENT' });
-        sendToRole('ADMIN', 'attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr, status: status || 'PRESENT' });
+        broadcast('attendance:updated', { 
+            teacherId: targetTeacherId, 
+            date: attendanceDateStr, 
+            status: status || 'PRESENT',
+            attendanceId: attendanceRes.rows[0].id
+        });
+        sendToUser(targetTeacherId, 'attendance:updated', { 
+            date: attendanceDateStr, 
+            status: status || 'PRESENT',
+            attendanceId: attendanceRes.rows[0].id
+        });
+        sendToRole('ADMIN', 'attendance:updated', { 
+            teacherId: targetTeacherId, 
+            date: attendanceDateStr, 
+            status: status || 'PRESENT',
+            attendanceId: attendanceRes.rows[0].id
+        });
 
         // Live Update - Mirroring the "Force Open/Close" Technique (Dual-stack Sockets + SSE)
-        broadcast('attendance:updated', { teacherId: targetTeacherId, date: attendanceDateStr, status: status || 'PRESENT' });
+        broadcast('attendance:updated', { 
+            teacherId: targetTeacherId, 
+            date: attendanceDateStr, 
+            status: status || 'PRESENT',
+            attendanceId: attendanceRes.rows[0].id
+        });
 
         res.status(200).json(attendanceRes.rows[0]);
     } catch (error) {
@@ -403,31 +441,31 @@ export const getTeacherAttendance = async (req: Request, res: Response) => {
     const { teacherId, startDate, endDate } = req.query;
 
     try {
+        // Institutional Launch Lock: January 2026 Minimum
+        const minDate = '2026-01-01';
+        let finalStartDate = startDate ? (new Date(startDate as string).toLocaleDateString('en-CA')) : minDate;
+        let finalEndDate = endDate ? (new Date(endDate as string).toLocaleDateString('en-CA')) : new Date().toLocaleDateString('en-CA');
+
+        if (finalStartDate < minDate) finalStartDate = minDate;
+
         let query = `
             SELECT ta.*, 
                    COALESCE(row_to_json(t.*), row_to_json(a.*)) as teacher
             FROM "TeacherAttendance" ta
             LEFT JOIN "Teacher" t ON ta."teacherId" = t.id
             LEFT JOIN "Admin" a ON ta."teacherId" = a.id
-            WHERE 1=1
+            WHERE ta.date >= $1 AND ta.date <= $2
         `;
-        const params: any[] = [];
-        let paramCount = 1;
-
+        const params: any[] = [finalStartDate, finalEndDate];
+        
         if (teacherId) {
-            query += ` AND ta."teacherId" = $${paramCount++}`;
+            query += ` AND ta."teacherId" = $3`;
             params.push(teacherId);
         }
-
-        if (startDate && endDate) {
-            query += ` AND ta.date >= $${paramCount++} AND ta.date <= $${paramCount++}`;
-            params.push(new Date(startDate as string).toLocaleDateString('en-CA'), new Date(endDate as string).toLocaleDateString('en-CA'));
-        }
-
         query += ` ORDER BY ta.date DESC`;
 
-        const attendanceRes = await db.query(query, params);
-        res.json(attendanceRes.rows);
+        const { rows } = await db.query(query, params);
+        res.status(200).json(rows);
     } catch (error) {
         console.error('Error fetching teacher attendance:', error);
     }
