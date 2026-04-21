@@ -24,6 +24,10 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
         return res.status(403).json({ message: 'Only teachers and admins can mark attendance' });
     }
 
+    if (!['PRESENT', 'ABSENT', 'LATE'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status value (PRESENT, ABSENT, or LATE required)' });
+    }
+
     let markerId = req.user.id;
     // Admins (Principal/HM) can now mark attendance directly using their Admin ID
     // The foreign key constraint has been relaxed in the database setup
@@ -34,66 +38,50 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
         // REGISTRY SYNC: Ensure this date is marked as a valid school session
         await db.query(`INSERT INTO "SchoolSession" (date) VALUES ($1) ON CONFLICT DO NOTHING`, [attendanceDateStr]);
 
-        // Ensure we only have one record per student per calendar date
-        const existingCheck = await db.query(
-            `SELECT id FROM "Attendance" 
-             WHERE "studentId" = $1 AND date::date = $2`,
-            [studentId, attendanceDateStr]
-        );
+        // UPSERT: Handles both creation and update atomically to prevent race conditions
+        const query = `
+            INSERT INTO "Attendance" (id, date, status, "studentId", "teacherId", "classId", subject)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT ("studentId", date) 
+            DO UPDATE SET 
+                status = EXCLUDED.status, 
+                "teacherId" = EXCLUDED."teacherId", 
+                "classId" = EXCLUDED."classId", 
+                subject = EXCLUDED.subject
+            RETURNING *
+        `;
 
-        let attendanceRes;
+        const attendanceRes = await db.query(query, [
+            crypto.randomUUID(), 
+            attendanceDateStr, 
+            status, 
+            studentId, 
+            markerId, 
+            classId, 
+            subject || 'FULL DAY SESSION'
+        ]);
 
-        if (existingCheck.rows.length > 0) {
-            // Update existing record for today
-            attendanceRes = await db.query(
-                `UPDATE "Attendance"
-                 SET status = $1, "teacherId" = $2, "classId" = $3, subject = $4
-                 WHERE id = $5
-                 RETURNING *`,
-                [status, markerId, classId, subject || null, existingCheck.rows[0].id]
-            );
-        } else {
-            // Insert new record
-            const id = crypto.randomUUID();
-            attendanceRes = await db.query(
-                `INSERT INTO "Attendance" (id, date, status, "studentId", "teacherId", "classId", subject) 
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)
-                 RETURNING *`,
-                [id, attendanceDateStr, status, studentId, markerId, classId, subject || null]
-            );
-        }
+        const record = attendanceRes.rows[0];
 
         broadcast('attendance:updated', { 
             studentId, 
             date: attendanceDateStr, 
             status, 
-            attendanceId: attendanceRes.rows[0].id 
+            attendanceId: record.id 
         });
+        
         sendToUser(studentId, 'attendance:updated', { 
             date: attendanceDateStr, 
             status,
-            attendanceId: attendanceRes.rows[0].id
-        });
-        sendToRole('ADMIN', 'attendance:updated', { 
-            studentId, 
-            date: attendanceDateStr, 
-            status,
-            attendanceId: attendanceRes.rows[0].id
-        });
-        
-        // Live Update - Mirroring the "Force Open/Close" Technique (Dual-stack Sockets + SSE)
-        broadcast('attendance:updated', { 
-            studentId, 
-            date: attendanceDateStr, 
-            status,
-            attendanceId: attendanceRes.rows[0].id
+            attendanceId: record.id
         });
 
-        res.status(200).json(attendanceRes.rows[0]);
+        res.status(200).json(record);
     } catch (error) {
         console.error('Error marking student attendance:', error);
         res.status(500).json({ message: 'Error marking student attendance' });
     }
+
 };
 
 /**
@@ -240,85 +228,52 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
         // REGISTRY SYNC: Ensure this date is marked as a valid school session
         await db.query(`INSERT INTO "SchoolSession" (date) VALUES ($1) ON CONFLICT DO NOTHING`, [attendanceDateStr]);
 
-        const existingCheck = await db.query(
-            `SELECT id, "arrivalTime", "departureTime" FROM "TeacherAttendance" 
-             WHERE "teacherId" = $1 AND date::date = $2`,
-            [targetTeacherId, attendanceDateStr]
-        );
+        // UPSERT: Atomic Teacher Attendance
+        const query = `
+            INSERT INTO "TeacherAttendance" (id, date, status, reason, "arrivalTime", "departureTime", "earlyLeaveReason", "teacherId")
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ON CONFLICT ("teacherId", date) 
+            DO UPDATE SET 
+                status = EXCLUDED.status,
+                reason = EXCLUDED.reason,
+                "arrivalTime" = EXCLUDED."arrivalTime",
+                "departureTime" = EXCLUDED."departureTime",
+                "earlyLeaveReason" = EXCLUDED."earlyLeaveReason"
+            RETURNING *
+        `;
 
-        let attendanceRes;
+        const attendanceRes = await db.query(query, [
+            crypto.randomUUID(),
+            attendanceDateStr,
+            status || 'PRESENT',
+            status === 'ABSENT' ? (reason || null) : null,
+            arrivalTime || null,
+            departureTime || null,
+            earlyLeaveReason || null,
+            targetTeacherId
+        ]);
 
-        if (existingCheck.rows.length > 0) {
-            // Update existing record with coalesced values
-            attendanceRes = await db.query(
-                `UPDATE "TeacherAttendance"
-                 SET status = COALESCE($1, status),
-                     reason = COALESCE($2, reason),
-                     "arrivalTime" = COALESCE($3, "arrivalTime"),
-                     "departureTime" = COALESCE($4, "departureTime"),
-                     "earlyLeaveReason" = COALESCE($5, "earlyLeaveReason")
-                 WHERE id = $6
-                 RETURNING *`,
-                [
-                    status || null,
-                    status === 'ABSENT' ? reason : null,
-                    arrivalTime || null,
-                    departureTime || null,
-                    earlyLeaveReason || null,
-                    existingCheck.rows[0].id
-                ]
-            );
-        } else {
-            // Insert new record
-            const id = crypto.randomUUID();
-            attendanceRes = await db.query(
-                `INSERT INTO "TeacherAttendance" (id, date, status, reason, "arrivalTime", "departureTime", "earlyLeaveReason", "teacherId") 
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                 RETURNING *`,
-                [
-                    id,
-                    attendanceDateStr,
-                    status || 'PRESENT',
-                    status === 'ABSENT' ? reason : null,
-                    arrivalTime || null,
-                    departureTime || null,
-                    earlyLeaveReason || null,
-                    targetTeacherId
-                ]
-            );
-        }
+        const record = attendanceRes.rows[0];
 
         broadcast('attendance:updated', { 
             teacherId: targetTeacherId, 
             date: attendanceDateStr, 
             status: status || 'PRESENT',
-            attendanceId: attendanceRes.rows[0].id
+            attendanceId: record.id
         });
+        
         sendToUser(targetTeacherId, 'attendance:updated', { 
             date: attendanceDateStr, 
             status: status || 'PRESENT',
-            attendanceId: attendanceRes.rows[0].id
-        });
-        sendToRole('ADMIN', 'attendance:updated', { 
-            teacherId: targetTeacherId, 
-            date: attendanceDateStr, 
-            status: status || 'PRESENT',
-            attendanceId: attendanceRes.rows[0].id
+            attendanceId: record.id
         });
 
-        // Live Update - Mirroring the "Force Open/Close" Technique (Dual-stack Sockets + SSE)
-        broadcast('attendance:updated', { 
-            teacherId: targetTeacherId, 
-            date: attendanceDateStr, 
-            status: status || 'PRESENT',
-            attendanceId: attendanceRes.rows[0].id
-        });
-
-        res.status(200).json(attendanceRes.rows[0]);
+        res.status(200).json(record);
     } catch (error) {
         console.error('Error marking teacher attendance:', error);
         res.status(500).json({ message: 'Error marking teacher attendance' });
     }
+
 };
 
 // --- Admin Update Attendance ---
@@ -330,8 +285,8 @@ export const updateStudentAttendance = async (req: AuthRequest, res: Response) =
     const { id } = req.params;
     const { status } = req.body;
 
-    if (!['PRESENT', 'ABSENT'].includes(status)) {
-        return res.status(400).json({ message: 'Invalid status value' });
+    if (!['PRESENT', 'ABSENT', 'LATE'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status value (PRESENT, ABSENT, or LATE required)' });
     }
 
     try {
@@ -374,8 +329,8 @@ export const updateTeacherAttendance = async (req: AuthRequest, res: Response) =
     const arrivalProvided = req.body.hasOwnProperty('arrivalTime');
     const departureProvided = req.body.hasOwnProperty('departureTime');
 
-    if (!['PRESENT', 'ABSENT'].includes(status)) {
-        return res.status(400).json({ message: 'Invalid status value' });
+    if (!['PRESENT', 'ABSENT', 'LATE'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status value (PRESENT, ABSENT, or LATE required)' });
     }
 
     try {
@@ -501,5 +456,144 @@ export const updateAttendanceConfig = async (req: AuthRequest, res: Response) =>
     } catch (error) {
         console.error('Error updating attendance config:', error);
         res.status(500).json({ message: 'Error updating attendance config' });
+    }
+};
+
+export const bulkMarkStudentAbsent = async (req: AuthRequest, res: Response) => {
+    const { date, classId } = req.body;
+    if (!req.user?.id || req.user.role !== 'ADMIN') {
+        return res.status(403).json({ message: 'Only admins can perform bulk operations' });
+    }
+
+    if (!date) {
+        return res.status(400).json({ message: 'Date is required' });
+    }
+
+    try {
+        const attendanceDateStr = new Date(date).toLocaleDateString('en-CA');
+        const markerId = req.user.id;
+
+        // Ensure date is in SchoolSession
+        await db.query(`INSERT INTO "SchoolSession" (date) VALUES ($1) ON CONFLICT DO NOTHING`, [attendanceDateStr]);
+
+        let query = '';
+        const params: any[] = [attendanceDateStr, markerId, 'ABSENT', 'FULL DAY SESSION'];
+
+        if (classId) {
+            // Mark all students in a specific class
+            query = `
+                INSERT INTO "Attendance" (id, date, status, "studentId", "teacherId", "classId", subject)
+                SELECT 
+                    gen_random_uuid(), 
+                    $1, 
+                    $3, 
+                    id, 
+                    $2, 
+                    "classId", 
+                    $4
+                FROM "Student"
+                WHERE "classId" = $5
+                ON CONFLICT ("studentId", date) 
+                DO UPDATE SET 
+                    status = EXCLUDED.status, 
+                    "teacherId" = EXCLUDED."teacherId", 
+                    "classId" = EXCLUDED."classId", 
+                    subject = EXCLUDED.subject
+            `;
+            params.push(classId);
+        } else {
+            // Mark ALL students
+            query = `
+                INSERT INTO "Attendance" (id, date, status, "studentId", "teacherId", "classId", subject)
+                SELECT 
+                    gen_random_uuid(), 
+                    $1, 
+                    $3, 
+                    id, 
+                    $2, 
+                    "classId", 
+                    $4
+                FROM "Student"
+                ON CONFLICT ("studentId", date) 
+                DO UPDATE SET 
+                    status = EXCLUDED.status, 
+                    "teacherId" = EXCLUDED."teacherId", 
+                    "classId" = EXCLUDED."classId", 
+                    subject = EXCLUDED.subject
+            `;
+        }
+
+        await db.query(query, params);
+
+        broadcast('attendance:bulk_updated', { date: attendanceDateStr, classId, status: 'ABSENT' });
+
+        res.status(200).json({ message: `Successfully marked all students ${classId ? 'in class' : 'of all classes'} as absent` });
+    } catch (error) {
+        console.error('Error bulk marking attendance:', error);
+        res.status(500).json({ message: 'Error bulk marking attendance' });
+    }
+};
+
+/**
+ * Administrative summary of attendance for all students.
+ * Used to display individual stats (X of Y days, %) in the admin dashboard.
+ */
+export const getStudentStatsSummary = async (req: AuthRequest, res: Response) => {
+    const { classId, academicYear } = req.query;
+    
+    try {
+        const year = academicYear || new Date().getFullYear();
+        const startDate = `${year}-01-01`;
+        const endDate = `${year}-12-31`;
+
+        // 1. Get Total Sessions (School Days)
+        const sessionCountRes = await db.query(
+            `SELECT COUNT(*)::int as count FROM "SchoolSession" WHERE date >= $1 AND date <= $2`,
+            [startDate, endDate]
+        );
+        let totalSessions = sessionCountRes.rows[0].count;
+
+        // Add today if it's a valid session but not in Registry yet
+        const today = new Date();
+        if (year.toString() === today.getFullYear().toString() && today.getDay() !== 0) {
+            const todayStr = today.toLocaleDateString('en-CA');
+            const checkRegistry = await db.query(`SELECT 1 FROM "SchoolSession" WHERE date = $1`, [todayStr]);
+            if (checkRegistry.rows.length === 0 && todayStr >= startDate && todayStr <= endDate) {
+               totalSessions += 1;
+            }
+        }
+
+        // 2. Get Absent Counts per student efficiently
+        let absentQuery = `
+            SELECT "studentId", COUNT(*)::int as absent_count
+            FROM "Attendance"
+            WHERE status = 'ABSENT' 
+              AND date >= $1 AND date <= $2
+        `;
+        const params: any[] = [startDate, endDate];
+        if (classId) {
+            absentQuery += ` AND "classId" = $3`;
+            params.push(classId);
+        }
+        absentQuery += ` GROUP BY "studentId"`;
+
+        const absentRes = await db.query(absentQuery, params);
+        
+        // Map stats: Presence = Total Sessions - Absent Count
+        const statsMap: Record<string, any> = {};
+        absentRes.rows.forEach(row => {
+            statsMap[row.studentId] = {
+                absent: row.absent_count,
+                present: Math.max(0, totalSessions - row.absent_count)
+            };
+        });
+
+        res.json({
+            stats: statsMap,
+            totalSessions
+        });
+    } catch (error) {
+        console.error('Error fetching student stats summary:', error);
+        res.status(500).json({ message: 'Error fetching stats summary' });
     }
 };

@@ -111,6 +111,23 @@ function MainPage() {
   }, []);
 
   useEffect(() => {
+    // Optimization: Load cached data if available for instant rendering
+    const cachedData = localStorage.getItem('main_page_cache');
+    if (cachedData) {
+      try {
+        const parsed = JSON.parse(cachedData);
+        if (parsed.heroBanner) setHeroBanner(parsed.heroBanner);
+        if (parsed.festivalBanners) setFestivalBanners(parsed.festivalBanners);
+        if (parsed.toppers) setToppers(parsed.toppers);
+        if (parsed.gallery) setGalleryItems(parsed.gallery);
+        if (parsed.notices) setNotices(parsed.notices);
+        if (parsed.resources) setResources(parsed.resources);
+        if (parsed.alumni) setAlumni(parsed.alumni);
+      } catch (e) {
+        console.warn('Failed to parse main page cache');
+      }
+    }
+
     // Fetch all dynamic assets in parallel to optimize initial load
     Promise.all([
       api.get("/system/hero-banner"),
@@ -121,27 +138,40 @@ function MainPage() {
       api.get("/resources"),
       api.get("/alumni")
     ]).then(([heroRes, festRes, topperRes, galleryRes, noticeRes, resourceRes, alumniRes]) => {
-      if (heroRes.data.url) setHeroBanner(heroRes.data.url);
-      else setHeroBanner("/banner.png");
+      const newHero = heroRes.data.url || "/banner.png";
+      const newFest = festRes.data.banners || [];
+      const newToppers = topperRes.data.students || [];
+      const newGallery = Array.isArray(galleryRes.data) ? galleryRes.data.map((item: any) => ({
+        src: item.imageUrl,
+        caption: item.title,
+      })) : [];
+      const newNotices = (noticeRes.data || []).filter((n: any) => n.type === "PUBLIC");
+      const newResources = resourceRes.data || [];
+      const newAlumni = alumniRes.data || [];
 
-      if (festRes.data.banners) setFestivalBanners(festRes.data.banners);
-      if (topperRes.data.students) setToppers(topperRes.data.students);
+      setHeroBanner(newHero);
+      if (festRes.data.banners) setFestivalBanners(newFest);
+      if (topperRes.data.students) setToppers(newToppers);
       if (topperRes.data.session) setTopperSession(topperRes.data.session);
+      setGalleryItems(newGallery);
+      setNotices(newNotices);
+      setResources(newResources);
+      setAlumni(newAlumni);
 
-      if (Array.isArray(galleryRes.data)) {
-        setGalleryItems(galleryRes.data.map((item: any) => ({
-          src: item.imageUrl,
-          caption: item.title,
-        })));
-      }
-
-      setNotices(noticeRes.data.filter((n: any) => n.type === "PUBLIC"));
-      setResources(resourceRes.data);
-      setAlumni(alumniRes.data);
+      // Cache the result for next time
+      localStorage.setItem('main_page_cache', JSON.stringify({
+        heroBanner: newHero,
+        festivalBanners: newFest,
+        toppers: newToppers,
+        gallery: newGallery,
+        notices: newNotices,
+        resources: newResources,
+        alumni: newAlumni
+      }));
     }).catch(err => {
       console.error("Initial data load failed:", err);
       // Ensure fallbacks are set even on failure
-      setHeroBanner("/banner.png");
+      if (!heroBanner) setHeroBanner("/banner.png");
     });
   }, []);
 
@@ -179,8 +209,10 @@ function MainPage() {
     };
   }, [navOpen]);
 
+  const isNative = Capacitor.isNativePlatform();
+
   return (
-    <div className="main-page-wrapper">
+    <div className={`main-page-wrapper ${isNative ? 'native-app' : ''}`}>
       <Navbar open={navOpen} onToggle={() => setNavOpen(!navOpen)} />
 
       <div className="main-container">
@@ -189,7 +221,7 @@ function MainPage() {
         <MemoizedNoticeAndResources notices={notices} resources={resources} />
         <MemoizedFestivalSection banners={festivalBanners} />
         <MemoizedGallery items={galleryItems} />
-        <MemoizedAlumniGallery photos={alumni} />
+        <MemoizedAlumniGallery photos={alumni} isNative={isNative} />
       </div>
 
       <MemoizedFooter />
@@ -348,15 +380,15 @@ function ToppersSection({ students, session }: { students: any[], session: strin
         <Swiper
           modules={[Autoplay, Pagination]}
           spaceBetween={20}
-          slidesPerView={1.1}
+          slidesPerView={1.2}
           centeredSlides={false}
           loop={students.length > 4}
           autoplay={{ delay: 3500, disableOnInteraction: false }}
           pagination={{ clickable: true, dynamicBullets: true }}
           breakpoints={{
-            500: { slidesPerView: 2 },
-            800: { slidesPerView: 3 },
-            1100: { slidesPerView: 4 }
+            480: { slidesPerView: 2.2 },
+            768: { slidesPerView: 3.2 },
+            1024: { slidesPerView: 4 }
           }}
           className="toppers-swiper"
         >
@@ -583,7 +615,7 @@ function NoticeAndResources({ notices, resources }: { notices: any[]; resources:
   );
 }
 
-function AlumniGallery({ photos }: { photos: any[] }) {
+function AlumniGallery({ photos, isNative }: { photos: any[]; isNative: boolean }) {
   const [visibleCount, setVisibleCount] = useState(6);
   const baseUrl = getBaseUrl();
 
@@ -601,9 +633,51 @@ function AlumniGallery({ photos }: { photos: any[] }) {
         </p>
       </div>
 
-      <div className="alumni-grid">
-        {photos.length > 0 ? (
-          <>
+      {photos.length > 0 ? (
+        isNative ? (
+          <div className="alumni-slider-wrapper" style={{ padding: "0 0 40px", maxWidth: "1200px", margin: "0 auto" }}>
+            <Swiper
+              modules={[Autoplay, Pagination, Navigation]}
+              spaceBetween={20}
+              slidesPerView={1.2}
+              navigation
+              autoplay={{ delay: 4500, disableOnInteraction: false }}
+              pagination={{ clickable: true, dynamicBullets: true }}
+              className="alumni-swiper"
+            >
+              {photos.map((photo) => (
+                <SwiperSlide key={photo.id}>
+                  <div className="alumni-card">
+                    <div className="alumni-image-wrapper">
+                      <img
+                        src={(photo.imageUrl.startsWith("/") ? `${baseUrl}${photo.imageUrl}` : photo.imageUrl)}
+                        alt={photo.title}
+                        loading="lazy"
+                      />
+                      <div className="alumni-overlay">
+                        <a
+                          href={(photo.imageUrl.startsWith("/") ? `${baseUrl}${photo.imageUrl}` : photo.imageUrl)}
+                          download
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="alumni-download-btn"
+                          title="Download high-res photo"
+                        >
+                          <Download size={22} />
+                        </a>
+                      </div>
+                    </div>
+                    <div className="alumni-info">
+                      <h4>{photo.title}</h4>
+                      {photo.description && <p>{photo.description}</p>}
+                    </div>
+                  </div>
+                </SwiperSlide>
+              ))}
+            </Swiper>
+          </div>
+        ) : (
+          <div className="alumni-grid">
             {visiblePhotos.map((photo) => (
               <div key={photo.id} className="alumni-card">
                 <div className="alumni-image-wrapper">
@@ -631,16 +705,16 @@ function AlumniGallery({ photos }: { photos: any[] }) {
                 </div>
               </div>
             ))}
-          </>
-        ) : (
-          <div className="empty-alumni">
-            <Users size={40} />
-            <p>Our alumni memories are being curated. Check back soon!</p>
           </div>
-        )}
-      </div>
+        )
+      ) : (
+        <div className="empty-alumni">
+          <Users size={40} />
+          <p>Our alumni memories are being curated. Check back soon!</p>
+        </div>
+      )}
 
-      {hasMore && (
+      {!isNative && hasMore && (
         <div className="load-more-container">
           <button
             className="btn-load-more"

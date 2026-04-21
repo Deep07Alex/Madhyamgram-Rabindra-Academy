@@ -93,47 +93,38 @@ const InlineStatusEdit = React.memo(({
     initialReason?: string | null;
     onUpdated: (silent?: boolean) => void;
 }) => {
-    const [editing, setEditing] = useState(false);
-    const [status, setStatus] = useState<AttendanceStatus | ''>(currentStatus || '');
-    const [reason, setReason] = useState(initialReason || '');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { showToast } = useToast();
 
     useEffect(() => {
-        if (!editing && !isSubmitting) {
-            setStatus(currentStatus || '');
-            setReason(initialReason || '');
-        }
-        // Auto-clear submitting state when prop catches up
-        if (isSubmitting && currentStatus === status && (!reason || reason === initialReason)) {
+        if (isSubmitting) {
             setIsSubmitting(false);
         }
-    }, [currentStatus, initialReason, editing, isSubmitting, status, reason]);
+    }, [currentStatus]);
 
-    const save = async () => {
-        if (!status) {
-            showToast('Please select a valid status', 'error');
-            return;
-        }
+
+    const toggle = async () => {
+        // Toggle Logic: Null/Absent -> Present, Present -> Absent
+        const nextStatus = currentStatus === 'PRESENT' ? 'ABSENT' : 'PRESENT';
+        
         setIsSubmitting(true);
         try {
             if (attendanceId) {
                 const endpoint = type === 'student'
                     ? `/attendance/admin/student/${attendanceId}`
                     : `/attendance/admin/teacher/${attendanceId}`;
-                await api.patch(endpoint, type === 'teacher' ? { status, reason } : { status });
+                await api.patch(endpoint, type === 'teacher' ? { status: nextStatus, reason: initialReason } : { status: nextStatus });
             } else {
                 if (type === 'student') {
                     await api.post('/attendance/student', {
-                        date, status, studentId: personId,
+                        date, status: nextStatus, studentId: personId,
                         classId: classId || '', subject: 'FULL DAY SESSION'
                     });
                 } else {
-                    await api.post('/attendance/teacher', { date, status, reason, teacherId: personId });
+                    await api.post('/attendance/teacher', { date, status: nextStatus, reason: '', teacherId: personId });
                 }
             }
-            showToast('Attendance updated!', 'success');
-            setEditing(false);
+            showToast(`Marked as ${nextStatus}`, 'success');
             onUpdated(true);
         } catch {
             showToast('Failed to update attendance.', 'error');
@@ -141,68 +132,25 @@ const InlineStatusEdit = React.memo(({
         }
     };
 
-    if (!editing) {
-        return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {isSubmitting ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 12px', background: 'var(--bg-main)', borderRadius: '20px', border: '1px solid var(--border-soft)' }}>
-                            <div className="animate-spin" style={{ width: '12px', height: '12px', border: '2px solid var(--primary-bold)', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
-                            <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text-muted)' }}>Updating...</span>
-                        </div>
-                    ) : (
-                        <>
-                            <StatusBadge status={currentStatus} />
-                            <button onClick={() => setEditing(true)} style={{
-                                background: 'none', border: 'none', cursor: 'pointer',
-                                color: 'var(--text-muted)', padding: '2px', display: 'flex'
-                            }} title="Edit">
-                                <Pencil size={14} />
-                            </button>
-                        </>
-                    )}
-                </div>
-                {type === 'teacher' && currentStatus === 'ABSENT' && initialReason && !isSubmitting && (
-                    <span style={{ fontSize: '0.75rem', color: '#ef4444', background: 'var(--bg-main)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                        {initialReason}
-                    </span>
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isSubmitting ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 12px', background: 'var(--bg-main)', borderRadius: '20px', border: '1px solid var(--border-soft)' }}>
+                        <div className="animate-spin" style={{ width: '12px', height: '12px', border: '2px solid var(--primary-bold)', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
+                        <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text-muted)' }}>Updating...</span>
+                    </div>
+                ) : (
+                    <div onClick={toggle} style={{ cursor: 'pointer', transition: 'transform 0.1s' }} onMouseDown={e => e.currentTarget.style.transform = 'scale(0.96)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
+                        <StatusBadge status={currentStatus} />
+                    </div>
                 )}
             </div>
-        );
-    }
-
-    return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <CustomSelect
-                value={status}
-                onChange={val => setStatus(val as AttendanceStatus)}
-                options={[
-                    { value: 'PRESENT', label: 'PRESENT', color: '#22c55e' },
-                    { value: 'ABSENT', label: 'ABSENT', color: '#ef4444' }
-                ]}
-                placeholder="Status"
-                size="sm"
-                className="compact-status-select"
-                containerStyle={{ width: '140px' }}
-            />
-            {type === 'teacher' && status === 'ABSENT' && (
-                <input
-                    type="text"
-                    placeholder="Reason..."
-                    value={reason}
-                    onChange={e => setReason(e.target.value)}
-                    style={{
-                        border: '1px solid var(--border-soft)', borderRadius: '6px',
-                        padding: '4px 8px', fontSize: '0.82rem', width: '120px'
-                    }}
-                />
+            {type === 'teacher' && currentStatus === 'ABSENT' && initialReason && !isSubmitting && (
+                <span style={{ fontSize: '0.75rem', color: '#ef4444', background: 'var(--bg-main)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                    {initialReason}
+                </span>
             )}
-            <button onClick={save} style={{ background: '#22c55e', border: 'none', borderRadius: '6px', padding: '4px 6px', cursor: 'pointer', color: 'white', display: 'flex' }}>
-                <Check size={14} />
-            </button>
-            <button onClick={() => { setStatus(currentStatus || ''); setReason(initialReason || ''); setEditing(false); }} style={{ background: '#ef4444', border: 'none', borderRadius: '6px', padding: '4px 6px', cursor: 'pointer', color: 'white', display: 'flex' }}>
-                <X size={14} />
-            </button>
         </div>
     );
 });
@@ -332,14 +280,16 @@ const StudentAttendanceRow = React.memo(({
     dateFilter,
     monthlyDataMap,
     fetchStudentData,
-    totalSessions
+    totalSessions,
+    stats
 }: {
     row: StudentRow,
     viewMode: 'daily' | 'monthly',
     dateFilter: string,
     monthlyDataMap: any,
     fetchStudentData: any,
-    totalSessions: number
+    totalSessions: number,
+    stats?: { present: number, absent: number, total: number }
 }) => {
     return (
         <tr style={{ borderBottom: '1px solid var(--border-soft)', transition: 'background 0.15s' }}
@@ -355,6 +305,31 @@ const StudentAttendanceRow = React.memo(({
                     {row.className}
                 </span>
             </td>
+            {viewMode === 'daily' && (
+                <td style={{ padding: '14px 20px' }}>
+                    {stats ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '0.9rem', fontWeight: '900', color: 'var(--text-main)' }}>
+                                    {stats.total > 0 ? ((stats.present / stats.total) * 100).toFixed(0) : '0'}%
+                                </span>
+                                <div style={{ height: '4px', width: '40px', background: 'var(--bg-main)', borderRadius: '4px', overflow: 'hidden' }}>
+                                    <div style={{ 
+                                        height: '100%', 
+                                        width: `${Math.min(100, (stats.present / (stats.total || 1)) * 100)}%`, 
+                                        background: (stats.present / (stats.total || 1)) > 0.75 ? '#22c55e' : (stats.present / (stats.total || 1)) > 0.5 ? '#f59e0b' : '#ef4444'
+                                    }}></div>
+                                </div>
+                            </div>
+                            <span style={{ fontSize: '0.68rem', fontWeight: '600', color: 'var(--text-muted)' }}>
+                                {stats.present} of {stats.total} days
+                            </span>
+                        </div>
+                    ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>—</span>
+                    )}
+                </td>
+            )}
             <td style={{ padding: '14px 20px' }}>
                 {viewMode === 'daily' ? (
                     dateFilter ? (
@@ -497,16 +472,27 @@ const ManageAttendance = () => {
     const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
     const [attendanceStatus, setAttendanceStatus] = useState<'AUTO' | 'OPEN' | 'CLOSED'>('AUTO');
     const [togglingOverride, setTogglingOverride] = useState(false);
+    const [markingBulkAbsent, setMarkingBulkAbsent] = useState(false);
 
     // Pagination state
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
     const [totalSessions, setTotalSessions] = useState(0);
+    const [isLoading, setIsLoading] = useState(false);
     const limit = 20;
+    const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search), 350);
+        return () => clearTimeout(timer);
+    }, [search]);
 
     // Student state
     const [studentRows, setStudentRows] = useState<StudentRow[]>([]);
+    const [attendanceStats, setAttendanceStats] = useState<Record<string, any>>({});
+    const [statsTotalSessions, setStatsTotalSessions] = useState(0);
     const fetchConfig = useCallback(async () => {
         try {
             const res = await api.get('/attendance/config');
@@ -544,6 +530,34 @@ const ManageAttendance = () => {
         }
     };
 
+    const handleBulkMarkAbsent = async () => {
+        if (!dateFilter) {
+            showToast('Please select a date first', 'error');
+            return;
+        }
+
+        setMarkingBulkAbsent(true);
+        try {
+            await api.post('/attendance/bulk-absent', {
+                date: dateFilter,
+                classId: selectedClass || null
+            });
+            showToast('Bulk attendance update successful!', 'success');
+
+            // Refresh data
+            if (viewMode === 'daily') {
+                if (tab === 'students') fetchStudentData();
+            } else {
+                fetchMonthlyData();
+            }
+        } catch (err) {
+            console.error('Bulk absent error:', err);
+            showToast('Failed to mark bulk absent.', 'error');
+        } finally {
+            setMarkingBulkAbsent(false);
+        }
+    };
+
     // Use SSE for real-time sync
     useServerEvents({
         'system:config_updated': (data: any) => {
@@ -553,7 +567,7 @@ const ManageAttendance = () => {
         },
         'attendance:updated': (data: any) => {
             const dateStr = dateFilter;
-            
+
             // Optimization: If update is for the currently viewed date, update local state immediately
             if (data && data.status && data.date === dateStr) {
                 if (data.studentId) {
@@ -572,6 +586,17 @@ const ManageAttendance = () => {
                     }
                 }, 300);
             }
+        },
+        'attendance:bulk_updated': (data: any) => {
+            const dateStr = dateFilter;
+            if (data && data.date === dateStr) {
+                if (viewMode === 'daily') {
+                    if (tab === 'students') fetchStudentData();
+                    else fetchTeacherData();
+                } else {
+                    fetchMonthlyData();
+                }
+            }
         }
     });
 
@@ -584,7 +609,6 @@ const ManageAttendance = () => {
     // Shared
     const [dateFilter, setDateFilter] = useState(new Date().toLocaleDateString('en-CA'));
     const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
-    const [search, setSearch] = useState('');
 
     const fetchClasses = useCallback(async () => {
         try {
@@ -602,29 +626,31 @@ const ManageAttendance = () => {
     // ── Fetch students + attendance for date
     const fetchStudentData = useCallback(async () => {
         if (viewMode !== 'daily') return;
+        setIsLoading(true);
         try {
-            const [stuRes, attRes] = await Promise.all([
+            const [stuRes, attRes, statsRes] = await Promise.all([
                 api.get('/users/students', {
                     params: {
                         page,
                         limit,
                         classId: selectedClass,
-                        search: search
+                        search: debouncedSearch
                     }
                 }),
                 api.get('/attendance/student', {
                     params: dateFilter ? { startDate: dateFilter, endDate: dateFilter } : {}
+                }),
+                api.get('/attendance/stats/students', {
+                    params: {
+                        classId: selectedClass || null
+                    }
                 })
             ]);
 
-            // Build a map: studentId → attendance record for the selected date
             const attMap: Record<string, any> = {};
             const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
-            attRecords.forEach((a: any) => {
-                if (!attMap[a.studentId]) attMap[a.studentId] = a;
-            });
+            attRecords.forEach((a: any) => { if (!attMap[a.studentId]) attMap[a.studentId] = a; });
 
-            // Get class name lookup
             const classMap: Record<string, string> = {};
             classes.forEach((c: any) => { classMap[c.id] = c.name; });
 
@@ -649,9 +675,15 @@ const ManageAttendance = () => {
             });
 
             setStudentRows(rows);
+            setAttendanceStats(statsRes.data.stats || {});
+            setStatsTotalSessions(statsRes.data.totalSessions || 0);
+        } catch (err) {
+            console.error('Failed to fetch student data:', err);
+            showToast('Failed to sync student attendance records', 'error');
         } finally {
+            setIsLoading(false);
         }
-    }, [dateFilter, viewMode, page, limit, selectedClass, search, classes]);
+    }, [dateFilter, viewMode, page, limit, selectedClass, debouncedSearch, classes]);
 
 
     // ── Fetch teachers + attendance for date ──────────────────────────────
@@ -663,7 +695,7 @@ const ManageAttendance = () => {
                     params: {
                         page,
                         limit,
-                        search: search,
+                        search: debouncedSearch,
                         filter: tab === 'teachers' ? 'teachers' : (tab === 'staff' ? 'staff' : '')
                     }
                 }),
@@ -701,7 +733,7 @@ const ManageAttendance = () => {
             setTeacherRows(rows);
         } finally {
         }
-    }, [dateFilter, viewMode, showToast, page, limit, search]);
+    }, [dateFilter, viewMode, showToast, page, limit, debouncedSearch]);
 
     // ── Fetch Monthly Data ────────────────────────────────────────────────────
     const [monthlyDataMap, setMonthlyDataMap] = useState<Record<string, Record<string, any>>>({}); // personId -> { dateStr -> record }
@@ -735,7 +767,7 @@ const ManageAttendance = () => {
                             classId: selectedClass,
                             page,
                             limit,
-                            search: search
+                            search: debouncedSearch
                         }
                     }),
                     api.get('/attendance/student', { params: { classId: selectedClass, startDate, endDate } })
@@ -766,7 +798,7 @@ const ManageAttendance = () => {
                         params: {
                             page,
                             limit,
-                            search: search
+                            search: debouncedSearch
                         }
                     }),
                     api.get('/attendance/teacher', { params: { startDate, endDate } })
@@ -794,7 +826,7 @@ const ManageAttendance = () => {
             showToast('Failed to load monthly data.', 'error');
         } finally {
         }
-    }, [viewMode, tab, monthFilter, selectedClass, classes.length, showToast, page, limit, search]);
+    }, [viewMode, tab, monthFilter, selectedClass, classes.length, showToast, page, limit, debouncedSearch]);
 
     useEffect(() => {
         setPage(1);
@@ -968,7 +1000,7 @@ const ManageAttendance = () => {
                 {viewMode === 'daily' ? (
                     <div style={{ position: 'relative' }}>
                         <CalendarDays size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                        <input type="date" value={dateFilter} 
+                        <input type="date" value={dateFilter}
                             min="2026-01-01"
                             onChange={e => {
                                 const val = e.target.value;
@@ -983,7 +1015,7 @@ const ManageAttendance = () => {
                 ) : (
                     <div style={{ position: 'relative' }}>
                         <CalendarDays size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                        <input type="month" value={monthFilter} 
+                        <input type="month" value={monthFilter}
                             min="2026-01"
                             onChange={e => {
                                 const val = e.target.value;
@@ -1019,7 +1051,38 @@ const ManageAttendance = () => {
                         borderRadius: 'var(--radius-md)', cursor: 'pointer', color: '#dc2626',
                         fontWeight: '600', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px'
                     }}>
-                        <X size={13} /> All Dates
+                        <X size={13} /> Clear Date
+                    </button>
+                )}
+
+                {viewMode === 'daily' && dateFilter && tab === 'students' && (
+                    <button
+                        onClick={handleBulkMarkAbsent}
+                        disabled={markingBulkAbsent}
+                        style={{
+                            padding: '8px 16px',
+                            background: '#ef4444',
+                            border: 'none',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            color: 'white',
+                            fontWeight: '700',
+                            fontSize: '0.82rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#dc2626'}
+                        onMouseLeave={e => e.currentTarget.style.background = '#ef4444'}
+                    >
+                        {markingBulkAbsent ? (
+                            <div className="animate-spin" style={{ width: '14px', height: '14px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
+                        ) : (
+                            <Users size={14} />
+                        )}
+                        Mark {selectedClass ? 'Class' : 'Everyone'} Absent
                     </button>
                 )}
             </div>
@@ -1035,6 +1098,15 @@ const ManageAttendance = () => {
                 minHeight: '400px'
             }}>
                 {/* Table Header/Body */}
+                {isLoading && (
+                    <div style={{
+                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(2px)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10
+                    }}>
+                        <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid var(--primary-bold)', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
+                    </div>
+                )}
                 <div className="table-responsive">
                     <table className="data-table">
                         <thead>
@@ -1044,6 +1116,7 @@ const ManageAttendance = () => {
                                         <th style={thStyle}>Student</th>
                                         <th style={thStyle}>Roll #</th>
                                         <th style={thStyle}>Class</th>
+                                        {viewMode === 'daily' && <th style={thStyle}>Attendance Stats</th>}
                                     </>
                                 ) : (
                                     <>
@@ -1073,6 +1146,7 @@ const ManageAttendance = () => {
                                             monthlyDataMap={monthlyDataMap}
                                             fetchStudentData={fetchStudentData}
                                             totalSessions={totalSessions}
+                                            stats={attendanceStats[row.id] ? { ...attendanceStats[row.id], total: statsTotalSessions } : undefined}
                                         />
                                     ) : (
                                         <TeacherAttendanceRow

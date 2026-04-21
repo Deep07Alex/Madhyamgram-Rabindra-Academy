@@ -132,20 +132,30 @@ export const getTeachers = async (req: Request, res: Response) => {
  */
 export const getClasses = async (req: AuthRequest, res: Response) => {
     try {
+        // Optimized Single-Pass Query: Using lateral joins or pre-aggregation is faster than subqueries in SELECT
         const query = `
+            WITH StudentCounts AS (
+                SELECT "classId", COUNT(*) as count FROM "Student" GROUP BY "classId"
+            ),
+            TeacherAssignment AS (
+                SELECT ct."A" as "classId", json_agg(row_to_json(t.*)) as teachers
+                FROM "Teacher" t 
+                JOIN "_ClassToTeacher" ct ON ct."B" = t.id 
+                GROUP BY ct."A"
+            ),
+            SubjectAssignment AS (
+                SELECT sb."classId", json_agg(row_to_json(sb.*) ORDER BY sb."name" ASC) as subjects
+                FROM "Subject" sb 
+                GROUP BY sb."classId"
+            )
             SELECT c.*, 
-            (SELECT COUNT(*) FROM "Student" s WHERE s."classId" = c.id) as "_count_students",
-            (SELECT json_agg(row_to_json(t.*)) 
-             FROM "Teacher" t 
-             JOIN "_ClassToTeacher" ct ON ct."B" = t.id 
-             WHERE ct."A" = c.id) as teachers,
-            (SELECT json_agg(row_to_json(sub.*))
-             FROM (
-                 SELECT * FROM "Subject" sb 
-                 WHERE sb."classId" = c.id 
-                 ORDER BY sb."name" ASC
-             ) sub) as subjects
+                   COALESCE(sc.count, 0) as "_count_students",
+                   COALESCE(ta.teachers, '[]'::json) as teachers,
+                   COALESCE(sa.subjects, '[]'::json) as subjects
             FROM "Class" c
+            LEFT JOIN StudentCounts sc ON sc."classId" = c.id
+            LEFT JOIN TeacherAssignment ta ON ta."classId" = c.id
+            LEFT JOIN SubjectAssignment sa ON sa."classId" = c.id
             ORDER BY c.grade ASC, c.name ASC
         `;
 
@@ -153,8 +163,8 @@ export const getClasses = async (req: AuthRequest, res: Response) => {
         const formatted = classesRes.rows.map(c => ({
             ...c,
             _count: { students: parseInt(c._count_students, 10) },
-            teachers: c.teachers || [],
-            subjects: c.subjects || []
+            teachers: c.teachers,
+            subjects: c.subjects
         }));
         res.json(formatted);
     } catch (error) {
@@ -448,7 +458,7 @@ export const enrollStudent = async (req: Request, res: Response) => {
                 await db.query(
                     `INSERT INTO "Attendance" (id, date, status, "studentId", "teacherId", "classId", subject) 
                      VALUES ($1, $2, 'PRESENT', $3, $4, $5, 'FULL DAY SESSION') 
-                     ON CONFLICT DO NOTHING`,
+                     ON CONFLICT ("studentId", date) DO NOTHING`,
                     [crypto.randomUUID(), todayDate, id, staffCheck.rows[0].id, classId]
                 );
             }
@@ -1066,7 +1076,7 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
                             attendanceValues.push(crypto.randomUUID(), todayDate, st.id, markerId, st.classId);
                         });
 
-                        const attQuery = `INSERT INTO "Attendance" (id, date, status, "studentId", "teacherId", "classId", subject) VALUES ${attendancePlaceholders.join(', ')}`;
+                        const attQuery = `INSERT INTO "Attendance" (id, date, status, "studentId", "teacherId", "classId", subject) VALUES ${attendancePlaceholders.join(', ')} ON CONFLICT ("studentId", date) DO NOTHING`;
                         await client.query(attQuery, attendanceValues);
                     }
                 } catch (autoAttErr) {

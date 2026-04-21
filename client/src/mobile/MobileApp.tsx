@@ -1,22 +1,25 @@
+import { lazy, Suspense } from 'react';
 import { HashRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { getPersistentStorage } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import MainPage from '../pages/MainPage';
 
-import MobileLoginScreen from './screens/MobileLoginScreen';
-import MobileDashboardLayout from './components/MobileDashboardLayout';
-import MobileAdminDashboard from './screens/admin/MobileAdminDashboard';
-import MobileIntroScreen from './screens/MobileIntroScreen';
-import MobileStudentDashboard from './screens/MobileStudentDashboard';
-import MobileTeacherDashboard from './screens/MobileTeacherDashboard';
-import MobileManageStudents from './screens/admin/MobileManageStudents';
-import MobileManageTeachers from './screens/admin/MobileManageTeachers';
-import MobileManageClasses from './screens/admin/MobileManageClasses';
-import MobileManageAttendance from './screens/admin/MobileManageAttendance';
-import MobileManageResults from './screens/admin/MobileManageResults';
-import MobileManageFees from './screens/admin/MobileManageFees';
+// Lazy load screens for performance optimization
+const MainPage = lazy(() => import('../pages/MainPage'));
+const MobileLoginScreen = lazy(() => import('./screens/MobileLoginScreen'));
+const MobileDashboardLayout = lazy(() => import('./components/MobileDashboardLayout'));
+const MobileAdminDashboard = lazy(() => import('./screens/admin/MobileAdminDashboard'));
+const MobileIntroScreen = lazy(() => import('./screens/MobileIntroScreen'));
+const MobileStudentDashboard = lazy(() => import('./screens/MobileStudentDashboard'));
+const MobileTeacherDashboard = lazy(() => import('./screens/MobileTeacherDashboard'));
+const MobileManageStudents = lazy(() => import('./screens/admin/MobileManageStudents'));
+const MobileManageTeachers = lazy(() => import('./screens/admin/MobileManageTeachers'));
+const MobileManageClasses = lazy(() => import('./screens/admin/MobileManageClasses'));
+const MobileManageAttendance = lazy(() => import('./screens/admin/MobileManageAttendance'));
+const MobileManageResults = lazy(() => import('./screens/admin/MobileManageResults'));
+const MobileManageFees = lazy(() => import('./screens/admin/MobileManageFees'));
+
 import '../index.css';
 
 const LoadingFallback = () => (
@@ -64,24 +67,26 @@ const AnimatedRoutes = () => {
     if (loading) return <LoadingFallback />;
 
     return (
-        <AnimatePresence mode="wait">
-            <Routes location={location} key={location.pathname}>
-                <Route path="/" element={<RootRedirector />} />
-                <Route path="/intro" element={<MobileIntroScreen />} />
-                <Route path="/login" element={<MobileLoginScreen />} />
+        <Suspense fallback={<LoadingFallback />}>
+            <AnimatePresence mode="wait">
+                <Routes location={location} key={location.pathname}>
+                    <Route path="/" element={<RootRedirector />} />
+                    <Route path="/intro" element={<MobileIntroScreen />} />
+                    <Route path="/login" element={<MobileLoginScreen />} />
 
-                {/* Protected Dashboard Routes nested inside MobileDashboardLayout */}
-                <Route path="/dashboard" element={<MobileDashboardLayout />}>
-                    <Route index element={<DashboardIndex />} />
-                    <Route path="students" element={<MobileManageStudents />} />
-                    <Route path="faculty" element={<MobileManageTeachers />} />
-                    <Route path="classes" element={<MobileManageClasses />} />
-                    <Route path="attendance" element={<MobileManageAttendance />} />
-                    <Route path="results" element={<MobileManageResults />} />
-                    <Route path="fees" element={<MobileManageFees />} />
-                </Route>
-            </Routes>
-        </AnimatePresence>
+                    {/* Protected Dashboard Routes nested inside MobileDashboardLayout */}
+                    <Route path="/dashboard" element={<MobileDashboardLayout />}>
+                        <Route index element={<DashboardIndex />} />
+                        <Route path="students" element={<MobileManageStudents />} />
+                        <Route path="faculty" element={<MobileManageTeachers />} />
+                        <Route path="classes" element={<MobileManageClasses />} />
+                        <Route path="attendance" element={<MobileManageAttendance />} />
+                        <Route path="results" element={<MobileManageResults />} />
+                        <Route path="fees" element={<MobileManageFees />} />
+                    </Route>
+                </Routes>
+            </AnimatePresence>
+        </Suspense>
     );
 };
 

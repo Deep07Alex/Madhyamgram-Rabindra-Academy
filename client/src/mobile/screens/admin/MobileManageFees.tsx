@@ -333,8 +333,8 @@ export default function MobileManageFees() {
                             {recentAdmission.map((r: any) => (
                                 <div key={r.id} style={{ background: 'var(--bg-card)', borderRadius: '20px', padding: '16px', border: '1px solid var(--border-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div>
-                                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800' }}>{r.name}</h4>
-                                        <p style={{ margin: '2px 0 0 0', fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' }}>{r.className} • ID {r.studentId}</p>
+                                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800' }}>{r.studentName}</h4>
+                                        <p style={{ margin: '2px 0 0 0', fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' }}>{r.className} • Roll {r.rollNumber} • ID {r.admissionNo}</p>
                                     </div>
                                     <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                         <div>
@@ -393,10 +393,10 @@ export default function MobileManageFees() {
                         {admissionDues.map((s: any) => (
                             <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid #ef444420', borderRadius: '14px' }}>
                                 <div>
-                                    <span style={{ fontSize: '13px', fontWeight: '800', display: 'block' }}>{s.name}</span>
-                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' }}>Class {s.className}</span>
+                                    <span style={{ fontSize: '13px', fontWeight: '800', display: 'block' }}>{s.name} (Roll: {s.rollNumber})</span>
+                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' }}>Class {s.className} • ID {s.admissionNo}</span>
                                 </div>
-                                <span style={{ fontSize: '14px', fontWeight: '900', color: '#ef4444' }}>₹{s.due} Due</span>
+                                <span style={{ fontSize: '14px', fontWeight: '900', color: '#ef4444' }}>₹{s.totalDue} Due</span>
                             </div>
                         ))}
                     </div>

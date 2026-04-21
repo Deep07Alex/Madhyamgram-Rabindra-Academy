@@ -502,38 +502,42 @@
 }
 
 @media (max-width: 600px) {
-  .toppers-container {
-    grid-template-columns: repeat(4, 1fr);
-    /* Forced 4/4 mode on mobile */
-    gap: 8px;
-    padding: 0 5px;
+  .topper-card {
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    padding: 2rem 1.5rem;
+    border-radius: 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid var(--border-soft);
   }
 
   .topper-rank {
-    padding: 2px 6px;
-    font-size: 0.6rem;
-    top: -5px;
-    right: -2px;
-  }
-
-  .topper-card {
-    padding: 1rem 0.25rem;
-    border-radius: 12px;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    top: -10px;
+    right: -5px;
   }
 
   .topper-avatar-wrapper {
-    width: 45px;
-    height: 45px;
-    margin-bottom: 0.5rem;
+    width: 120px;
+    height: 120px;
+    margin-bottom: 1.5rem;
+    border-width: 4px;
+    border-color: var(--bg-card);
   }
 
   .topper-info h3 {
-    font-size: 0.6rem;
-    letter-spacing: 0;
+    font-size: 0.85rem;
+    margin-bottom: 4px;
   }
 
   .topper-info p {
-    font-size: 0.65rem;
+    font-size: 1.1rem;
+    line-height: 1.2;
+    font-weight: 800;
   }
 }
 
@@ -1329,46 +1333,117 @@
 }
 
 /* Final Desktop-to-Mobile Symmetry Fixes */
-@media (max-width: 600px) {
-  .alumni-grid {
-    grid-template-columns: 1fr;
-    /* Stack on mobile */
-    gap: 20px;
+@media (max-width: 768px) {
+  .landing-section.alumni-gallery .alumni-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+    margin-top: 24px !important;
+    padding: 0 5px !important;
+  }
+
+  .alumni-card {
+    border-radius: 12px !important;
   }
 
   .alumni-info {
-    padding: 20px;
+    padding: 12px 10px !important;
   }
 
   .alumni-info h4 {
-    font-size: 1.1rem;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
 
   .alumni-info p {
-    font-size: 0.9rem;
+    font-size: 0.7rem;
+    margin-top: 4px;
+    line-height: 1.3;
   }
 
   .alumni-download-btn {
-    width: 44px;
-    height: 44px;
-  }
-
-  .notice-resources .section-grid {
-    grid-template-columns: 1fr;
-    /* Stacked */
-    gap: 30px;
-  }
-
-  .notice-board-container,
-  .resources-board-container {
-    height: auto;
-    min-height: 400px;
-    padding: 20px;
-  }
-
-  .gallery-grid {
-    grid-template-columns: 1fr;
-    /* Full width on mobile */
-    gap: 20px;
+    width: 38px;
+    height: 38px;
   }
 }
+
+.native-app .landing-section.alumni-gallery .alumni-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 12px !important;
+}
+
+.native-app .alumni-card {
+  border-radius: 12px !important;
+}
+
+.native-app .alumni-info {
+  padding: 12px 10px !important;
+}
+
+.native-app .notice-resources .section-grid {
+  grid-template-columns: 1fr;
+  gap: 30px;
+}
+
+.native-app .notice-board-container,
+.native-app .resources-board-container {
+  height: auto;
+  min-height: 400px;
+  padding: 20px;
+}
+
+.native-app .gallery-grid {
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+/* Alumni Swiper Styles */
+.alumni-slider-wrapper {
+  margin-top: 2rem;
+  position: relative;
+}
+
+.alumni-swiper {
+  padding: 0 10px 50px !important;
+  overflow: visible !important;
+}
+
+.alumni-swiper .swiper-pagination-bullet {
+  background: var(--primary-bold);
+  opacity: 0.3;
+}
+
+.alumni-swiper .swiper-pagination-bullet-active {
+  background: var(--primary-bold);
+  opacity: 1;
+  width: 25px;
+  border-radius: 4px;
+}
+
+.alumni-swiper .swiper-button-next,
+.alumni-swiper .swiper-button-prev {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--primary-bold);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-soft);
+}
+
+.alumni-swiper .swiper-button-next::after,
+.alumni-swiper .swiper-button-prev::after {
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
+.alumni-swiper .alumni-card {
+  height: 100%;
+}

@@ -198,26 +198,34 @@ export const generateResultPDF = async (data: any) => {
         const sidebarX = pageWidth - margin - 40;
         const attWidth = 38;
         
-        // 6a. Attendance Sidebar
+        // 6a. Attendance Sidebar (Fixed missing values)
         autoTable(doc, {
             startY: infoY + 20,
             margin: { left: sidebarX },
             tableWidth: attWidth,
-            head: [[{ content: 'Attendance Record', styles: { fontSize: 7 } }]],
-            body: [['Days', 'Pres.', 'Abs.', '%'], [(attendance?.total_days || 0).toString(), (attendance?.present_days || 0).toString(), (attendance?.absent_days || 0).toString(), `${attendance?.total_days ? ((attendance.present_days / attendance.total_days) * 100).toFixed(0) : 0}%`]],
+            head: [[{ content: 'Attendance Record', colSpan: 2, styles: { halign: 'center', fontSize: 7 } }]],
+            body: [
+                ['Total Days', (attendance?.total_days || 0).toString()],
+                ['Days Present', (attendance?.present_days || 0).toString()],
+                ['Percentage', `${attendance?.total_days ? ((attendance.present_days / attendance.total_days) * 100).toFixed(0) : 0}%`]
+            ],
             theme: 'grid',
             styles: { fontSize: 7, halign: 'center' },
-            headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] }
+            headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0] },
+            columnStyles: { 
+                0: { halign: 'left', cellWidth: 24 }, // Increased width for label
+                1: { halign: 'right', fontStyle: 'bold' } 
+            }
         });
 
         const attFinalY = (doc as any).lastAutoTable?.finalY || infoY + 40;
 
-        // 6b. Grades Legend
+        // 6b. Grades Legend (Fixed for 2-column consistency)
         autoTable(doc, {
             startY: attFinalY + 5,
             margin: { left: sidebarX },
             tableWidth: attWidth,
-            head: [['Grades']],
+            head: [[{ content: 'Grades', colSpan: 2, styles: { halign: 'center', fontSize: 7 } }]],
             body: [['90-100', 'AA'], ['80-89', 'A+'], ['60-79', 'A'], ['50-59', 'B+'], ['30-49', 'B'], ['Below 29', 'C']],
             theme: 'grid',
             styles: { fontSize: 6, cellPadding: 1, halign: 'center' },

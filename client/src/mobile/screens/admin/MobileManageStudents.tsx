@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { FileOpener } from '@capawesome-team/capacitor-file-opener';
 import { Capacitor } from '@capacitor/core';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, User, ArrowLeft, Loader2, BookOpen, Plus, UserPlus, Upload, FileSpreadsheet, Trash2, Edit, Eye, EyeOff, Save, ChevronDown, Download } from 'lucide-react';
+import { Search, User, ArrowLeft, Loader2, BookOpen, Plus, UserPlus, FileSpreadsheet, Trash2, Edit, Eye, EyeOff, Save, ChevronDown, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { App } from '@capacitor/app';
 import api, { getBaseUrl } from '../../../services/api';
@@ -449,139 +449,31 @@ export default function MobileManageStudents() {
                                         </div>
                                     )}
                                     {students.map(student => (
-                                    <div key={student.id} style={{
-                                        backgroundColor: 'var(--bg-card)',
-                                        padding: '20px',
-                                        borderRadius: '24px',
-                                        boxShadow: '0 10px 30px -15px rgba(0,0,0,0.3)',
-                                        border: '1px solid var(--border-soft)',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '16px',
-                                        position: 'relative',
-                                        overflow: 'hidden'
-                                    }}>
-                                        {/* Top Section: Photo and Basic Info */}
-                                        <div style={{ display: 'flex', gap: '18px', alignItems: 'center' }}>
-                                            <div style={{
-                                                width: '68px',
-                                                height: '68px',
-                                                borderRadius: '20px',
-                                                overflow: 'hidden',
-                                                background: 'linear-gradient(135deg, var(--bg-soft) 0%, var(--border-soft) 100%)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                border: '2px solid var(--primary-soft)',
-                                                boxShadow: 'inset 0 0 10px rgba(0,0,0,0.1)'
-                                            }}>
-                                                {student.photo ? (
-                                                    <img src={`${getBaseUrl()}${student.photo.startsWith('/') ? '' : '/'}${student.photo}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                ) : (
-                                                    <User size={30} color="var(--primary-bold)" />
-                                                )}
-                                            </div>
-
-                                            <div style={{ flex: 1, overflow: 'hidden' }}>
-                                                <h3 style={{
-                                                    margin: 0,
-                                                    fontSize: '18px',
-                                                    fontWeight: '900',
-                                                    color: 'var(--text-main)',
-                                                    fontFamily: 'Outfit',
-                                                    letterSpacing: '-0.02em',
-                                                    lineHeight: 1.2
-                                                }}>
-                                                    {student.name.toUpperCase()}
-                                                </h3>
-
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginTop: '6px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--primary-soft)', padding: '4px 10px', borderRadius: '8px' }}>
-                                                        <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--primary-bold)' }}>{student.studentId}</span>
-                                                    </div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-soft)', padding: '4px 10px', borderRadius: '8px', border: '1px solid var(--border-soft)' }}>
-                                                        <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Roll {student.rollNumber}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Top Corner Actions */}
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                                <button onClick={() => {
-                                                    setSelectedStudent(student);
-                                                    setEditData({ 
-                                                        ...student,
-                                                        password: '',
-                                                        dob: student.dob ? new Date(student.dob).toISOString().split('T')[0] : '',
-                                                        email: student.email || '',
-                                                        guardianName: student.guardianName || '',
-                                                        phone: student.phone || '',
-                                                        address: student.address || '',
-                                                        banglarSikkhaId: student.banglarSikkhaId || ''
-                                                    });
-                                                    setIsEditModalOpen(true);
-                                                }} style={{ background: 'var(--warning-soft)', color: 'var(--warning)', border: 'none', width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
-                                                    <Edit size={18} />
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Divider */}
-                                        <div style={{ height: '1px', background: 'linear-gradient(to right, transparent, var(--border-soft), transparent)' }} />
-
-                                        {/* Bottom Section: Meta Data */}
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                        <BookOpen size={14} color="var(--primary-bold)" />
-                                                    </div>
-                                                    <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>{student.class?.name || student.className || 'Unknown Class'}</span>
-                                                </div>
-
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <div style={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '10px',
-                                                        background: 'var(--bg-main)',
-                                                        padding: '6px 12px',
-                                                        borderRadius: '10px',
-                                                        border: '1px solid var(--border-soft)'
-                                                    }}>
-                                                        <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '0.05em', fontFamily: 'monospace' }}>
-                                                            {visiblePasswords.has(student.id) ? (student.plainPassword || 'NO PASS') : '••••••••'}
-                                                        </span>
-                                                        <button onClick={() => togglePasswordVisibility(student.id)} style={{ background: 'none', border: 'none', color: visiblePasswords.has(student.id) ? 'var(--primary-bold)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}>
-                                                            {visiblePasswords.has(student.id) ? <EyeOff size={18} /> : <Eye size={18} />}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <button
-                                                onClick={() => setDeleteModal({ isOpen: true, id: student.id })}
-                                                style={{
-                                                    background: '#fee2e2',
-                                                    color: '#ef4444',
-                                                    border: 'none',
-                                                    width: '48px',
-                                                    height: '48px',
-                                                    borderRadius: '14px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    boxShadow: '0 6px 20px rgba(239, 68, 68, 0.15)'
-                                                }}
-                                            >
-                                                <Trash2 size={20} />
-                                            </button>
-                                        </div>
-                                        </div>
+                                        <MemoizedStudentCard 
+                                            key={student.id} 
+                                            student={student}
+                                            isPasswordVisible={visiblePasswords.has(student.id)}
+                                            onTogglePassword={() => togglePasswordVisibility(student.id)}
+                                            onDelete={() => setDeleteModal({ isOpen: true, id: student.id })}
+                                            onEdit={() => {
+                                                setSelectedStudent(student);
+                                                setEditData({ 
+                                                    ...student,
+                                                    password: '',
+                                                    dob: student.dob ? new Date(student.dob).toISOString().split('T')[0] : '',
+                                                    email: student.email || '',
+                                                    guardianName: student.guardianName || '',
+                                                    phone: student.phone || '',
+                                                    address: student.address || '',
+                                                    banglarSikkhaId: student.banglarSikkhaId || ''
+                                                });
+                                                setIsEditModalOpen(true);
+                                            }}
+                                        />
                                     ))}
                                 </>
                             ) : (
-                                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '13px', fontWeight: '600' }}>No students found.</div>
+                                <EmptyState text="No students found in this directory." />
                             )}
                         </div>
 
@@ -781,7 +673,7 @@ export default function MobileManageStudents() {
 
                         <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-soft)' }}>
                             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
-                                <div style={{ background: 'var(--primary-soft)', padding: '8px', borderRadius: '10px', color: 'var(--primary-bold)' }}><Upload size={20} /></div>
+                                <div style={{ background: 'var(--primary-soft)', padding: '8px', borderRadius: '10px', color: 'var(--primary-bold)' }}><FileSpreadsheet size={20} /></div>
                                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: 'var(--text-main)' }}>Bulk Enrollment</h3>
                             </div>
                             <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--text-muted)' }}>Uploading the excel must follow the strict format given in templates.</p>
@@ -898,3 +790,137 @@ export default function MobileManageStudents() {
         </motion.div>
     );
 }
+
+const MemoizedStudentCard = memo(({ student, isPasswordVisible, onTogglePassword, onDelete, onEdit }: any) => {
+    return (
+        <div style={{
+            backgroundColor: 'var(--bg-card)',
+            padding: '20px',
+            borderRadius: '24px',
+            boxShadow: '0 10px 30px -15px rgba(0,0,0,0.3)',
+            border: '1px solid var(--border-soft)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            position: 'relative',
+            overflow: 'hidden'
+        }}>
+            <div style={{ display: 'flex', gap: '18px', alignItems: 'center' }}>
+                <div style={{
+                    width: '68px',
+                    height: '68px',
+                    borderRadius: '20px',
+                    overflow: 'hidden',
+                    background: 'linear-gradient(135deg, var(--bg-soft) 0%, var(--border-soft) 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '2px solid var(--primary-soft)',
+                    boxShadow: 'inset 0 0 10px rgba(0,0,0,0.1)'
+                }}>
+                    {student.photo ? (
+                        <img src={`${getBaseUrl()}${student.photo.startsWith('/') ? '' : '/'}${student.photo}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                    ) : (
+                        <User size={30} color="var(--primary-bold)" />
+                    )}
+                </div>
+
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                    <h3 style={{
+                        margin: 0,
+                        fontSize: '18px',
+                        fontWeight: '900',
+                        color: 'var(--text-main)',
+                        fontFamily: 'Outfit',
+                        letterSpacing: '-0.02em',
+                        lineHeight: 1.2
+                    }}>
+                        {student.name.toUpperCase()}
+                    </h3>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginTop: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--primary-soft)', padding: '4px 10px', borderRadius: '8px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--primary-bold)' }}>{student.studentId}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-soft)', padding: '4px 10px', borderRadius: '8px', border: '1px solid var(--border-soft)' }}>
+                            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>Roll {student.rollNumber}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <button onClick={onEdit} style={{ background: 'var(--warning-soft)', color: 'var(--warning)', border: 'none', width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)' }}>
+                        <Edit size={18} />
+                    </button>
+                </div>
+            </div>
+
+            <div style={{ height: '1px', background: 'linear-gradient(to right, transparent, var(--border-soft), transparent)' }} />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <BookOpen size={14} color="var(--primary-bold)" />
+                        </div>
+                        <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>{student.class?.name || student.className || 'Unknown Class'}</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            background: 'var(--bg-main)',
+                            padding: '6px 12px',
+                            borderRadius: '10px',
+                            border: '1px solid var(--border-soft)'
+                        }}>
+                            <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '0.05em', fontFamily: 'monospace' }}>
+                                {isPasswordVisible ? (student.plainPassword || 'NO PASS') : '••••••••'}
+                            </span>
+                            <button onClick={onTogglePassword} style={{ background: 'none', border: 'none', color: isPasswordVisible ? 'var(--primary-bold)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}>
+                                {isPasswordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <button
+                    onClick={onDelete}
+                    style={{
+                        background: '#fee2e2',
+                        color: '#ef4444',
+                        border: 'none',
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 6px 20px rgba(239, 68, 68, 0.15)'
+                    }}
+                >
+                    <Trash2 size={20} />
+                </button>
+            </div>
+        </div>
+    );
+}, (prev: any, next: any) => {
+    return prev.student.id === next.student.id && 
+           prev.isPasswordVisible === next.isPasswordVisible &&
+           prev.student.updatedAt === next.student.updatedAt &&
+           prev.student.photo === next.student.photo &&
+           prev.student.name === next.student.name;
+});
+
+function EmptyState({ text }: { text: string }) {
+    return (
+        <div style={{ textAlign: 'center', padding: '40px 20px', background: 'var(--bg-card)', borderRadius: '24px', border: '1px dashed var(--border-soft)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+            <div style={{ opacity: 0.1 }}><User size={40} /></div>
+            <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)' }}>{text}</p>
+        </div>
+    );
+}
+
+

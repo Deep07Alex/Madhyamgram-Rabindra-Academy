@@ -56,12 +56,11 @@ export const initCronJobs = () => {
                 )
             `, [todayStr, markerId]);
 
-            // 2. 30-Day Cleanup Logic
-            console.log('Cleaning up student/teacher attendance records older than 30 days...');
-            const cleanupStudent = await db.query(`DELETE FROM "Attendance" WHERE date < (CURRENT_DATE - INTERVAL '30 days')`);
-            const cleanupTeacher = await db.query(`DELETE FROM "TeacherAttendance" WHERE date < (CURRENT_DATE - INTERVAL '30 days')`);
+            // 2. Cleanup Logic (Optional/Extended)
+            // We no longer delete attendance records every 30 days because users need to see long-term history.
+            // Old cleanup was causing "Absent" records to disappear, making students appear "Present" again.
+            console.log('Attendance cleanup skipped to preserve history.');
 
-            console.log(`Cleanup complete. Deleted ${cleanupStudent.rowCount} student and ${cleanupTeacher.rowCount} teacher records.`);
             console.log('Midnight Auto-Attendance Job COMPLETED.');
         } catch (error) {
             console.error('Error in Midnight Auto-Attendance Job:', error);

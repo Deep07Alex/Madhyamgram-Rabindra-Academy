@@ -129,6 +129,7 @@ export default function MobileManageAttendance() {
     const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
     const [attendanceStatus, setAttendanceStatus] = useState<'AUTO' | 'OPEN' | 'CLOSED'>('AUTO');
     const [togglingOverride, setTogglingOverride] = useState(false);
+    const [markingBulkAbsent, setMarkingBulkAbsent] = useState(false);
 
     const [isLoading, setIsLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -337,6 +338,17 @@ export default function MobileManageAttendance() {
         },
         'system:config_updated': (data) => {
             if (data.key === 'attendance_override') setAttendanceStatus(data.value);
+        },
+        'attendance:bulk_updated': (data: any) => {
+            const dateStr = dateFilter;
+            if (data && data.date === dateStr) {
+                if (viewMode === 'daily') {
+                    if (tab === 'students') fetchStudentData(true);
+                    else fetchTeacherData(true);
+                } else {
+                    fetchMonthlyData(true);
+                }
+            }
         }
     });
 
@@ -405,6 +417,32 @@ export default function MobileManageAttendance() {
             showToast('Operation failed', 'error');
         } finally {
             setTogglingOverride(false);
+        }
+    };
+
+    const handleBulkMarkAbsent = async () => {
+        if (!dateFilter) {
+            showToast('Please select a date first', 'error');
+            return;
+        }
+
+        setMarkingBulkAbsent(true);
+        try {
+            await api.post('/attendance/bulk-absent', {
+                date: dateFilter,
+                classId: selectedClass || null
+            });
+            showToast('Bulk update successful!', 'success');
+            
+            if (viewMode === 'daily') {
+                if (tab === 'students') fetchStudentData(true);
+            } else {
+                fetchMonthlyData(true);
+            }
+        } catch (err) {
+            showToast('Failed to mark bulk absent.', 'error');
+        } finally {
+            setMarkingBulkAbsent(false);
         }
     };
 
@@ -514,6 +552,37 @@ export default function MobileManageAttendance() {
                         />
                     </div>
                 </div>
+
+                {/* Bulk Mark Absent Button (Mobile Optimized) */}
+                {viewMode === 'daily' && dateFilter && tab === 'students' && (
+                    <button
+                        onClick={handleBulkMarkAbsent}
+                        disabled={markingBulkAbsent}
+                        style={{
+                            width: '100%',
+                            padding: '14px',
+                            borderRadius: '16px',
+                            background: '#ef4444',
+                            border: 'none',
+                            color: 'white',
+                            fontWeight: '900',
+                            fontSize: '13px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '10px',
+                            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)',
+                            opacity: markingBulkAbsent ? 0.7 : 1
+                        }}
+                    >
+                        {markingBulkAbsent ? (
+                            <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                            <ShieldAlert size={16} />
+                        )}
+                        MARK {selectedClass ? 'CLASS' : 'ALL'} ABSENT
+                    </button>
+                )}
             </div>
 
             {/* List */}

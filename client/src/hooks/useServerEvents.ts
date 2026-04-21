@@ -35,6 +35,7 @@ export type SSEEventType =
     | 'alumni:updated'
     | 'toppers:updated'
     | 'focus'
+    | 'attendance:bulk_updated'
     | 'resources:updated';
 
 type EventHandlers = Partial<Record<SSEEventType, (data: any) => void>>;

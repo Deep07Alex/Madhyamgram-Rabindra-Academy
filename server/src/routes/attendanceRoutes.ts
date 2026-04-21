@@ -14,7 +14,9 @@ import {
     updateStudentAttendance,
     updateTeacherAttendance,
     getAttendanceConfig,
-    updateAttendanceConfig
+    updateAttendanceConfig,
+    bulkMarkStudentAbsent,
+    getStudentStatsSummary
 } from '../controllers/attendanceController.js';
 
 const router = Router();
@@ -24,7 +26,9 @@ router.use(authenticate);
 
 // Student Attendance routes
 router.post('/student', authorize(['ADMIN', 'TEACHER']), markStudentAttendance);
+router.post('/bulk-absent', authorize(['ADMIN']), bulkMarkStudentAbsent);
 router.get('/student', authorize(['ADMIN', 'TEACHER', 'STUDENT']), getStudentAttendance);
+router.get('/stats/students', authorize(['ADMIN']), getStudentStatsSummary);
 router.patch('/admin/student/:id', authorize(['ADMIN']), updateStudentAttendance);
 
 // Teacher Attendance routes
