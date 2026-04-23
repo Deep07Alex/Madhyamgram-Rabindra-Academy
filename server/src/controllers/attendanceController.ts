@@ -11,6 +11,37 @@ import { AuthRequest } from '../middleware/auth.js';
 import { broadcast, sendToUser, sendToRole } from '../lib/sseManager.js';
 import { emitEvent } from '../lib/socket.js';
 
+// --- Helpers ---
+
+// Performance Cache for stats: key: period_classId -> data
+const statsCache = new Map<string, { data: any, expires: number }>();
+const STATS_TTL = 30000; // 30 seconds
+
+const clearStatsCache = () => {
+    statsCache.clear();
+};
+
+/**
+ * Standardizes date formatting to YYYY-MM-DD.
+ * Uses UTC components to ensure consistency across all timezones.
+ */
+const formatDate = (date: any): string => {
+    if (!date) {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+    
+    // If it's already a string in YYYY-MM-DD format, return as is to avoid any parsing logic
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return date;
+    }
+
+    const d = new Date(date);
+    // Use UTC methods to avoid local timezone shifts
+    // Date(string) with YYYY-MM-DD is interpreted as UTC 00:00 by JS engines
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+};
+
 // --- Student Attendance ---
 
 /**
@@ -33,12 +64,13 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
     // The foreign key constraint has been relaxed in the database setup
 
     try {
-        const attendanceDateStr = new Date(date).toLocaleDateString('en-CA');
+        const attendanceDateStr = formatDate(date);
 
         // REGISTRY SYNC: Ensure this date is marked as a valid school session
         await db.query(`INSERT INTO "SchoolSession" (date) VALUES ($1) ON CONFLICT DO NOTHING`, [attendanceDateStr]);
 
         // UPSERT: Handles both creation and update atomically to prevent race conditions
+        clearStatsCache();
         const query = `
             INSERT INTO "Attendance" (id, date, status, "studentId", "teacherId", "classId", subject)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -52,26 +84,26 @@ export const markStudentAttendance = async (req: AuthRequest, res: Response) => 
         `;
 
         const attendanceRes = await db.query(query, [
-            crypto.randomUUID(), 
-            attendanceDateStr, 
-            status, 
-            studentId, 
-            markerId, 
-            classId, 
+            crypto.randomUUID(),
+            attendanceDateStr,
+            status,
+            studentId,
+            markerId,
+            classId,
             subject || 'FULL DAY SESSION'
         ]);
 
         const record = attendanceRes.rows[0];
 
-        broadcast('attendance:updated', { 
-            studentId, 
-            date: attendanceDateStr, 
-            status, 
-            attendanceId: record.id 
+        broadcast('attendance:updated', {
+            studentId,
+            date: attendanceDateStr,
+            status,
+            attendanceId: record.id
         });
-        
-        sendToUser(studentId, 'attendance:updated', { 
-            date: attendanceDateStr, 
+
+        sendToUser(studentId, 'attendance:updated', {
+            date: attendanceDateStr,
             status,
             attendanceId: record.id
         });
@@ -103,30 +135,44 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
     try {
         // Institutional Launch Lock: January 2026 Minimum
         const minLaunchDate = '2026-01-01';
-        let finalStartDate = startDate ? (new Date(startDate as string).toLocaleDateString('en-CA')) : minLaunchDate;
-        let finalEndDate = endDate ? (new Date(endDate as string).toLocaleDateString('en-CA')) : new Date().toLocaleDateString('en-CA');
+        const todayStr = formatDate(new Date());
+        let finalStartDate: string = startDate ? formatDate(startDate) : minLaunchDate;
+        let finalEndDate: string = endDate ? formatDate(endDate) : todayStr;
 
         if (finalStartDate < minLaunchDate) finalStartDate = minLaunchDate;
 
-        // 1. Get unique school session dates from the Registry (Blazing Fast compared to Scanning all Attendance)
-        let sessionQuery = `SELECT date::date as session_date FROM "SchoolSession" WHERE date >= $1 AND date <= $2 `;
-        const sessionParams: any[] = [finalStartDate, finalEndDate];
-        
-        sessionQuery += ` ORDER BY date DESC`;
-
-        const allSessionsRes = await db.query(sessionQuery, sessionParams);
-        const sessionDates = allSessionsRes.rows.map(r => new Date(r.session_date).toLocaleDateString('en-CA'));
-
-        // 2. Add today's date if not already in session dates (Virtual Presence for Today)
-        // 2. Add today's date if not Sunday and not already in session dates
-        const today = new Date();
-        const todayStr = today.toLocaleDateString('en-CA');
-        if (today.getDay() !== 0 && !sessionDates.includes(todayStr)) {
-            sessionDates.unshift(todayStr); // Add today as a potential session date
+        // 1. Get student class info for precise session counting
+        let classIdToUse = classId;
+        if (targetStudentId && !classIdToUse) {
+            const sRes = await db.query(`SELECT "classId" FROM "Student" WHERE id = $1`, [targetStudentId]);
+            if (sRes.rows.length > 0) classIdToUse = sRes.rows[0].classId;
         }
+
+        // 2. Get unique academic dates for THIS CLASS
+        // Requirement: Academic Day = (Not Sunday) AND (Not Bulk Absent)
+        // Manual attendance (even if everyone is absent) = Academic Day.
+        // No attendance = Academic Day (shows as "No Record").
+        // Only explicit 'BULK_ABSENT' subject excludes the day.
+        
+        // We use AT TIME ZONE 'UTC' to ensure EXTRACT(DOW) is consistent regardless of server TZ
+        let sessionQuery = `
+            SELECT TO_CHAR(($1::date + n), 'YYYY-MM-DD') as session_date 
+            FROM generate_series(0, ($2::date - $1::date)) n
+            WHERE EXTRACT(ISODOW FROM ($1::date + n)) != 7
+              AND NOT EXISTS (
+                  SELECT 1 FROM "Attendance" a 
+                  WHERE a.date = ($1::date + n)
+                    AND (a."classId" = $3 OR $3 IS NULL) 
+                    AND a.subject = 'BULK_ABSENT'
+              )
+            ORDER BY session_date DESC
+        `;
+        const sessionParams: any[] = [finalStartDate, finalEndDate, classIdToUse];
+        const allSessionsRes = await db.query(sessionQuery, sessionParams);
+        const sessionDates = allSessionsRes.rows.map(r => r.session_date);
         const totalSessions = sessionDates.length;
 
-        // 2. Get explicit records for this student
+        // 3. Get records (Only on valid sessions for this class)
         let query = `
             SELECT a.*, 
                    row_to_json(s.*) as student, 
@@ -153,50 +199,17 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
         }
         if (startDate && endDate) {
             query += ` AND a.date >= $${paramCount++} AND a.date <= $${paramCount++}`;
-            params.push(new Date(startDate as string).toLocaleDateString('en-CA'), new Date(endDate as string).toLocaleDateString('en-CA'));
+            params.push(formatDate(startDate), formatDate(endDate));
         }
         query += ` ORDER BY a.date DESC`;
 
         const attendanceRes = await db.query(query, params);
         const realRecords = attendanceRes.rows;
 
-        // 3. Merge real records with virtual PRESENT records for all sessions (for single student history)
-        if (!targetStudentId && (!targetStudentIds || targetStudentIds.length === 0)) {
-            return res.json({
-                records: realRecords,
-                totalSessions: totalSessions
-            });
-        }
-
-        const recordMap = new Map();
-        realRecords.forEach(r => {
-            const dateStr = new Date(r.date).toLocaleDateString('en-CA');
-            recordMap.set(dateStr, r);
-        });
-
-        // Construct final list from session dates
-        const finalRecords = sessionDates.map(dateStr => {
-            // Filter by date range if provided (to optimize response)
-            if (startDate && dateStr < (startDate as string)) return null;
-            if (endDate && dateStr > (endDate as string)) return null;
-
-            if (recordMap.has(dateStr)) {
-                return recordMap.get(dateStr);
-            }
-
-            // Generate virtual PRESENT record (Institutional Default)
-            return {
-                id: `virtual-${dateStr}`,
-                date: dateStr,
-                status: 'PRESENT',
-                studentId: targetStudentId,
-                subject: 'FULL DAY SESSION',
-                isVirtual: true // Flag for debugging if needed
-            };
-        }).filter(Boolean);
-
+        // We no longer filter realRecords by sessionDates because we want the frontend to receive
+        // BULK_ABSENT records (which are explicitly excluded from sessionDates) so it can display "Non-Academic Day".
         res.json({
-            records: finalRecords,
+            records: realRecords,
             totalSessions
         });
     } catch (error) {
@@ -223,12 +236,13 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
     const targetTeacherId = (userRole === 'ADMIN' && bodyTeacherId) ? bodyTeacherId : markerId;
 
     try {
-        const attendanceDateStr = new Date(date || new Date()).toLocaleDateString('en-CA');
+        const attendanceDateStr = formatDate(date || new Date());
 
         // REGISTRY SYNC: Ensure this date is marked as a valid school session
         await db.query(`INSERT INTO "SchoolSession" (date) VALUES ($1) ON CONFLICT DO NOTHING`, [attendanceDateStr]);
 
         // UPSERT: Atomic Teacher Attendance
+        clearStatsCache();
         const query = `
             INSERT INTO "TeacherAttendance" (id, date, status, reason, "arrivalTime", "departureTime", "earlyLeaveReason", "teacherId")
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -255,15 +269,15 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
 
         const record = attendanceRes.rows[0];
 
-        broadcast('attendance:updated', { 
-            teacherId: targetTeacherId, 
-            date: attendanceDateStr, 
+        broadcast('attendance:updated', {
+            teacherId: targetTeacherId,
+            date: attendanceDateStr,
             status: status || 'PRESENT',
             attendanceId: record.id
         });
-        
-        sendToUser(targetTeacherId, 'attendance:updated', { 
-            date: attendanceDateStr, 
+
+        sendToUser(targetTeacherId, 'attendance:updated', {
+            date: attendanceDateStr,
             status: status || 'PRESENT',
             attendanceId: record.id
         });
@@ -290,6 +304,7 @@ export const updateStudentAttendance = async (req: AuthRequest, res: Response) =
     }
 
     try {
+        clearStatsCache();
         const result = await db.query(
             `UPDATE "Attendance" SET status = $1 WHERE id = $2 RETURNING *`,
             [status, id]
@@ -303,8 +318,7 @@ export const updateStudentAttendance = async (req: AuthRequest, res: Response) =
         // Broadcast updates asynchronously so they don't block the response or cause 500s
         try {
             const sid = record.studentId || record.studentid;
-            const d = new Date(record.date);
-            const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const dStr = formatDate(record.date);
 
             // Live Update - Mirroring the "Force Open/Close" Technique (Dual-stack Sockets + SSE)
             broadcast('attendance:updated', { studentId: sid, date: dStr, status });
@@ -335,7 +349,7 @@ export const updateTeacherAttendance = async (req: AuthRequest, res: Response) =
 
     try {
         console.log(`Admin updating teacher attendance ${id}:`, req.body);
-
+        clearStatsCache();
         const result = await db.query(
             `UPDATE "TeacherAttendance" 
              SET status = CAST($1 AS "AttendanceStatus"), 
@@ -373,8 +387,7 @@ export const updateTeacherAttendance = async (req: AuthRequest, res: Response) =
         // Broadcast updates asynchronously
         try {
             const tid = record.teacherId || record.teacherid;
-            const d = new Date(record.date);
-            const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const dStr = formatDate(record.date);
 
             // Live Update - Mirroring the "Force Open/Close" Technique (Dual-stack Sockets + SSE)
             broadcast('attendance:updated', { teacherId: tid, date: dStr, status });
@@ -398,8 +411,8 @@ export const getTeacherAttendance = async (req: Request, res: Response) => {
     try {
         // Institutional Launch Lock: January 2026 Minimum
         const minDate = '2026-01-01';
-        let finalStartDate = startDate ? (new Date(startDate as string).toLocaleDateString('en-CA')) : minDate;
-        let finalEndDate = endDate ? (new Date(endDate as string).toLocaleDateString('en-CA')) : new Date().toLocaleDateString('en-CA');
+        let finalStartDate = startDate ? formatDate(startDate) : minDate;
+        let finalEndDate = endDate ? formatDate(endDate) : formatDate(new Date());
 
         if (finalStartDate < minDate) finalStartDate = minDate;
 
@@ -412,7 +425,7 @@ export const getTeacherAttendance = async (req: Request, res: Response) => {
             WHERE ta.date >= $1 AND ta.date <= $2
         `;
         const params: any[] = [finalStartDate, finalEndDate];
-        
+
         if (teacherId) {
             query += ` AND ta."teacherId" = $3`;
             params.push(teacherId);
@@ -470,14 +483,14 @@ export const bulkMarkStudentAbsent = async (req: AuthRequest, res: Response) => 
     }
 
     try {
-        const attendanceDateStr = new Date(date).toLocaleDateString('en-CA');
+        const attendanceDateStr = formatDate(date);
         const markerId = req.user.id;
 
         // Ensure date is in SchoolSession
         await db.query(`INSERT INTO "SchoolSession" (date) VALUES ($1) ON CONFLICT DO NOTHING`, [attendanceDateStr]);
 
         let query = '';
-        const params: any[] = [attendanceDateStr, markerId, 'ABSENT', 'FULL DAY SESSION'];
+        const params: any[] = [attendanceDateStr, markerId, 'ABSENT', 'BULK_ABSENT'];
 
         if (classId) {
             // Mark all students in a specific class
@@ -524,6 +537,7 @@ export const bulkMarkStudentAbsent = async (req: AuthRequest, res: Response) => 
         }
 
         await db.query(query, params);
+        clearStatsCache();
 
         broadcast('attendance:bulk_updated', { date: attendanceDateStr, classId, status: 'ABSENT' });
 
@@ -539,59 +553,115 @@ export const bulkMarkStudentAbsent = async (req: AuthRequest, res: Response) => 
  * Used to display individual stats (X of Y days, %) in the admin dashboard.
  */
 export const getStudentStatsSummary = async (req: AuthRequest, res: Response) => {
-    const { classId, academicYear } = req.query;
-    
+    const { classId, academicYear, startDate: queryStartDate, endDate: queryEndDate } = req.query;
+
     try {
         const year = academicYear || new Date().getFullYear();
-        const startDate = `${year}-01-01`;
-        const endDate = `${year}-12-31`;
 
-        // 1. Get Total Sessions (School Days)
-        const sessionCountRes = await db.query(
-            `SELECT COUNT(*)::int as count FROM "SchoolSession" WHERE date >= $1 AND date <= $2`,
-            [startDate, endDate]
-        );
-        let totalSessions = sessionCountRes.rows[0].count;
+        // Institutional Launch Lock: January 2026 Minimum
+        const minLaunchDate = '2026-01-01';
+        const todayStr = formatDate(new Date());
+        let startDate: string = queryStartDate ? formatDate(queryStartDate) : `${year}-01-01`;
+        let endDate: string = queryEndDate ? formatDate(queryEndDate) : todayStr;
 
-        // Add today if it's a valid session but not in Registry yet
-        const today = new Date();
-        if (year.toString() === today.getFullYear().toString() && today.getDay() !== 0) {
-            const todayStr = today.toLocaleDateString('en-CA');
-            const checkRegistry = await db.query(`SELECT 1 FROM "SchoolSession" WHERE date = $1`, [todayStr]);
-            if (checkRegistry.rows.length === 0 && todayStr >= startDate && todayStr <= endDate) {
-               totalSessions += 1;
-            }
+        if (startDate < minLaunchDate) startDate = minLaunchDate;
+
+        // Cache Check: Elite Speed optimization
+        const cacheKey = `stats_${classId || 'all'}_${startDate}_${endDate}`;
+        const cached = statsCache.get(cacheKey);
+        if (cached && Date.now() < cached.expires) {
+            return res.json(cached.data);
         }
 
-        // 2. Get Absent Counts per student efficiently
-        let absentQuery = `
-            SELECT "studentId", COUNT(*)::int as absent_count
-            FROM "Attendance"
-            WHERE status = 'ABSENT' 
-              AND date >= $1 AND date <= $2
+        // Optimized Query using CTEs with Single-Pass Aggregation
+        // Requirement: Academic Day = (Not Sunday) AND (Not Bulk Absent)
+        const statsQuery = `
+            WITH DateRange AS (
+                SELECT ($1::date + n) as d
+                FROM generate_series(0, ($2::date - $1::date)) n
+                WHERE EXTRACT(ISODOW FROM ($1::date + n)) != 7 -- Exclude Sundays
+            ),
+            -- Identify days where a class was "Closed" (Bulk Absent)
+            ClosureDays AS (
+                SELECT DISTINCT "classId", date
+                FROM "Attendance"
+                WHERE date >= $1 AND date <= $2
+                  AND subject = 'BULK_ABSENT'
+            ),
+            ClassSessionCounts AS (
+                SELECT 
+                    c.id as class_id,
+                    (SELECT COUNT(*)::int FROM DateRange) - (
+                        SELECT COUNT(DISTINCT date)::int 
+                        FROM ClosureDays cd 
+                        WHERE cd."classId" = c.id
+                    ) as session_count
+                FROM "Class" c
+                GROUP BY c.id
+            ),
+            StudentAggregates AS (
+                SELECT 
+                    a."studentId",
+                    COUNT(*) FILTER (WHERE a.status = 'ABSENT' AND a.subject != 'BULK_ABSENT') as absent_count,
+                    COUNT(*) FILTER (WHERE a.status IN ('PRESENT', 'LATE')) as present_count
+                FROM "Attendance" a
+                WHERE a.date >= $1 AND a.date <= $2
+                  AND EXTRACT(ISODOW FROM a.date) != 7
+                GROUP BY a."studentId"
+            )
+            SELECT 
+                s.id, 
+                s."classId", 
+                COALESCE(sa.absent_count, 0) as absent_count,
+                COALESCE(sa.present_count, 0) as present_count,
+                csc.session_count
+            FROM "Student" s
+            JOIN ClassSessionCounts csc ON s."classId" = csc.class_id
+            LEFT JOIN StudentAggregates sa ON s.id = sa."studentId"
+            ${classId ? 'WHERE s."classId" = $3' : ''}
         `;
-        const params: any[] = [startDate, endDate];
-        if (classId) {
-            absentQuery += ` AND "classId" = $3`;
-            params.push(classId);
-        }
-        absentQuery += ` GROUP BY "studentId"`;
 
-        const absentRes = await db.query(absentQuery, params);
-        
-        // Map stats: Presence = Total Sessions - Absent Count
+        const queryParams = classId ? [startDate, endDate, classId] : [startDate, endDate];
+        const result = await db.query(statsQuery, queryParams);
+
         const statsMap: Record<string, any> = {};
-        absentRes.rows.forEach(row => {
-            statsMap[row.studentId] = {
-                absent: row.absent_count,
-                present: Math.max(0, totalSessions - row.absent_count)
+        result.rows.forEach(r => {
+            statsMap[r.id] = {
+                absent: r.absent_count,
+                present: r.present_count,
+                total: r.session_count
             };
         });
 
-        res.json({
+        let schoolWideTotal = 0;
+        if (!classId) {
+            const schoolWideRes = await db.query(
+                `WITH DateRange AS (
+                    SELECT ($1::date + n) as d
+                    FROM generate_series(0, ($2::date - $1::date)) n
+                    WHERE EXTRACT(ISODOW FROM ($1::date + n)) != 7
+                ),
+                FullClosures AS (
+                    SELECT date FROM "Attendance"
+                    WHERE date >= $1 AND date <= $2 AND subject = 'BULK_ABSENT'
+                    GROUP BY date
+                    HAVING COUNT(DISTINCT "classId") = (SELECT COUNT(*) FROM "Class")
+                )
+                SELECT (SELECT COUNT(*) FROM DateRange) - (SELECT COUNT(*) FROM FullClosures) as count`,
+                [startDate, endDate]
+            );
+            schoolWideTotal = parseInt(schoolWideRes.rows[0].count || '0');
+        }
+
+        const responseData = {
             stats: statsMap,
-            totalSessions
-        });
+            totalSessions: classId ? (result.rows[0]?.session_count || 0) : schoolWideTotal
+        };
+
+        // Cache the result
+        statsCache.set(cacheKey, { data: responseData, expires: Date.now() + STATS_TTL });
+
+        res.json(responseData);
     } catch (error) {
         console.error('Error fetching student stats summary:', error);
         res.status(500).json({ message: 'Error fetching stats summary' });

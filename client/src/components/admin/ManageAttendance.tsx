@@ -65,17 +65,18 @@ const STATUS_COLORS: Record<AttendanceStatus, string> = {
     ABSENT: '#ef4444',
 };
 
-const StatusBadge = React.memo(({ status }: { status: AttendanceStatus | null }) => {
-    const displayStatus = status || 'PRESENT';
+const StatusBadge = React.memo(({ status, subject }: { status: AttendanceStatus | null, subject?: string | null }) => {
+    if (subject === 'BULK_ABSENT') return <span style={{ color: '#f59e0b', fontSize: '0.75rem', fontWeight: '700', padding: '3px 10px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '20px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>Non-Academic Day</span>;
+    if (!status) return <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: '600' }}>No Record</span>;
     return (
         <span style={{
             padding: '3px 12px', borderRadius: '20px',
-            background: STATUS_COLORS[displayStatus] + '20',
-            color: STATUS_COLORS[displayStatus],
+            background: STATUS_COLORS[status] + '20',
+            color: STATUS_COLORS[status],
             fontWeight: '700', fontSize: '0.78rem',
-            border: `1px solid ${STATUS_COLORS[displayStatus]}40`
+            border: `1px solid ${STATUS_COLORS[status]}40`
         }}>
-            {displayStatus}
+            {status}
         </span>
     );
 });
@@ -106,7 +107,7 @@ const InlineStatusEdit = React.memo(({
     const toggle = async () => {
         // Toggle Logic: Null/Absent -> Present, Present -> Absent
         const nextStatus = currentStatus === 'PRESENT' ? 'ABSENT' : 'PRESENT';
-        
+
         setIsSubmitting(true);
         try {
             if (attendanceId) {
@@ -142,7 +143,7 @@ const InlineStatusEdit = React.memo(({
                     </div>
                 ) : (
                     <div onClick={toggle} style={{ cursor: 'pointer', transition: 'transform 0.1s' }} onMouseDown={e => e.currentTarget.style.transform = 'scale(0.96)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
-                        <StatusBadge status={currentStatus} />
+                        <StatusBadge status={currentStatus} subject={initialReason} />
                     </div>
                 )}
             </div>
@@ -247,14 +248,11 @@ const InlineTimeEdit = React.memo(({
 });
 
 
-const MonthlySummaryDisplay = React.memo(({ personId, dataMap, totalSessions, type = 'student' }: { personId: string; dataMap: Record<string, Record<string, any>>, totalSessions: number, type?: 'student' | 'teacher' }) => {
+const MonthlySummaryDisplay = React.memo(({ personId, dataMap }: { personId: string; dataMap: Record<string, Record<string, any>> }) => {
     const records = dataMap[personId] || {};
     const days = Object.values(records);
     const absent = days.filter((r: any) => r.status === 'ABSENT').length;
-
-    // Virtual Presence Logic: Only applicable for Students
-    // Total Present = Total Sessions - Absents (marked non-present)
-    const present = type === 'student' ? (totalSessions - absent) : days.filter((r: any) => r.status === 'PRESENT').length;
+    const present = days.filter((r: any) => r.status === 'PRESENT' || r.status === 'LATE').length;
 
     return (
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -279,17 +277,17 @@ const StudentAttendanceRow = React.memo(({
     viewMode,
     dateFilter,
     monthlyDataMap,
-    fetchStudentData,
-    totalSessions,
-    stats
+    onRefresh,
+    stats,
+    isStatsLoading
 }: {
     row: StudentRow,
     viewMode: 'daily' | 'monthly',
     dateFilter: string,
     monthlyDataMap: any,
-    fetchStudentData: any,
-    totalSessions: number,
-    stats?: { present: number, absent: number, total: number }
+    onRefresh: any,
+    stats?: { present: number, absent: number, total: number },
+    isStatsLoading?: boolean
 }) => {
     return (
         <tr style={{ borderBottom: '1px solid var(--border-soft)', transition: 'background 0.15s' }}
@@ -308,15 +306,15 @@ const StudentAttendanceRow = React.memo(({
             {viewMode === 'daily' && (
                 <td style={{ padding: '14px 20px' }}>
                     {stats ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', opacity: isStatsLoading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span style={{ fontSize: '0.9rem', fontWeight: '900', color: 'var(--text-main)' }}>
                                     {stats.total > 0 ? ((stats.present / stats.total) * 100).toFixed(0) : '0'}%
                                 </span>
                                 <div style={{ height: '4px', width: '40px', background: 'var(--bg-main)', borderRadius: '4px', overflow: 'hidden' }}>
-                                    <div style={{ 
-                                        height: '100%', 
-                                        width: `${Math.min(100, (stats.present / (stats.total || 1)) * 100)}%`, 
+                                    <div style={{
+                                        height: '100%',
+                                        width: `${Math.min(100, (stats.present / (stats.total || 1)) * 100)}%`,
                                         background: (stats.present / (stats.total || 1)) > 0.75 ? '#22c55e' : (stats.present / (stats.total || 1)) > 0.5 ? '#f59e0b' : '#ef4444'
                                     }}></div>
                                 </div>
@@ -340,7 +338,7 @@ const StudentAttendanceRow = React.memo(({
                             personId={row.id}
                             date={dateFilter}
                             classId={row.classId}
-                            onUpdated={fetchStudentData}
+                            onUpdated={onRefresh}
                         />
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
@@ -353,7 +351,7 @@ const StudentAttendanceRow = React.memo(({
                         </div>
                     )
                 ) : (
-                    <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} totalSessions={totalSessions} type="student" />
+                    <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} />
                 )}
             </td>
         </tr>
@@ -366,16 +364,14 @@ const TeacherAttendanceRow = React.memo(({
     dateFilter,
     monthlyDataMap,
     fetchTeacherData,
-    tab,
-    totalSessions
+    tab
 }: {
     row: TeacherRow,
     viewMode: 'daily' | 'monthly',
     dateFilter: string,
     monthlyDataMap: any,
     fetchTeacherData: any,
-    tab: string,
-    totalSessions: number
+    tab: string
 }) => {
     return (
         <tr style={{ borderBottom: '1px solid var(--border-soft)', transition: 'background 0.15s' }}
@@ -441,7 +437,7 @@ const TeacherAttendanceRow = React.memo(({
                         </div>
                     )
                 ) : (
-                    <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} totalSessions={totalSessions} type="teacher" />
+                    <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} />
                 )}
             </td>
             <td style={{ padding: '14px 20px' }}>
@@ -478,7 +474,6 @@ const ManageAttendance = () => {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
-    const [totalSessions, setTotalSessions] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const limit = 20;
     const [search, setSearch] = useState('');
@@ -492,7 +487,7 @@ const ManageAttendance = () => {
     // Student state
     const [studentRows, setStudentRows] = useState<StudentRow[]>([]);
     const [attendanceStats, setAttendanceStats] = useState<Record<string, any>>({});
-    const [statsTotalSessions, setStatsTotalSessions] = useState(0);
+    const [isStatsLoading, setIsStatsLoading] = useState(false);
     const fetchConfig = useCallback(async () => {
         try {
             const res = await api.get('/attendance/config');
@@ -546,7 +541,9 @@ const ManageAttendance = () => {
 
             // Refresh data
             if (viewMode === 'daily') {
-                if (tab === 'students') fetchStudentData();
+                if (tab === 'students') {
+                    refreshStudentView();
+                }
             } else {
                 fetchMonthlyData();
             }
@@ -579,7 +576,9 @@ const ManageAttendance = () => {
                 // Fallback: silent re-fetch with stabilization delay if needed
                 setTimeout(() => {
                     if (viewMode === 'daily') {
-                        if (tab === 'students') fetchStudentData();
+                        if (tab === 'students') {
+                            refreshStudentView();
+                        }
                         else fetchTeacherData();
                     } else {
                         fetchMonthlyData();
@@ -608,7 +607,10 @@ const ManageAttendance = () => {
 
     // Shared
     const [dateFilter, setDateFilter] = useState(new Date().toLocaleDateString('en-CA'));
-    const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+    const [monthFilter, setMonthFilter] = useState(() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
 
     const fetchClasses = useCallback(async () => {
         try {
@@ -623,12 +625,58 @@ const ManageAttendance = () => {
         fetchClasses();
     }, [fetchClasses]);
 
+    // ── Fetch Student Stats (Separated from pagination) ──
+    const fetchStudentStats = useCallback(async () => {
+        if (tab !== 'students') return;
+        setIsStatsLoading(true);
+        try {
+            const formatISODate = (d: Date) => {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            };
+
+            let startDate, endDate;
+            if (viewMode === 'daily') {
+                // Get full month range for the selected day
+                const [y, m] = dateFilter.split('-').map(Number);
+                const firstDay = new Date(y, m - 1, 1);
+                const lastDay = new Date(y, m, 0);
+                startDate = formatISODate(firstDay);
+                endDate = formatISODate(lastDay);
+            } else {
+                // Use the month filter
+                const [y, m] = monthFilter.split('-').map(Number);
+                startDate = formatISODate(new Date(y, m - 1, 1));
+                endDate = formatISODate(new Date(y, m, 0));
+            }
+
+            const statsRes = await api.get('/attendance/stats/students', {
+                params: {
+                    classId: selectedClass || null,
+                    startDate,
+                    endDate
+                }
+            });
+            setAttendanceStats(statsRes.data.stats || {});
+        } catch (err) {
+            console.error('Failed to fetch attendance stats:', err);
+        } finally {
+            setIsStatsLoading(false);
+        }
+    }, [selectedClass, viewMode, tab, dateFilter, monthFilter]);
+
+    useEffect(() => {
+        fetchStudentStats();
+    }, [fetchStudentStats]);
+
     // ── Fetch students + attendance for date
     const fetchStudentData = useCallback(async () => {
         if (viewMode !== 'daily') return;
         setIsLoading(true);
         try {
-            const [stuRes, attRes, statsRes] = await Promise.all([
+            const [stuRes, attRes] = await Promise.all([
                 api.get('/users/students', {
                     params: {
                         page,
@@ -638,18 +686,20 @@ const ManageAttendance = () => {
                     }
                 }),
                 api.get('/attendance/student', {
-                    params: dateFilter ? { startDate: dateFilter, endDate: dateFilter } : {}
-                }),
-                api.get('/attendance/stats/students', {
-                    params: {
-                        classId: selectedClass || null
-                    }
+                    params: dateFilter ? {
+                        startDate: dateFilter,
+                        endDate: dateFilter,
+                        classId: selectedClass || undefined
+                    } : {}
                 })
             ]);
 
             const attMap: Record<string, any> = {};
             const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
-            attRecords.forEach((a: any) => { if (!attMap[a.studentId]) attMap[a.studentId] = a; });
+            attRecords.forEach((a: any) => {
+                const sid = a.studentId || a.studentid;
+                if (sid && !attMap[sid]) attMap[sid] = a;
+            });
 
             const classMap: Record<string, string> = {};
             classes.forEach((c: any) => { classMap[c.id] = c.name; });
@@ -668,22 +718,25 @@ const ManageAttendance = () => {
                     classId: s.classId,
                     className: classMap[s.classId] || '—',
                     attendanceId: att?.id || null,
-                    status: att?.status || 'PRESENT',
+                    status: att?.status || null,
                     date: att?.date || null,
                     subject: att?.subject || null,
                 };
             });
 
             setStudentRows(rows);
-            setAttendanceStats(statsRes.data.stats || {});
-            setStatsTotalSessions(statsRes.data.totalSessions || 0);
         } catch (err) {
             console.error('Failed to fetch student data:', err);
             showToast('Failed to sync student attendance records', 'error');
         } finally {
             setIsLoading(false);
         }
-    }, [dateFilter, viewMode, page, limit, selectedClass, debouncedSearch, classes]);
+    }, [dateFilter, viewMode, page, limit, selectedClass, debouncedSearch, classes, showToast]);
+
+    const refreshStudentView = useCallback(() => {
+        fetchStudentData();
+        fetchStudentStats();
+    }, [fetchStudentData, fetchStudentStats]);
 
 
     // ── Fetch teachers + attendance for date ──────────────────────────────
@@ -700,13 +753,18 @@ const ManageAttendance = () => {
                     }
                 }),
                 api.get('/attendance/teacher', {
-                    params: dateFilter ? { startDate: dateFilter, endDate: dateFilter } : {}
+                    params: dateFilter ? {
+                        startDate: dateFilter,
+                        endDate: dateFilter
+                    } : {}
                 }),
             ]);
 
             const attMap: Record<string, any> = {};
-            attRes.data.forEach((a: any) => {
-                attMap[a.teacherId] = a;
+            const teacherAttData = Array.isArray(attRes.data) ? attRes.data : [];
+            teacherAttData.forEach((a: any) => {
+                const tid = a.teacherId || a.teacherid;
+                if (tid) attMap[tid] = a;
             });
 
             const teacherData = teachRes.data.teachers || [];
@@ -720,7 +778,7 @@ const ManageAttendance = () => {
                     name: t.name,
                     teacherId: t.teacherId,
                     attendanceId: att?.id || null,
-                    status: att?.status || 'PRESENT',
+                    status: att?.status || null,
                     date: att?.date || null,
                     reason: att?.reason || null,
                     arrivalTime: att?.arrivalTime || null,
@@ -778,14 +836,16 @@ const ManageAttendance = () => {
                 const attRecords = Array.isArray(attRes.data) ? attRes.data : (attRes.data.records || []);
                 attRecords.forEach((a: any) => {
                     const d = a.date.split('T')[0];
-                    if (!matrix[a.studentId]) matrix[a.studentId] = {};
-                    matrix[a.studentId][d] = a;
+                    const sid = a.studentId || a.studentid;
+                    if (sid) {
+                        if (!matrix[sid]) matrix[sid] = {};
+                        matrix[sid][d] = a;
+                    }
                 });
 
                 const studentData = stuRes.data.students || [];
                 setTotalCount(stuRes.data.total || 0);
                 setTotalPages(stuRes.data.totalPages || 1);
-                setTotalSessions(attRes.data.totalSessions || 0);
 
                 setMonthlyDataMap(matrix);
                 setStudentRows(studentData.map((s: any) => ({
@@ -808,8 +868,11 @@ const ManageAttendance = () => {
                 const teacherAttData = Array.isArray(attRes.data) ? attRes.data : [];
                 teacherAttData.forEach((a: any) => {
                     const d = a.date.split('T')[0];
-                    if (!matrix[a.teacherId]) matrix[a.teacherId] = {};
-                    matrix[a.teacherId][d] = a;
+                    const tid = a.teacherId || a.teacherid;
+                    if (tid) {
+                        if (!matrix[tid]) matrix[tid] = {};
+                        matrix[tid][d] = a;
+                    }
                 });
 
                 const teacherData = teachRes.data.teachers || [];
@@ -1082,7 +1145,7 @@ const ManageAttendance = () => {
                         ) : (
                             <Users size={14} />
                         )}
-                        Mark {selectedClass ? 'Class' : 'Everyone'} Absent
+                        Mark {selectedClass ? 'Class' : 'Everyone'} Absent (Non Academic Days)
                     </button>
                 )}
             </div>
@@ -1144,9 +1207,9 @@ const ManageAttendance = () => {
                                             viewMode={viewMode}
                                             dateFilter={dateFilter}
                                             monthlyDataMap={monthlyDataMap}
-                                            fetchStudentData={fetchStudentData}
-                                            totalSessions={totalSessions}
-                                            stats={attendanceStats[row.id] ? { ...attendanceStats[row.id], total: statsTotalSessions } : undefined}
+                                            onRefresh={refreshStudentView}
+                                            stats={attendanceStats[row.id]}
+                                            isStatsLoading={isStatsLoading}
                                         />
                                     ) : (
                                         <TeacherAttendanceRow
@@ -1157,7 +1220,6 @@ const ManageAttendance = () => {
                                             monthlyDataMap={monthlyDataMap}
                                             fetchTeacherData={fetchTeacherData}
                                             tab={tab}
-                                            totalSessions={totalSessions}
                                         />
                                     )
                                 )) : (

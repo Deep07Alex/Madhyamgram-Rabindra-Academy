@@ -37,6 +37,7 @@ export const initCronJobs = () => {
             }
             const markerId = teacherRes.rows[0].id;
 
+            /* 
             console.log(`Marking all students as PRESENT for ${todayStr}...`);
 
             await db.query(`
@@ -55,6 +56,8 @@ export const initCronJobs = () => {
                     WHERE a."studentId" = s.id AND a.date::date = $1::date
                 )
             `, [todayStr, markerId]);
+            */
+            console.log('Auto-attendance marking is DISABLED (Manual mode enabled).');
 
             // 2. Cleanup Logic (Optional/Extended)
             // We no longer delete attendance records every 30 days because users need to see long-term history.

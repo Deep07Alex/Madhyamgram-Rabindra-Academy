@@ -24,7 +24,7 @@ export const getStudents = async (req: AuthRequest, res: Response) => {
         const offset = (Number(page) - 1) * Number(limit);
 
         let query = `
-            SELECT s.*, row_to_json(c.*) as class 
+            SELECT s.id, s.name, s."studentId", s."rollNumber", s."banglarSikkhaId", s.email, s."plainPassword", s.photo, s."classId", row_to_json(c.*) as class 
             FROM "Student" s 
             LEFT JOIN "Class" c ON s."classId" = c.id
             WHERE 1=1
@@ -43,15 +43,20 @@ export const getStudents = async (req: AuthRequest, res: Response) => {
             paramCount++;
         }
 
-        const countQuery = query.replace('s.*, row_to_json(c.*) as class', 'COUNT(*) as total');
+        const countQuery = `SELECT COUNT(*) as total FROM "Student" s WHERE 1=1`;
+        // We will re-append filters below
 
         query += ` ORDER BY c.grade ASC, CAST(s."rollNumber" AS INTEGER) ASC NULLS LAST`;
         query += ` LIMIT $${paramCount++} OFFSET $${paramCount++}`;
         params.push(Number(limit), offset);
 
+        let finalCountQuery = countQuery;
+        if (classId) finalCountQuery += ` AND s."classId" = $1`;
+        if (search) finalCountQuery += ` AND (s.name ILIKE $${classId ? 2 : 1} OR s."studentId" ILIKE $${classId ? 2 : 1})`;
+
         const [studentsRes, countRes] = await Promise.all([
             db.query(query, params),
-            db.query(countQuery, params.slice(0, paramCount - 3))
+            db.query(finalCountQuery, params.slice(0, paramCount - 3))
         ]);
 
         const total = parseInt(countRes.rows[0].total, 10);
@@ -93,9 +98,9 @@ export const getTeachers = async (req: Request, res: Response) => {
 
         const baseQuery = `
             FROM (
-                SELECT id, name, email, "teacherId", phone, aadhar, photo, address, dob, qualification, "extraQualification", designation, caste, "joiningDate", "isTeaching", "plainPassword", 'TEACHER' as role FROM "Teacher"
+                SELECT id, name, email, "teacherId", phone, aadhar, photo, designation, "joiningDate", "isTeaching", "plainPassword", 'TEACHER' as role FROM "Teacher"
                 UNION ALL
-                SELECT id, name, email, "adminId" as "teacherId", phone, aadhar, photo, address, dob, qualification, "extraQualification", designation, caste, "joiningDate", TRUE as "isTeaching", "plainPassword", 'ADMIN' as role FROM "Admin"
+                SELECT id, name, email, "adminId" as "teacherId", phone, aadhar, photo, designation, "joiningDate", TRUE as "isTeaching", "plainPassword", 'ADMIN' as role FROM "Admin"
                 WHERE designation IN ('PRINCIPAL', 'HEAD MISTRESS')
             ) staff
             WHERE (name ILIKE $1 OR "teacherId" ILIKE $1 OR designation ILIKE $1)
@@ -106,7 +111,7 @@ export const getTeachers = async (req: Request, res: Response) => {
 
         const countRes = await db.query(`SELECT COUNT(*) as total ${baseQuery}`, [searchParam]);
         const teachersRes = await db.query(`
-            SELECT * ${baseQuery}
+            SELECT id, name, email, "teacherId", phone, aadhar, photo, designation, "joiningDate", "isTeaching", "plainPassword", role ${baseQuery}
             ORDER BY "isTeaching" DESC, "joiningDate" ASC NULLS LAST, "name" ASC
             LIMIT $2 OFFSET $3
         `, [searchParam, Number(limit), offset]);
@@ -448,6 +453,7 @@ export const enrollStudent = async (req: Request, res: Response) => {
 
         broadcast('user:created', { id, role: 'STUDENT' });
 
+        /* 
         // AUTOMATIC PRESENT MARKING FOR TODAY
         // Ensures new students have their "Today" attendance saved immediately
         try {
@@ -465,6 +471,7 @@ export const enrollStudent = async (req: Request, res: Response) => {
         } catch (attErr) {
             console.warn('Silent failure marking new student attendance for today:', attErr);
         }
+        */
 
         res.status(201).json(result.rows[0]);
     } catch (error: any) {
@@ -1061,6 +1068,7 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
                 const query = `INSERT INTO "Student" ${columns} VALUES ${placeholders.join(', ')}`;
                 await client.query(query, values);
 
+                /* 
                 // AUTOMATIC ATTENDANCE MARKING FOR BULK IMPORT (TODAY)
                 try {
                     const todayDate = new Date().toLocaleDateString('en-CA');
@@ -1082,6 +1090,7 @@ export const bulkStudentImport = async (req: AuthRequest, res: Response) => {
                 } catch (autoAttErr) {
                     console.warn("Silent failure in bulk auto-attendance marking:", autoAttErr);
                 }
+                */
 
                 await client.query('COMMIT');
                 broadcast('user:created', { count: validStudents.length });

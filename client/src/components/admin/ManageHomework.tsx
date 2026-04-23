@@ -161,9 +161,13 @@ const ManageHomework = () => {
         }
     };
 
-    const handleGrade = async (submissionId: string, status: string) => {
+    const handleGrade = async (submissionId: string, status: string, grade?: string) => {
         try {
-            await api.patch(`/homework/submissions/${submissionId}/grade`, { status, feedback: gradingFeedback });
+            await api.put(`/homework/submissions/${submissionId}`, { 
+                status, 
+                grade: grade || submissions.find(s => s.id === submissionId)?.grade,
+                feedback: gradingFeedback 
+            });
             showToast('Submission status updated.', 'success');
             const res = await api.get(`/homework/${viewSubmissionsModal.homework.id}/submissions`);
             setSubmissions(res.data);
@@ -271,10 +275,10 @@ const ManageHomework = () => {
 
                     {newHomework.isSubmissionRequired && (
                         <div className="form-group">
-                            <label>Submission Deadline</label>
+                            <label>Submission Deadline (Optional)</label>
                             <div style={{ position: 'relative' }}>
                                 <Calendar size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                                <input type="date" value={newHomework.dueDate} onClick={(e) => (e.target as any).showPicker?.()} onChange={e => setNewHomework({ ...newHomework, dueDate: e.target.value })} required style={{ paddingLeft: '40px' }} />
+                                <input type="date" value={newHomework.dueDate} onClick={(e) => (e.target as any).showPicker?.()} onChange={e => setNewHomework({ ...newHomework, dueDate: e.target.value })} style={{ paddingLeft: '40px' }} />
                             </div>
                         </div>
                     )}
@@ -468,7 +472,7 @@ const ManageHomework = () => {
                                         <td style={{ textAlign: 'center' }}>
                                             {hw.isSubmissionRequired ? (
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                                    <Calendar size={14} /> {new Date(hw.dueDate).toLocaleDateString()}
+                                                    <Calendar size={14} /> {hw.dueDate ? new Date(hw.dueDate).toLocaleDateString() : 'No Deadline'}
                                                 </div>
                                             ) : (
                                                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600' }}>—</span>
@@ -706,13 +710,16 @@ const ManageHomework = () => {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                {s.status === 'GRADED' && <span className="badge success" style={{ fontSize: '0.7rem' }}>GRADED</span>}
-                                                {s.status === 'SUBMITTED' && (
-                                                    <button onClick={() => handleGrade(s.id, 'GRADED')} className="btn-primary" style={{ padding: '6px 16px', fontSize: '0.8rem', background: 'var(--success)', border: 'none', borderRadius: '8px' }}>
-                                                        Mark as Checked
-                                                    </button>
-                                                )}
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    {s.grade && <span className="badge" style={{ background: s.grade === 'Right' ? 'var(--success-soft)' : s.grade === 'Wrong' ? 'var(--error-soft)' : 'var(--primary-soft)', color: s.grade === 'Right' ? 'var(--success-bold)' : s.grade === 'Wrong' ? 'var(--error-bold)' : 'var(--primary-bold)', fontSize: '0.7rem' }}>{s.grade}</span>}
+                                                    <span className={`badge ${s.status.toLowerCase()}`}>{s.status}</span>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button onClick={() => handleGrade(s.id, 'GRADED', 'Right')} style={{ padding: '4px 10px', fontSize: '0.7rem', border: '1px solid var(--success-bold)', background: s.grade === 'Right' ? 'var(--success)' : 'transparent', color: s.grade === 'Right' ? 'white' : 'var(--success-bold)', borderRadius: '4px', cursor: 'pointer' }}>Right</button>
+                                                    <button onClick={() => handleGrade(s.id, 'GRADED', 'Wrong')} style={{ padding: '4px 10px', fontSize: '0.7rem', border: '1px solid var(--error-bold)', background: s.grade === 'Wrong' ? 'var(--error)' : 'transparent', color: s.grade === 'Wrong' ? 'white' : 'var(--error-bold)', borderRadius: '4px', cursor: 'pointer' }}>Wrong</button>
+                                                    <button onClick={() => handleGrade(s.id, 'GRADED')} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.7rem', borderRadius: '4px', background: 'var(--primary)' }}>Save Remarks</button>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -740,6 +747,16 @@ const ManageHomework = () => {
                                                 </a>
                                             </div>
                                         )}
+
+                                        <div style={{ marginTop: '16px' }}>
+                                            <textarea
+                                                placeholder="Provide remarks..."
+                                                defaultValue={s.feedback || ''}
+                                                onBlur={e => setGradingFeedback(e.target.value)}
+                                                rows={2}
+                                                style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border-soft)', fontSize: '0.85rem' }}
+                                            />
+                                        </div>
                                     </div>
                                 ))}
                             </div>

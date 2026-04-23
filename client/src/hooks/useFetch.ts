@@ -1,7 +1,8 @@
 /**
- * Custom Fetch Hook
+ * Custom Fetch Hook with Elite Performance Features
  * 
  * Provides a standardized way to fetch data with built-in:
+ * - Global client-side caching with TTL.
  * - Automatic retries with exponential backoff.
  * - Request cancellation (AbortController) to prevent race conditions.
  * - Global error handling via Toast notifications.
@@ -11,6 +12,10 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import axios from 'axios';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
+
+// Global Cache Store: Persists across component unmounts for "Elite" speed
+const fetchCache: Record<string, { data: any, timestamp: number }> = {};
+const DEFAULT_TTL = 30000; // 30 seconds default cache
 
 interface FetchState<T> {
     data: T | null;
@@ -23,13 +28,28 @@ const DEFAULT_OPTIONS = {};
 export const useFetch = <T>(url: string, options: any = DEFAULT_OPTIONS) => {
     const [state, setState] = useState<FetchState<T>>({
         data: null,
-        loading: true,
+        loading: !options.manual,
         error: null
     });
     const { showToast } = useToast();
     const abortControllerRef = useRef<AbortController | null>(null);
 
     const execute = useCallback(async (customUrl?: string, customOptions?: any) => {
+        const targetUrl = customUrl || url;
+        const mergedOptions = { ...options, ...customOptions };
+        const cacheKey = `${targetUrl}:${JSON.stringify(mergedOptions.params || {})}`;
+
+        // 1. Check Cache (Only for GET requests)
+        const method = mergedOptions.method || 'GET';
+        if (method.toUpperCase() === 'GET' && !mergedOptions.skipCache) {
+            const cached = fetchCache[cacheKey];
+            const ttl = mergedOptions.ttl || DEFAULT_TTL;
+            if (cached && Date.now() - cached.timestamp < ttl) {
+                setState({ data: cached.data, loading: false, error: null });
+                return cached.data;
+            }
+        }
+
         // Cancel previous request if it exists
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
@@ -48,11 +68,18 @@ export const useFetch = <T>(url: string, options: any = DEFAULT_OPTIONS) => {
         while (attempts < maxAttempts) {
             try {
                 const response = await api({
-                    url: customUrl || url,
-                    ...options,
-                    ...customOptions,
+                    url: targetUrl,
+                    ...mergedOptions,
                     signal: controller.signal
                 });
+
+                // 2. Update Cache
+                if (method.toUpperCase() === 'GET' && !mergedOptions.skipCache) {
+                    fetchCache[cacheKey] = {
+                        data: response.data,
+                        timestamp: Date.now()
+                    };
+                }
 
                 setState({ data: response.data, loading: false, error: null });
                 return response.data;

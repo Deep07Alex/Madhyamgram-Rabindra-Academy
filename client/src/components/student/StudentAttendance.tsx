@@ -25,8 +25,14 @@ const StudentAttendance = () => {
     const fetchAttendance = useCallback(async (silent = false) => {
         if (!silent) setIsLoading(true);
         try {
-            const startDate = new Date(currentYear, currentMonth, 1).toLocaleDateString('en-CA');
-            const endDate = new Date(currentYear, currentMonth + 1, 0).toLocaleDateString('en-CA');
+            const formatISODate = (d: Date) => {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            };
+            const startDate = formatISODate(new Date(currentYear, currentMonth, 1));
+            const endDate = formatISODate(new Date(currentYear, currentMonth + 1, 0));
             const res = await api.get(`/attendance/student`, {
                 params: { startDate, endDate }
             });
@@ -87,13 +93,14 @@ const StudentAttendance = () => {
     }, [currentMonth, currentYear]);
 
     const stats = useMemo(() => {
-        const records = attendanceData.records;
-        const present = records.filter((r: any) => r.status === 'PRESENT').length;
-        const absent = records.filter((r: any) => r.status === 'ABSENT').length;
-        const total = records.length;
+        const records = attendanceData.records || [];
+        const present = records.filter((r: any) => r.status === 'PRESENT' || r.status === 'LATE').length;
+        // Exclude bulk absent from the explicit absent count
+        const absent = records.filter((r: any) => r.status === 'ABSENT' && r.subject !== 'BULK_ABSENT').length;
+        const total = attendanceData.totalSessions || 0;
         const rate = total > 0 ? ((present / total) * 100).toFixed(1) : "0.0";
         return { present, absent, total, rate };
-    }, [attendanceData.records]);
+    }, [attendanceData]);
 
     return (
         <div className="manage-section">
@@ -219,9 +226,14 @@ const StudentAttendance = () => {
                                                             <CheckCircle2 size={12} /> PRESENT
                                                         </span>
                                                     )}
-                                                    {record?.status === 'ABSENT' && (
+                                                    {record?.status === 'ABSENT' && record?.subject !== 'BULK_ABSENT' && (
                                                         <span className="badge absent" style={{ minWidth: '100px', justifyContent: 'center', gap: '6px' }}>
                                                             <XCircle size={12} /> ABSENT
+                                                        </span>
+                                                    )}
+                                                    {record?.subject === 'BULK_ABSENT' && (
+                                                        <span style={{ color: '#f59e0b', fontSize: '0.85rem', fontWeight: '600', padding: '4px 10px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '6px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                                                            Non-Academic Day
                                                         </span>
                                                     )}
                                                      {!record && !isFuture && (
@@ -255,7 +267,9 @@ const StudentAttendance = () => {
                                         </td>
                                         <td>
                                             {record?.subject ? (
-                                                <span className="badge" style={{ background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-soft)' }}>{record.subject}</span>
+                                                <span className="badge" style={{ background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-soft)' }}>
+                                                    {record.subject === 'BULK_ABSENT' ? 'Class Closure' : record.subject}
+                                                </span>
                                             ) : (
                                                 record ? <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>FULL DAY SESSION</span> : null
                                             )}

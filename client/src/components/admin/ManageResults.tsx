@@ -32,6 +32,76 @@ interface SchoolClass {
     subjects?: { id?: string, name: string, fullMarks: number | string }[];
 }
 
+
+
+const TermScheduleCard = ({ term, initialStart, initialEnd, onSave }: any) => {
+    const { showToast } = useToast();
+    const [startDate, setStartDate] = useState(initialStart ? new Date(initialStart).toLocaleDateString('en-CA') : '');
+    const [endDate, setEndDate] = useState(initialEnd ? new Date(initialEnd).toLocaleDateString('en-CA') : '');
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (initialStart) setStartDate(new Date(initialStart).toLocaleDateString('en-CA'));
+        if (initialEnd) setEndDate(new Date(initialEnd).toLocaleDateString('en-CA'));
+    }, [initialStart, initialEnd]);
+
+    const handleSave = async () => {
+        if (!startDate || !endDate) {
+            showToast('Please select both start and end dates', 'warning');
+            return;
+        }
+        if (new Date(startDate) >= new Date(endDate)) {
+            showToast('Start date must be strictly before end date', 'warning');
+            return;
+        }
+        setIsSaving(true);
+        try {
+            await onSave(term, startDate, endDate);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="card" style={{ margin: 0, border: '1px solid var(--border-soft)', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <h4 style={{ marginTop: 0, marginBottom: 0, fontSize: '1.2rem', color: 'var(--primary-bold)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {term}
+                {initialStart && initialEnd && (
+                    <span style={{ fontSize: '0.65rem', background: 'var(--success-soft)', color: 'var(--success-bold)', padding: '4px 8px', borderRadius: '4px' }}>SCHEDULED</span>
+                )}
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>Starts From</label>
+                    <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-soft)' }}
+                    />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>Ends/Publish Date (Till)</label>
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-soft)' }}
+                    />
+                </div>
+            </div>
+            <button 
+                onClick={handleSave} 
+                disabled={isSaving || (startDate === (initialStart ? new Date(initialStart).toLocaleDateString('en-CA') : '') && endDate === (initialEnd ? new Date(initialEnd).toLocaleDateString('en-CA') : ''))}
+                className="btn-primary" 
+                style={{ width: '100%', padding: '12px', height: 'auto', fontSize: '0.9rem', opacity: isSaving ? 0.7 : 1 }}
+            >
+                {isSaving ? 'Saving...' : 'Update Schedule'}
+            </button>
+        </div>
+    );
+};
+
 const ManageResults = () => {
     const { showToast } = useToast();
     const [results, setResults] = useState<any[]>([]);
@@ -39,9 +109,10 @@ const ManageResults = () => {
     const [classes, setClasses] = useState<SchoolClass[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
-    const [viewMode, setViewMode] = useState<'ledger' | 'rankings' | 'marks'>('ledger');
+    const [viewMode, setViewMode] = useState<'ledger' | 'rankings' | 'marks' | 'schedule'>('ledger');
     const [rankings, setRankings] = useState<Record<string, any[]>>({});
     const [marksLedger, setMarksLedger] = useState<Record<string, any[]>>({});
+    const [termSchedules, setTermSchedules] = useState<any[]>([]);
 
     // Form States
     const [selectedClassId, setSelectedClassId] = useState('');
@@ -97,6 +168,9 @@ const ManageResults = () => {
             } else if (viewMode === 'marks') {
                 const marksRes = await api.get(`/results/rankings?academicYear=${selectedYear}&all=true`);
                 setMarksLedger(marksRes.data);
+            } else if (viewMode === 'schedule') {
+                const termRes = await api.get(`/results/terms?academicYear=${selectedYear}`);
+                setTermSchedules(termRes.data);
             }
         } catch (error) {
             console.error('Failed to fetch results:', error);
@@ -228,6 +302,22 @@ const ManageResults = () => {
         }
     };
 
+    const handleUpdateTerm = async (term: string, startDate: string, endDate: string) => {
+        try {
+            await api.post('/results/terms', {
+                semester: term,
+                academicYear: selectedYear,
+                startDate,
+                endDate
+            });
+            showToast(`${term} schedule updated`, 'success');
+            fetchResults();
+        } catch (error: any) {
+            const errorMessage = error.response?.data?.message || 'Failed to update term schedule';
+            showToast(errorMessage, 'error');
+        }
+    };
+
     const handleDeleteStudentAllResults = async (studentId: string, name: string) => {
         setConfirmModal({
             isOpen: true,
@@ -352,6 +442,24 @@ const ManageResults = () => {
                         }}
                     >
                         <FileSpreadsheet size={18} /> Classwise Marks
+                    </button>
+                    <button
+                        onClick={() => setViewMode('schedule')}
+                        style={{
+                            padding: '10px 20px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: viewMode === 'schedule' ? 'var(--primary-bold)' : 'transparent',
+                            color: viewMode === 'schedule' ? 'white' : 'var(--text-muted)',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
+                        <Calendar size={18} /> Attendance Bound
                     </button>
                 </div>
             </header>
@@ -756,6 +864,44 @@ const ManageResults = () => {
                         </>
                     )}
                 </div>
+            ) : viewMode === 'schedule' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    <div className="card" style={{ padding: '32px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-bold)' }}>
+                                <Calendar size={24} />
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.4rem' }}>Academic Term Boundaries</h3>
+                                <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontWeight: 500 }}>Set start and end dates for each unit to bound attendance counting.</p>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+                            {EXAMINATION_TERMS.map(term => {
+                                const sched = termSchedules.find(s => s.semester === term) || { startDate: '', endDate: '' };
+                                return (
+                                    <TermScheduleCard 
+                                        key={term} 
+                                        term={term} 
+                                        initialStart={sched.startDate} 
+                                        initialEnd={sched.endDate}
+                                        onSave={handleUpdateTerm}
+                                    />
+                                );
+                            })}
+                        </div>
+                        <div style={{ marginTop: '32px', padding: '16px', background: 'rgba(var(--primary-rgb), 0.05)', borderRadius: '12px', border: '1px solid var(--border-soft)', display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                            <div style={{ color: 'var(--primary-bold)', marginTop: '2px' }}><Download size={20} /></div>
+                            <div>
+                                <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Dynamic Attendance Calculation</h4>
+                                <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                                    When these dates are set, the <strong>Total Academic Days</strong> and <strong>Student Attendance Record</strong> on the generated PDF will be calculated strictly between the "Starts From" of Unit-I and the "Ends Date" of the selected term.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             ) : (
                 <div className="rankings-container">
                     <div className="card" style={{ padding: '32px', textAlign: 'center', marginBottom: '32px', background: 'linear-gradient(135deg, var(--bg-main) 0%, rgba(var(--primary-rgb), 0.05) 100%)' }}>
@@ -986,7 +1132,7 @@ const ManageResults = () => {
                                     onClick={async () => {
                                         try {
                                             showToast(`Generating ${selectedTerm} report...`, 'info');
-                                            const res = await api.get(`/results/report?studentId=${selectedStudent.student.id}&academicYear=${selectedYear}`);
+                                            const res = await api.get(`/results/report?studentId=${selectedStudent.student.id}&academicYear=${selectedYear}&semester=${selectedTerm}`);
                                             await generateResultPDF({ ...res.data, targetSemester: selectedTerm });
                                             showToast('Report generated successfully', 'success');
                                         } catch (err) {

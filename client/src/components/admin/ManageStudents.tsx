@@ -25,13 +25,14 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 const ManageStudents = () => {
     const { showToast } = useToast();
     const [searchQuery, setSearchQuery] = useState('');
+    const debouncedSearch = useDebounce(searchQuery, 500);
     const [selectedClassId, setSelectedClassId] = useState<string>('');
     const [page, setPage] = useState(1);
 
     const { data: studentsData, refetch: refreshStudents } = useFetch<any>('/users/students', {
         params: {
             classId: selectedClassId,
-            search: searchQuery,
+            search: debouncedSearch,
             page: page,
             limit: 20
         }
@@ -343,7 +344,7 @@ const ManageStudents = () => {
     // Reset to page 1 when search or class changes
     useEffect(() => {
         setPage(1);
-    }, [searchQuery, selectedClassId]);
+    }, [debouncedSearch, selectedClassId]);
 
     return (
         <div className="manage-section">
@@ -712,7 +713,16 @@ const ManageStudents = () => {
                                     <td style={{ padding: '24px 20px', verticalAlign: 'middle' }}>
                                         <div style={{ width: '45px', height: '45px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-soft)', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                             {user.photo ? (
-                                                <img src={`${import.meta.env.VITE_API_URL || ''}${user.photo}?t=${Date.now()}`} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                <img 
+                                                    src={`${import.meta.env.VITE_API_URL || ''}${user.photo}`} 
+                                                    alt={user.name} 
+                                                    loading="lazy"
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                    onError={(e) => {
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.src = '/placeholder-avatar.png'; // Fallback
+                                                    }}
+                                                />
                                             ) : (
                                                 <Users size={24} color="var(--text-muted)" />
                                             )}

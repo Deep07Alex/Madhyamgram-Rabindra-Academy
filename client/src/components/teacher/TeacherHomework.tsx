@@ -128,13 +128,20 @@ const TeacherHomework = () => {
         }
     };
 
-    const handleGrade = async (submissionId: string, status: string) => {
+    const handleGrade = async (submissionId: string, status: string, grade?: string) => {
         try {
-            await api.put(`/homework/submissions/${submissionId}`, { status, feedback: gradingFeedback });
+            await api.put(`/homework/submissions/${submissionId}`, { 
+                status, 
+                grade: grade || selectedSubmission?.grade, 
+                feedback: gradingFeedback 
+            });
             showToast('Submission graded and feedback recorded.', 'success');
-            api.get(`/homework/${selectedHomework}/submissions`)
-                .then(res => setSubmissions(res.data));
-            setGradingFeedback('');
+            const res = await api.get(`/homework/${selectedHomework}/submissions`);
+            setSubmissions(res.data);
+            if (selectedSubmission && selectedSubmission.id === submissionId) {
+                const updated = res.data.find((sub: any) => sub.id === submissionId);
+                setSelectedSubmission(updated);
+            }
         } catch (error: any) {
             console.error('Failed to update submission:', error);
             const msg = error.response?.data?.message || 'Failed to update submission.';
@@ -245,10 +252,10 @@ const TeacherHomework = () => {
 
                     {newHomework.isSubmissionRequired && (
                         <div className="form-group">
-                            <label>Submission Deadline</label>
+                            <label>Submission Deadline (Optional)</label>
                             <div style={{ position: 'relative' }}>
                                 <Calendar size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                                <input type="date" value={newHomework.dueDate} onClick={(e) => (e.target as any).showPicker?.()} onChange={e => setNewHomework({ ...newHomework, dueDate: e.target.value })} required style={{ paddingLeft: '40px' }} />
+                                <input type="date" value={newHomework.dueDate} onClick={(e) => (e.target as any).showPicker?.()} onChange={e => setNewHomework({ ...newHomework, dueDate: e.target.value })} style={{ paddingLeft: '40px' }} />
                             </div>
                         </div>
                     )}
@@ -359,7 +366,7 @@ const TeacherHomework = () => {
                                     <td style={{ textAlign: 'center' }}>
                                         {hw.isSubmissionRequired ? (
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                                <Calendar size={14} /> {new Date(hw.dueDate).toLocaleDateString()}
+                                                <Calendar size={14} /> {hw.dueDate ? new Date(hw.dueDate).toLocaleDateString() : 'No Deadline'}
                                             </div>
                                         ) : (
                                             <span style={{ fontSize: '0.75rem', color: 'var(--primary-bold)', fontWeight: '700' }}>GENERAL INFO</span>
@@ -431,6 +438,7 @@ const TeacherHomework = () => {
                                                         {s.content && <FileText size={14} />}
                                                     </span>
                                                 )}
+                                                {s.grade && <span className="badge" style={{ background: s.grade === 'Right' ? 'var(--success-soft)' : s.grade === 'Wrong' ? 'var(--error-soft)' : 'var(--primary-soft)', color: s.grade === 'Right' ? 'var(--success-bold)' : s.grade === 'Wrong' ? 'var(--error-bold)' : 'var(--primary-bold)', fontSize: '0.7rem' }}>{s.grade}</span>}
                                                 <span className={`badge ${s.status.toLowerCase()}`}>{s.status}</span>
                                                 <button onClick={() => {
                                                     setSelectedSubmission(s);
@@ -501,39 +509,54 @@ const TeacherHomework = () => {
                                     </p>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                                    <span className={`badge ${s.status.toLowerCase()}`}>{s.status}</span>
-                                    {s.status === 'SUBMITTED' && (
-                                        (() => {
-                                            const isPastDue = new Date() > new Date(s.homework?.dueDate);
-                                            return (
-                                                <div style={{ textAlign: 'right' }}>
-                                                    <button 
-                                                        onClick={() => {
-                                                            handleGrade(s.id, 'GRADED');
-                                                            setSelectedSubmission({ ...s, status: 'GRADED', feedback: gradingFeedback });
-                                                        }}
-                                                        disabled={!isPastDue}
-                                                        className="btn-primary"
-                                                        style={{ 
-                                                            background: isPastDue ? 'var(--success)' : 'var(--text-muted)', 
-                                                            opacity: isPastDue ? 1 : 0.6,
-                                                            border: 'none', 
-                                                            padding: '6px 16px', 
-                                                            fontSize: '0.8rem',
-                                                            cursor: isPastDue ? 'pointer' : 'not-allowed'
-                                                        }}>
-                                                        <CheckCircle2 size={16} /> Finalize Grading
-                                                    </button>
-                                                    {/* Grace Period Guard: Teachers can only finalize grades after the submission deadline */}
-                                                    {!isPastDue && (
-                                                        <p style={{ margin: '4px 0 0 0', fontSize: '0.65rem', color: 'var(--error)', fontWeight: '700' }}>
-                                                            UNAVAILABLE UNTIL DEADLINE EXPIRES
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            );
-                                        })()
-                                    )}
+                                     <span className={`badge ${s.status.toLowerCase()}`}>{s.status}</span>
+                                     {s.status !== 'PENDING' && (
+                                        <div style={{ textAlign: 'right' }}>
+                                            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                                <button 
+                                                    onClick={() => handleGrade(s.id, 'GRADED', 'Right')}
+                                                    className="btn-success"
+                                                    style={{ 
+                                                        padding: '6px 12px', 
+                                                        fontSize: '0.75rem',
+                                                        background: s.grade === 'Right' ? 'var(--success)' : 'transparent',
+                                                        color: s.grade === 'Right' ? 'white' : 'var(--success-bold)',
+                                                        border: '1px solid var(--success-bold)',
+                                                        borderRadius: 'var(--radius-sm)',
+                                                        cursor: 'pointer'
+                                                    }}>
+                                                    Right
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleGrade(s.id, 'GRADED', 'Wrong')}
+                                                    className="btn-danger"
+                                                    style={{ 
+                                                        padding: '6px 12px', 
+                                                        fontSize: '0.75rem',
+                                                        background: s.grade === 'Wrong' ? 'var(--error)' : 'transparent',
+                                                        color: s.grade === 'Wrong' ? 'white' : 'var(--error-bold)',
+                                                        border: '1px solid var(--error-bold)',
+                                                        borderRadius: 'var(--radius-sm)',
+                                                        cursor: 'pointer'
+                                                    }}>
+                                                    Wrong
+                                                </button>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleGrade(s.id, 'GRADED')}
+                                                className="btn-primary"
+                                                style={{ 
+                                                    background: 'var(--primary)', 
+                                                    border: 'none', 
+                                                    padding: '6px 16px', 
+                                                    fontSize: '0.8rem',
+                                                    cursor: 'pointer',
+                                                    width: '100%'
+                                                }}>
+                                                <CheckCircle2 size={16} /> Save Remarks
+                                            </button>
+                                        </div>
+                                     )}
                                 </div>
                             </div>
 
@@ -667,8 +690,8 @@ const TeacherHomework = () => {
                             </div>
                             {editHomework.isSubmissionRequired && (
                                 <div className="form-group">
-                                    <label>Submission Deadline</label>
-                                    <input type="date" value={editHomework.dueDate} onChange={e => setEditHomework({ ...editHomework, dueDate: e.target.value })} required />
+                                    <label>Submission Deadline (Optional)</label>
+                                    <input type="date" value={editHomework.dueDate} onChange={e => setEditHomework({ ...editHomework, dueDate: e.target.value })} />
                                 </div>
                             )}
                             <div className="form-group">

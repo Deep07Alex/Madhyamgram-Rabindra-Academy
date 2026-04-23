@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
 // Determine the backend URL for Socket.io
 // In Native/Android: Use the production domain
 // In Web/Dev: Use the base URL or current origin
-const SOCKET_URL = Capacitor.isNativePlatform() 
+const SOCKET_URL = (Capacitor.isNativePlatform() || Capacitor.getPlatform() === 'electron')
     ? 'https://madhyamgramrabindraacademy.in' 
     : (import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000');
 

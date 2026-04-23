@@ -105,10 +105,10 @@ const StudentHomework = () => {
                     Academic Tasks & Assignments
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px', marginTop: '24px' }}>
-                    {assignments.filter((hw: any) => !hw.isSubmissionRequired || new Date(hw.dueDate).getTime() >= new Date().getTime()).map((hw: any) => {
+                    {assignments.filter((hw: any) => !hw.isSubmissionRequired || !hw.dueDate || new Date(hw.dueDate).getTime() >= new Date().getTime()).map((hw: any) => {
                         const hasSubmitted = hw.submissions?.length > 0;
                         const submission = hw.submissions?.[0];
-                        const isPastDue = new Date(hw.dueDate).getTime() < new Date().getTime();
+                        const isPastDue = hw.dueDate ? new Date(hw.dueDate).getTime() < new Date().getTime() : false;
                         const canEdit = !isPastDue && submission?.status !== 'GRADED';
 
                         return (
@@ -129,10 +129,13 @@ const StudentHomework = () => {
                                             {hw.subject || 'Core Study'}
                                         </span>
                                         {hasSubmitted ? (
-                                            <span className={`badge ${submission.status.toLowerCase()}`} style={{ fontSize: '0.7rem' }}>
-                                                {submission.status === 'GRADED' ? <CheckCircle2 size={12} /> : <Clock size={12} />}
-                                                {submission.status}
-                                            </span>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                {submission.grade && <span className="badge" style={{ background: submission.grade === 'Right' ? 'var(--success-soft)' : submission.grade === 'Wrong' ? 'var(--error-soft)' : 'var(--primary-soft)', color: submission.grade === 'Right' ? 'var(--success-bold)' : submission.grade === 'Wrong' ? 'var(--error-bold)' : 'var(--primary-bold)', fontSize: '0.7rem' }}>{submission.grade}</span>}
+                                                <span className={`badge ${submission.status.toLowerCase()}`} style={{ fontSize: '0.7rem' }}>
+                                                    {submission.status === 'GRADED' ? <CheckCircle2 size={12} /> : <Clock size={12} />}
+                                                    {submission.status}
+                                                </span>
+                                            </div>
                                         ) : hw.isSubmissionRequired ? (
                                             <span className="badge" style={{ background: '#fff7ed', color: '#c2410c', border: '1px solid #ffedd5', fontSize: '0.7rem' }}>
                                                 Pending Action
@@ -149,7 +152,7 @@ const StudentHomework = () => {
                                     {hw.isSubmissionRequired && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <Calendar size={14} /> Due: {new Date(hw.dueDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                <Calendar size={14} /> Due: {hw.dueDate ? new Date(hw.dueDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'No Deadline'}
                                             </div>
                                         </div>
                                     )}

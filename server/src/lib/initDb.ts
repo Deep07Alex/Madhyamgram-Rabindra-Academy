@@ -173,6 +173,7 @@ export const initDb = async () => {
                 "status" "SubmissionStatus" NOT NULL DEFAULT 'PENDING',
                 "studentId" TEXT NOT NULL REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE,
                 "homeworkId" TEXT NOT NULL REFERENCES "Homework"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+                "grade" TEXT,
                 "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -264,6 +265,17 @@ export const initDb = async () => {
             );
             CREATE INDEX IF NOT EXISTS "idx_school_session_date" ON "SchoolSession"("date" DESC);
 
+            -- AcademicTerm Table (Term-wise attendance boundaries)
+            CREATE TABLE IF NOT EXISTS "AcademicTerm" (
+                "id" TEXT PRIMARY KEY,
+                "semester" TEXT NOT NULL,
+                "academicYear" INTEGER NOT NULL,
+                "startDate" DATE NOT NULL,
+                "endDate" DATE NOT NULL,
+                "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT "academic_term_unique" UNIQUE ("semester", "academicYear")
+            );
+
             -- SystemConfig Table
             CREATE TABLE IF NOT EXISTS "SystemConfig" (
                 "key" TEXT PRIMARY KEY,
@@ -351,6 +363,9 @@ export const initDb = async () => {
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Student' AND column_name='phone') THEN
                     ALTER TABLE "Student" ADD COLUMN "phone" TEXT;
                 END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Submission' AND column_name='grade') THEN
+                    ALTER TABLE "Submission" ADD COLUMN "grade" TEXT;
+                END IF;
             END $$;
 
             -- Leadership Role Migration (Teacher -> Admin)
@@ -403,6 +418,7 @@ export const initDb = async () => {
             CREATE INDEX IF NOT EXISTS "idx_monthly_fee_student" ON "MonthlyFee"("studentId");
             CREATE INDEX IF NOT EXISTS "idx_monthly_fee_year" ON "MonthlyFee"("academicYear");
             CREATE INDEX IF NOT EXISTS "idx_admission_fee_student" ON "AdmissionFee"("studentId");
+            CREATE INDEX IF NOT EXISTS "idx_academic_term_lookup" ON "AcademicTerm"("academicYear", "semester");
         `);
 
         console.log('Database finalized and ready. Running predefined Subject seeding...');

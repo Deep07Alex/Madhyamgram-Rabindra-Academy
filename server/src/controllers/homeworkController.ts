@@ -37,7 +37,7 @@ export const createHomework = async (req: AuthRequest, res: Response) => {
         if (!teacherId) return res.status(401).json({ message: 'Unauthorized' });
 
         let finalDueDate = null;
-        if (subRequired && dueDate) {
+        if (dueDate) {
             finalDueDate = new Date(dueDate);
             finalDueDate.setHours(23, 59, 59, 999);
         }
@@ -70,7 +70,7 @@ export const updateHomework = async (req: AuthRequest, res: Response) => {
         const subRequired = isSubmissionRequired === 'true' || isSubmissionRequired === true;
 
         let finalDueDate = null;
-        if (subRequired && dueDate) {
+        if (dueDate) {
             finalDueDate = new Date(dueDate);
             finalDueDate.setHours(23, 59, 59, 999);
         }
@@ -144,7 +144,7 @@ export const getHomeworks = async (req: AuthRequest, res: Response) => {
         let paramCount = 1;
 
         if (role === 'STUDENT') {
-            submissionsSubquery = `COALESCE((SELECT json_agg(json_build_object('id', s.id, 'status', s.status, 'content', s.content, 'fileUrl', s."fileUrl", 'submittedAt', s."submittedAt"))
+            submissionsSubquery = `COALESCE((SELECT json_agg(json_build_object('id', s.id, 'status', s.status, 'grade', s.grade, 'content', s.content, 'fileUrl', s."fileUrl", 'submittedAt', s."submittedAt", 'feedback', s.feedback))
                FROM "Submission" s WHERE s."homeworkId" = h.id AND s."studentId" = $${paramCount++}), '[]'::json) as submissions`;
             params.push(userId);
         }
@@ -299,7 +299,7 @@ export const getSubmissions = async (req: Request, res: Response) => {
 export const gradeSubmission = async (req: AuthRequest, res: Response) => {
     try {
         const id = req.params.id as string;
-        const { status, feedback } = req.body; // status should be 'GRADED' etc.
+        const { status, grade, feedback } = req.body; // status should be 'GRADED' etc.
 
         // Check if deadline is passed and if submission is required
         const checkRes = await db.query(`
@@ -317,13 +317,9 @@ export const gradeSubmission = async (req: AuthRequest, res: Response) => {
             return res.status(403).json({ message: 'This assignment does not require grading.' });
         }
 
-        if (dueDate && new Date() < new Date(dueDate)) {
-            return res.status(403).json({ message: 'Grading is only permitted after the submission deadline has passed.' });
-        }
-
         const submissionRes = await db.query(
-            `UPDATE "Submission" SET status = $1, feedback = $2 WHERE id = $3 RETURNING *`,
-            [status, feedback || null, id]
+            `UPDATE "Submission" SET status = $1, grade = $2, feedback = $3 WHERE id = $4 RETURNING *`,
+            [status || 'GRADED', grade || null, feedback || null, id]
         );
 
         sendToUser(submissionRes.rows[0].studentId, 'homework_graded', { submissionId: id });

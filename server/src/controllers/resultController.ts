@@ -220,33 +220,80 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
             [studentId, academicYear]
         );
 
-        // Fetch Attendance Summary using Virtual Presence Logic
-        // We count all unique school session dates in the system as expected presence
-        const sessionsRes = await db.query(
-            `SELECT date::date as session_date 
-             FROM (
-                SELECT date::date FROM "Attendance"
-                UNION
-                SELECT date::date FROM "TeacherAttendance"
-             ) as session_union 
-             WHERE (
-                (EXTRACT(YEAR FROM date) = $1 AND EXTRACT(MONTH FROM date) >= 1) OR 
-                (EXTRACT(YEAR FROM date) = $1 + 1 AND EXTRACT(MONTH FROM date) <= 12)
-             )`,
+        // ── Term-Bound Attendance Logic ──
+        // Fetch custom term date boundaries if set by admin
+        const termsRes = await db.query(
+            `SELECT * FROM "AcademicTerm" WHERE "academicYear" = $1 ORDER BY "startDate" ASC`,
             [academicYear]
         );
-        const sessionDates = new Set(sessionsRes.rows.map(r => new Date(r.session_date).toLocaleDateString('en-CA')));
-        const totalSessions = sessionDates.size;
+        const terms = termsRes.rows;
 
-        // Count explicit ABSENT records for this student within these sessions
+        // Determine the "Max Date" for academic days calculation
+        // If we are viewing a specific term, we stop at its endDate. 
+        // If we are viewing yearly/progressive, we stop at the latest term's endDate that has results.
+        
+        let targetEndDate: string | null = null;
+        const requestedSemester = req.query.semester as string; // Optional filter from client
+
+        if (requestedSemester) {
+            const specificTerm = terms.find(t => t.semester === requestedSemester);
+            if (specificTerm) targetEndDate = new Date(specificTerm.endDate).toLocaleDateString('en-CA');
+        }
+
+        if (!targetEndDate) {
+            // Find the latest semester that has ANY result recorded for this student in this year
+            const latestResultRes = await db.query(
+                `SELECT semester FROM "Result" WHERE "studentId" = $1 AND "academicYear" = $2 ORDER BY "createdAt" DESC LIMIT 1`,
+                [studentId, academicYear]
+            );
+            const latestSemester = latestResultRes.rows[0]?.semester;
+            const termForLatest = terms.find(t => t.semester === latestSemester);
+            if (termForLatest) {
+                targetEndDate = new Date(termForLatest.endDate).toLocaleDateString('en-CA');
+            } else {
+                // Fallback to today if no term boundaries or results found
+                targetEndDate = new Date().toLocaleDateString('en-CA');
+            }
+        }
+
+        // We count sessions starting from the first term's startDate (or Jan 1st) up to targetEndDate
+        const firstTerm = terms.find(t => t.semester === 'Unit-I');
+        const startDate = firstTerm ? new Date(firstTerm.startDate).toLocaleDateString('en-CA') : `${academicYear}-01-01`;
+
+        // Count every non-Sunday calendar day UNLESS this specific class had a full closure
+        // (ALL students in class marked absent, 0 present = 100% closure)
+        const sessionsRes = await db.query(
+            `SELECT COUNT(*) as total_sessions
+             FROM (
+                SELECT d::date as d 
+                FROM generate_series($1::date, $2::date, '1 day'::interval) d
+             ) cal
+             WHERE EXTRACT(DOW FROM d) != 0
+               AND NOT (
+                   (SELECT COUNT(*) FROM "Attendance" a WHERE a.date = cal.d AND a."classId" = $3 AND a.status = 'ABSENT')
+                       >= (SELECT COUNT(*) FROM "Student" s WHERE s."classId" = $3)
+                   AND (SELECT COUNT(*) FROM "Student" s WHERE s."classId" = $3) > 0
+                   AND NOT EXISTS (SELECT 1 FROM "Attendance" a2 WHERE a2.date = cal.d AND a2."classId" = $3 AND a2.status IN ('PRESENT', 'LATE'))
+               )`,
+            [startDate, targetEndDate, student.classId]
+        );
+        const totalSessions = parseInt(sessionsRes.rows[0].total_sessions || '0');
+
+        // Count absences only on valid academic days (not on class-closure days)
         const explicitAbsentRes = await db.query(
             `SELECT COUNT(DISTINCT date::date) as absent_count
-             FROM "Attendance"
-             WHERE "studentId" = $1 AND status = 'ABSENT' AND (
-                (EXTRACT(YEAR FROM date) = $2 AND EXTRACT(MONTH FROM date) >= 1) OR 
-                (EXTRACT(YEAR FROM date) = $2 + 1 AND EXTRACT(MONTH FROM date) <= 12)
-             )`,
-            [studentId, academicYear]
+             FROM "Attendance" att
+             WHERE att."studentId" = $1 
+               AND att.status = 'ABSENT' 
+               AND att.date >= $2 AND att.date <= $3
+               AND EXTRACT(DOW FROM att.date) != 0
+               AND NOT (
+                   (SELECT COUNT(*) FROM "Attendance" a3 WHERE a3.date = att.date AND a3."classId" = $4 AND a3.status = 'ABSENT')
+                       >= (SELECT COUNT(*) FROM "Student" s WHERE s."classId" = $4)
+                   AND (SELECT COUNT(*) FROM "Student" s WHERE s."classId" = $4) > 0
+                   AND NOT EXISTS (SELECT 1 FROM "Attendance" a4 WHERE a4.date = att.date AND a4."classId" = $4 AND a4.status IN ('PRESENT', 'LATE'))
+               )`,
+            [studentId, startDate, targetEndDate, student.classId]
         );
         const absentCount = parseInt(explicitAbsentRes.rows[0].absent_count || '0');
         const presentCount = Math.max(0, totalSessions - absentCount);
@@ -254,7 +301,9 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
         const attendanceData = {
             total_days: totalSessions,
             present_days: presentCount,
-            absent_days: absentCount
+            absent_days: absentCount,
+            startDate,
+            endDate: targetEndDate
         };
 
         // Calculate Rank in Class (Only if student has all 3 units AND ranked against others with all 3 units)
@@ -526,6 +575,77 @@ export const getClassRankings = async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Error fetching class rankings:', error);
         res.status(500).json({ message: 'Error fetching class rankings' });
+    }
+};
+
+/**
+ * Save/Update Academic Term Schedule
+ */
+export const upsertAcademicTerm = async (req: Request, res: Response) => {
+    try {
+        const { semester, academicYear, startDate, endDate } = req.body;
+        if (!semester || !academicYear) {
+            return res.status(400).json({ message: 'Missing semester or academic year' });
+        }
+        if (!startDate || !endDate) {
+            return res.status(400).json({ message: 'Both start and end dates are required' });
+        }
+
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        if (start >= end) {
+            return res.status(400).json({ message: 'Validation Failed: Start date must be strictly before end date' });
+        }
+
+        // Strict Overlap Check
+        const overlapCheck = await db.query(
+            `SELECT semester, "startDate", "endDate" FROM "AcademicTerm" 
+             WHERE "academicYear" = $1 AND semester != $2
+             AND (
+                 ($3::date BETWEEN "startDate" AND "endDate") OR 
+                 ($4::date BETWEEN "startDate" AND "endDate") OR
+                 ("startDate" BETWEEN $3::date AND $4::date)
+             )`,
+            [parseInt(academicYear), semester, startDate, endDate]
+        );
+
+        if (overlapCheck.rows.length > 0) {
+            const overlapping = overlapCheck.rows.map(r => `${r.semester} (${new Date(r.startDate).toLocaleDateString()} to ${new Date(r.endDate).toLocaleDateString()})`).join(', ');
+            return res.status(400).json({ message: `Validation Failed: Dates overlap with existing term(s): ${overlapping}` });
+        }
+
+        const id = crypto.randomUUID();
+        const result = await db.query(
+            `INSERT INTO "AcademicTerm" (id, semester, "academicYear", "startDate", "endDate")
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT ON CONSTRAINT "academic_term_unique"
+             DO UPDATE SET "startDate" = EXCLUDED."startDate", "endDate" = EXCLUDED."endDate"
+             RETURNING *`,
+            [id, semester, parseInt(academicYear), startDate, endDate]
+        );
+
+        res.json(result.rows[0]);
+    } catch (error: any) {
+        console.error('Error upserting academic term:', error);
+        res.status(500).json({ message: `Error saving term schedule: ${error.message}` });
+    }
+};
+
+/**
+ * Fetch all Academic Terms for a year
+ */
+export const getAcademicTerms = async (req: Request, res: Response) => {
+    try {
+        const { academicYear } = req.query;
+        const year = academicYear || new Date().getFullYear().toString();
+        
+        const result = await db.query(
+            `SELECT * FROM "AcademicTerm" WHERE "academicYear" = $1 ORDER BY "startDate" ASC`,
+            [parseInt(year as string)]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching terms' });
     }
 };
 

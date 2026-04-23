@@ -19,10 +19,16 @@ export const getPersistentStorage = () => localStorage;
 
 // Helper to get the absolute production URL (Critical for Native Android support)
 export const getBaseUrl = () => {
-    if (Capacitor.isNativePlatform()) {
-        return 'https://madhyamgramrabindraacademy.in';
+    const platform = Capacitor.getPlatform();
+    console.log('[API] Current Platform:', platform);
+    if (Capacitor.isNativePlatform() || platform === 'electron') {
+        const url = 'https://madhyamgramrabindraacademy.in';
+        console.log('[API] Using Native/Electron URL:', url);
+        return url;
     }
-    return import.meta.env.VITE_API_URL || window.location.origin;
+    const url = import.meta.env.VITE_API_URL || window.location.origin;
+    console.log('[API] Using Web URL:', url);
+    return url;
 };
 
 const api = axios.create({

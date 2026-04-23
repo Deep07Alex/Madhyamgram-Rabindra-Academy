@@ -5,13 +5,28 @@
  */
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
-import { createResult, getResults, bulkUploadResults, getConsolidatedReport, deleteResult, deleteStudentResults, deleteClassResults, getClassRankings } from '../controllers/resultController.js';
+import { 
+    createResult, 
+    getResults, 
+    bulkUploadResults, 
+    getConsolidatedReport, 
+    deleteResult, 
+    deleteStudentResults, 
+    deleteClassResults, 
+    getClassRankings,
+    upsertAcademicTerm,
+    getAcademicTerms
+} from '../controllers/resultController.js';
 import multer from 'multer';
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 
 router.use(authenticate);
+
+// Academic Term Scheduling
+router.get('/terms', authorize(['ADMIN', 'TEACHER', 'STUDENT']), getAcademicTerms);
+router.post('/terms', authorize(['ADMIN']), upsertAcademicTerm);
 
 router.post('/', authorize(['ADMIN']), createResult);
 router.post('/bulk', authorize(['ADMIN', 'TEACHER']), upload.single('file'), bulkUploadResults);
