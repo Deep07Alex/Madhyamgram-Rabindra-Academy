@@ -130,7 +130,7 @@ const TeacherHomework = () => {
 
     const handleGrade = async (submissionId: string, status: string, grade?: string) => {
         try {
-            await api.put(`/homework/submissions/${submissionId}`, { 
+            await api.patch(`/homework/submissions/${submissionId}/grade`, { 
                 status, 
                 grade: grade || selectedSubmission?.grade, 
                 feedback: gradingFeedback 

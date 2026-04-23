@@ -47,7 +47,6 @@ const ManageHomework = () => {
     const [viewTaskModal, setViewTaskModal] = useState({ isOpen: false, homework: null as any });
     const [viewSubmissionsModal, setViewSubmissionsModal] = useState({ isOpen: false, homework: null as any });
     const [submissions, setSubmissions] = useState<any[]>([]);
-    const [gradingFeedback, setGradingFeedback] = useState('');
     
     // Creation state
     const [newHomework, setNewHomework] = useState({
@@ -161,17 +160,17 @@ const ManageHomework = () => {
         }
     };
 
-    const handleGrade = async (submissionId: string, status: string, grade?: string) => {
+    const handleGrade = async (submissionId: string, status: string, grade?: string, feedback?: string) => {
         try {
-            await api.put(`/homework/submissions/${submissionId}`, { 
+            const currentSubmission = submissions.find(s => s.id === submissionId);
+            await api.patch(`/homework/submissions/${submissionId}/grade`, { 
                 status, 
-                grade: grade || submissions.find(s => s.id === submissionId)?.grade,
-                feedback: gradingFeedback 
+                grade: grade || currentSubmission?.grade,
+                feedback: feedback !== undefined ? feedback : currentSubmission?.feedback 
             });
             showToast('Submission status updated.', 'success');
             const res = await api.get(`/homework/${viewSubmissionsModal.homework.id}/submissions`);
             setSubmissions(res.data);
-            setGradingFeedback('');
         } catch (error: any) {
             const msg = error.response?.data?.message || 'Failed to update submission.';
             showToast(msg, 'error');
@@ -716,9 +715,9 @@ const ManageHomework = () => {
                                                     <span className={`badge ${s.status.toLowerCase()}`}>{s.status}</span>
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '8px' }}>
-                                                    <button onClick={() => handleGrade(s.id, 'GRADED', 'Right')} style={{ padding: '4px 10px', fontSize: '0.7rem', border: '1px solid var(--success-bold)', background: s.grade === 'Right' ? 'var(--success)' : 'transparent', color: s.grade === 'Right' ? 'white' : 'var(--success-bold)', borderRadius: '4px', cursor: 'pointer' }}>Right</button>
-                                                    <button onClick={() => handleGrade(s.id, 'GRADED', 'Wrong')} style={{ padding: '4px 10px', fontSize: '0.7rem', border: '1px solid var(--error-bold)', background: s.grade === 'Wrong' ? 'var(--error)' : 'transparent', color: s.grade === 'Wrong' ? 'white' : 'var(--error-bold)', borderRadius: '4px', cursor: 'pointer' }}>Wrong</button>
-                                                    <button onClick={() => handleGrade(s.id, 'GRADED')} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.7rem', borderRadius: '4px', background: 'var(--primary)' }}>Save Remarks</button>
+                                                    <button onClick={() => handleGrade(s.id, 'GRADED', 'Right', s.feedback)} style={{ padding: '4px 10px', fontSize: '0.7rem', border: '1px solid var(--success-bold)', background: s.grade === 'Right' ? 'var(--success)' : 'transparent', color: s.grade === 'Right' ? 'white' : 'var(--success-bold)', borderRadius: '4px', cursor: 'pointer' }}>Right</button>
+                                                    <button onClick={() => handleGrade(s.id, 'GRADED', 'Wrong', s.feedback)} style={{ padding: '4px 10px', fontSize: '0.7rem', border: '1px solid var(--error-bold)', background: s.grade === 'Wrong' ? 'var(--error)' : 'transparent', color: s.grade === 'Wrong' ? 'white' : 'var(--error-bold)', borderRadius: '4px', cursor: 'pointer' }}>Wrong</button>
+                                                    <button onClick={() => handleGrade(s.id, 'GRADED', undefined, s.feedback)} className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.7rem', borderRadius: '4px', background: 'var(--primary)' }}>Save Remarks</button>
                                                 </div>
                                             </div>
                                         </div>
@@ -751,8 +750,11 @@ const ManageHomework = () => {
                                         <div style={{ marginTop: '16px' }}>
                                             <textarea
                                                 placeholder="Provide remarks..."
-                                                defaultValue={s.feedback || ''}
-                                                onBlur={e => setGradingFeedback(e.target.value)}
+                                                value={s.feedback || ''}
+                                                onChange={e => {
+                                                    const val = e.target.value;
+                                                    setSubmissions(prev => prev.map(sub => sub.id === s.id ? { ...sub, feedback: val } : sub));
+                                                }}
                                                 rows={2}
                                                 style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border-soft)', fontSize: '0.85rem' }}
                                             />

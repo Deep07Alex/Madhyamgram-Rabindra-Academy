@@ -185,7 +185,7 @@ const TeacherAttendance = () => {
             });
 
             (stuRes.data.students || []).forEach((s: any) => {
-                init[s.id] = attMap[s.id] || 'PRESENT';
+                init[s.id] = attMap[s.id] || '';
             });
 
             setAttendanceData(init);
@@ -223,7 +223,7 @@ const TeacherAttendance = () => {
                     studentId: s.studentId,
                     rollNumber: s.rollNumber,
                     attendanceId: att?.id || null,
-                    status: att?.status || 'PRESENT',
+                    status: att?.status || null,
                 };
             }));
         } catch {
@@ -288,7 +288,7 @@ const TeacherAttendance = () => {
         r.studentId.toLowerCase().includes(histSearch.toLowerCase()) ||
         r.rollNumber.includes(histSearch)
     );
-    const presentCount = filteredHist.filter(r => r.status !== 'ABSENT').length;
+    const presentCount = filteredHist.filter(r => r.status === 'PRESENT').length;
     const absentCount = filteredHist.filter(r => r.status === 'ABSENT').length;
     const noRecordCount = filteredHist.filter(r => !r.status).length;
 
@@ -474,7 +474,7 @@ const TeacherAttendance = () => {
                                                 </td>
                                                 <td style={{ padding: '13px 20px', textAlign: 'center', fontWeight: '700', color: 'var(--text-muted)' }}>#{row.rollNumber}</td>
                                                 <td style={{ padding: '13px 20px', textAlign: 'right' }}>
-                                                    <StatusBadge status={row.status || 'PRESENT'} />
+                                                    <StatusBadge status={row.status} />
                                                 </td>
                                             </tr>
                                         ))}
