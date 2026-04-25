@@ -70,7 +70,65 @@ export const initCronJobs = () => {
         }
     });
 
-    // 3. Hourly Notice Cleanup Case
+    // 3. Auto-Non-Academic Day Job (11:59 PM)
+    // Runs at 23:59 every day to handle classes where no attendance was marked.
+    // If a class has zero attendance records at the end of the day, it is automatically marked as a Non-Academic day.
+    cron.schedule('59 23 * * *', async () => {
+        console.log('Running 11:59 PM Auto-Non-Academic Day Job...');
+        try {
+            const todayStr = new Date().toLocaleDateString('en-CA'); // 'YYYY-MM-DD'
+            
+            // Skip Sundays as they are non-academic by default in the system logic
+            if (new Date().getDay() === 0) {
+                console.log('Skipping Non-Academic Day check for Sunday.');
+                return;
+            }
+
+            // Get a marker ID (Admin preferred, fallback to Teacher)
+            let markerRes = await db.query('SELECT id FROM "Admin" LIMIT 1');
+            if (markerRes.rows.length === 0) {
+                markerRes = await db.query('SELECT id FROM "Teacher" LIMIT 1');
+            }
+            
+            if (markerRes.rows.length === 0) {
+                console.warn('Auto-Non-Academic Day job skipped: No valid marker (Admin/Teacher) found.');
+                return;
+            }
+            const markerId = markerRes.rows[0].id;
+
+            // Optimized Atomic Operation:
+            // Insert BULK_ABSENT records for all students in any class that has NO attendance records for today.
+            // This treats the day as a "Non-Academic Day" for that specific class.
+            const result = await db.query(`
+                INSERT INTO "Attendance" (id, date, status, "studentId", "teacherId", "classId", subject)
+                SELECT 
+                    gen_random_uuid(), 
+                    $1::date, 
+                    'ABSENT', 
+                    s.id, 
+                    $2, 
+                    s."classId", 
+                    'BULK_ABSENT'
+                FROM "Student" s
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM "Attendance" a 
+                    WHERE a.date = $1::date 
+                      AND a."classId" = s."classId"
+                )
+            `, [todayStr, markerId]);
+
+            if (result.rowCount && result.rowCount > 0) {
+                console.log(`Auto-Non-Academic Day: Successfully marked ${result.rowCount} students across inactive classes as BULK_ABSENT for ${todayStr}.`);
+            } else {
+                console.log(`No inactive classes found for ${todayStr}. All classes have existing records.`);
+            }
+
+        } catch (error) {
+            console.error('Error in Auto-Non-Academic Day Job:', error);
+        }
+    });
+
+    // 4. Hourly Notice Cleanup Case
     cron.schedule('0 * * * *', async () => {
         console.log('Running Hourly Notice Cleanup Job...');
         try {
@@ -83,6 +141,6 @@ export const initCronJobs = () => {
         }
     });
 
-    console.log('Attendance Cron Jobs Initialized (Midnight Daily).');
+    console.log('Attendance Cron Jobs Initialized (Midnight & 11:59 PM).');
     console.log('Notice Cleanup Cron Initialized (Hourly).');
 };

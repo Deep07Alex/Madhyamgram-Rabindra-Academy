@@ -248,14 +248,14 @@ const InlineTimeEdit = React.memo(({
 });
 
 
-const MonthlySummaryDisplay = React.memo(({ personId, dataMap }: { personId: string; dataMap: Record<string, Record<string, any>> }) => {
+const MonthlySummaryDisplay = React.memo(({ personId, dataMap, totalSessions, cumulativeStats }: { personId: string; dataMap: Record<string, Record<string, any>>, totalSessions?: number, cumulativeStats?: any }) => {
     const records = dataMap[personId] || {};
     const days = Object.values(records);
     const absent = days.filter((r: any) => r.status === 'ABSENT').length;
     const present = days.filter((r: any) => r.status === 'PRESENT' || r.status === 'LATE').length;
 
     return (
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
                 <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#22c55e' }}>
@@ -268,6 +268,30 @@ const MonthlySummaryDisplay = React.memo(({ personId, dataMap }: { personId: str
                     <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#ef4444' }}>{absent} Absent</span>
                 </div>
             )}
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                {totalSessions !== undefined && (
+                    <div style={{ background: 'var(--primary-soft)', padding: '2px 10px', borderRadius: '12px', border: '1px solid var(--primary-soft)' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', marginRight: '4px' }}>Monthly:</span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--primary-bold)' }}>
+                            {totalSessions > 0 ? ((present / totalSessions) * 100).toFixed(0) : '0'}%
+                            <span style={{ fontSize: '0.75rem', fontWeight: '600', marginLeft: '4px', opacity: 0.7 }}>
+                                ({present}/{totalSessions}d)
+                            </span>
+                        </span>
+                    </div>
+                )}
+                {cumulativeStats && (
+                    <div style={{ background: 'rgba(var(--primary-rgb), 0.1)', padding: '2px 10px', borderRadius: '12px', border: '1px solid rgba(var(--primary-rgb), 0.2)' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', marginRight: '4px' }}>Overall:</span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--primary-bold)' }}>
+                            {cumulativeStats.total > 0 ? ((cumulativeStats.present / cumulativeStats.total) * 100).toFixed(0) : '0'}%
+                            <span style={{ fontSize: '0.75rem', fontWeight: '600', marginLeft: '4px', opacity: 0.7 }}>
+                                ({cumulativeStats.present}/{cumulativeStats.total}d)
+                            </span>
+                        </span>
+                    </div>
+                )}
+            </div>
         </div>
     );
 });
@@ -279,7 +303,8 @@ const StudentAttendanceRow = React.memo(({
     monthlyDataMap,
     onRefresh,
     stats,
-    isStatsLoading
+    isStatsLoading,
+    cumulativeStats
 }: {
     row: StudentRow,
     viewMode: 'daily' | 'monthly',
@@ -287,7 +312,8 @@ const StudentAttendanceRow = React.memo(({
     monthlyDataMap: any,
     onRefresh: any,
     stats?: { present: number, absent: number, total: number },
-    isStatsLoading?: boolean
+    isStatsLoading?: boolean,
+    cumulativeStats?: { present: number, total: number }
 }) => {
     return (
         <tr style={{ borderBottom: '1px solid var(--border-soft)', transition: 'background 0.15s' }}
@@ -322,6 +348,11 @@ const StudentAttendanceRow = React.memo(({
                             <span style={{ fontSize: '0.68rem', fontWeight: '600', color: 'var(--text-muted)' }}>
                                 {stats.present} of {stats.total} days
                             </span>
+                            {cumulativeStats && (
+                                <span style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--primary-bold)', opacity: 0.8, marginTop: '2px' }}>
+                                    Overall: {cumulativeStats.total > 0 ? ((cumulativeStats.present / cumulativeStats.total) * 100).toFixed(0) : '0'}% ({cumulativeStats.present}/{cumulativeStats.total}d)
+                                </span>
+                            )}
                         </div>
                     ) : (
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>—</span>
@@ -351,7 +382,7 @@ const StudentAttendanceRow = React.memo(({
                         </div>
                     )
                 ) : (
-                    <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} />
+                    <MonthlySummaryDisplay personId={row.id} dataMap={monthlyDataMap} totalSessions={stats?.total} cumulativeStats={cumulativeStats} />
                 )}
             </td>
         </tr>
@@ -487,6 +518,7 @@ const ManageAttendance = () => {
     // Student state
     const [studentRows, setStudentRows] = useState<StudentRow[]>([]);
     const [attendanceStats, setAttendanceStats] = useState<Record<string, any>>({});
+    const [cumulativeStats, setCumulativeStats] = useState<Record<string, any>>({});
     const [isStatsLoading, setIsStatsLoading] = useState(false);
     const fetchConfig = useCallback(async () => {
         try {
@@ -660,6 +692,16 @@ const ManageAttendance = () => {
                 }
             });
             setAttendanceStats(statsRes.data.stats || {});
+
+            // Also fetch cumulative stats (Jan 1, 2026 to Today)
+            const cumulativeRes = await api.get('/attendance/stats/students', {
+                params: {
+                    classId: selectedClass || null,
+                    startDate: '2026-01-01',
+                    endDate: formatISODate(new Date())
+                }
+            });
+            setCumulativeStats(cumulativeRes.data.stats || {});
         } catch (err) {
             console.error('Failed to fetch attendance stats:', err);
         } finally {
@@ -1209,6 +1251,7 @@ const ManageAttendance = () => {
                                             monthlyDataMap={monthlyDataMap}
                                             onRefresh={refreshStudentView}
                                             stats={attendanceStats[row.id]}
+                                            cumulativeStats={cumulativeStats[row.id]}
                                             isStatsLoading={isStatsLoading}
                                         />
                                     ) : (

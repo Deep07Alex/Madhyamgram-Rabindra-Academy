@@ -18,6 +18,7 @@ const StudentAttendance = () => {
     const [currentMonth, setCurrentMonth] = useState(now.getMonth());
     const [currentYear, setCurrentYear] = useState(now.getFullYear());
     const [attendanceData, setAttendanceData] = useState({ records: [] as any[], totalSessions: 0 });
+    const [overallStats, setOverallStats] = useState({ present: 0, total: 0, rate: "0.0" });
     const [isLoading, setIsLoading] = useState(true);
 
     const monthName = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(currentYear, currentMonth));
@@ -37,6 +38,19 @@ const StudentAttendance = () => {
                 params: { startDate, endDate }
             });
             setAttendanceData(res.data);
+
+            // Fetch overall stats till date
+            const statsRes = await api.get('/attendance/stats/students', {
+                params: { startDate: '2026-01-01', endDate: formatISODate(new Date()) }
+            });
+            const o = Object.values(statsRes.data.stats || {})[0] as any;
+            if (o) {
+                setOverallStats({
+                    present: o.present,
+                    total: o.total,
+                    rate: o.total > 0 ? ((o.present / o.total) * 100).toFixed(1) : "0.0"
+                });
+            }
         } catch (error) {
             console.error('Failed to fetch attendance', error);
         } finally {
@@ -53,11 +67,12 @@ const StudentAttendance = () => {
         }
     });
 
-    // Polling fallback every 3 seconds - silent so no loading flicker
+    // Polling fallback every 2 minutes - silent so no loading flicker
+    // (SSE already handles real-time updates)
     useEffect(() => {
         const interval = setInterval(() => {
             fetchAttendance(true);
-        }, 3000);
+        }, 120000); // 2 minutes
         return () => clearInterval(interval);
     }, [fetchAttendance]);
 
@@ -104,41 +119,66 @@ const StudentAttendance = () => {
 
     return (
         <div className="manage-section">
-            <div className="stats-grid" style={{ marginBottom: '32px' }}>
-                <div className="stat-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                            <h3>{stats.total}</h3>
-                            <p>Academic Sessions</p>
+            <div className="stats-grid" style={{ marginBottom: '24px' }}>
+                <div className="stat-card" style={{ padding: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ background: 'var(--primary-soft)', padding: '10px', borderRadius: '12px' }}>
+                                <BarChart3 size={24} color="var(--primary-bold)" />
+                            </div>
+                            <div>
+                                <h4 style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase' }}>Overall Performance</h4>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                    <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900', color: 'var(--text-main)' }}>{overallStats.rate}%</h2>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)' }}>{overallStats.present} of {overallStats.total} days</span>
+                                </div>
+                            </div>
                         </div>
-                        <Calendar size={24} color="var(--primary-bold)" opacity={0.5} />
+                        <div style={{ width: '120px', height: '6px', background: 'var(--bg-main)', borderRadius: '10px', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${overallStats.rate}%`, background: 'var(--primary-bold)' }} />
+                        </div>
                     </div>
                 </div>
-                <div className="stat-card" style={{ borderLeftColor: 'var(--success)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                            <h3>{stats.present}</h3>
-                            <p>Days Present</p>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+                <h4 style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>Monthly Statistics ({monthName})</h4>
+                <div className="stats-grid" style={{ marginBottom: '32px' }}>
+                    <div className="stat-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                                <h3>{stats.total}</h3>
+                                <p>Academic Sessions</p>
+                            </div>
+                            <Calendar size={24} color="var(--primary-bold)" opacity={0.5} />
                         </div>
-                        <CheckCircle2 size={24} color="var(--success)" opacity={0.5} />
                     </div>
-                </div>
-                <div className="stat-card" style={{ borderLeftColor: '#ef4444' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                            <h3>{stats.absent}</h3>
-                            <p>Days Absent</p>
+                    <div className="stat-card" style={{ borderLeftColor: 'var(--success)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                                <h3>{stats.present}</h3>
+                                <p>Days Present</p>
+                            </div>
+                            <CheckCircle2 size={24} color="var(--success)" opacity={0.5} />
                         </div>
-                        <XCircle size={24} color="#ef4444" opacity={0.5} />
                     </div>
-                </div>
-                <div className="stat-card" style={{ borderLeftColor: 'var(--accent)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                            <h3>{stats.rate}%</h3>
-                            <p>Monthly Rate</p>
+                    <div className="stat-card" style={{ borderLeftColor: '#ef4444' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                                <h3>{stats.absent}</h3>
+                                <p>Days Absent</p>
+                            </div>
+                            <XCircle size={24} color="#ef4444" opacity={0.5} />
                         </div>
-                        <BarChart3 size={24} color="var(--accent)" opacity={0.5} />
+                    </div>
+                    <div className="stat-card" style={{ borderLeftColor: 'var(--accent)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                                <h3>{stats.rate}%</h3>
+                                <p>Monthly Rate</p>
+                            </div>
+                            <BarChart3 size={24} color="var(--accent)" opacity={0.5} />
+                        </div>
                     </div>
                 </div>
             </div>

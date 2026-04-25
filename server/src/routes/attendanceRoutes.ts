@@ -28,7 +28,7 @@ router.use(authenticate);
 router.post('/student', authorize(['ADMIN', 'TEACHER']), markStudentAttendance);
 router.post('/bulk-absent', authorize(['ADMIN']), bulkMarkStudentAbsent);
 router.get('/student', authorize(['ADMIN', 'TEACHER', 'STUDENT']), getStudentAttendance);
-router.get('/stats/students', authorize(['ADMIN']), getStudentStatsSummary);
+router.get('/stats/students', authorize(['ADMIN', 'TEACHER', 'STUDENT']), getStudentStatsSummary);
 router.patch('/admin/student/:id', authorize(['ADMIN']), updateStudentAttendance);
 
 // Teacher Attendance routes

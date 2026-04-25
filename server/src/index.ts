@@ -126,19 +126,24 @@ app.use(cors({
 
 // 4. Rate Limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: isProd ? 10000 : 5000, // Professional High-Traffic Capacity
+    windowMs: 1 * 60 * 1000, // 1 minute window for faster recovery
+    limit: 10000, // 10,000 requests per minute (Extremely generous for institutional use)
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: (req) => {
+        // Use Authorization header as key if available to distinguish users on the same network
+        const token = req.headers.authorization?.split(' ')[1];
+        return token || req.ip || 'anonymous';
+    },
     message: { message: 'High traffic detected. Please wait a moment and try again.' }
 });
 app.use('/api', limiter);
 
-// Stricter limiter for auth/login
+// Stricter limiter for auth/login (Protects against brute force)
 const loginLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: isProd ? 1000 : 300, // Professional Result-Day Capacity
-    message: { message: 'Too many login attempts from this network. Please try again after some time.' }
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 500, // 500 attempts per 15 mins
+    message: { message: 'Too many login attempts. Please try again after 15 minutes.' }
 });
 app.use('/api/auth/login', loginLimiter);
 

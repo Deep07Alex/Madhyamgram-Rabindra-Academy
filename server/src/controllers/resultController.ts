@@ -12,6 +12,24 @@ import { broadcast, sendToUser } from '../lib/sseManager.js';
 import * as XLSX from 'xlsx';
 
 /**
+ * Standardizes date formatting to YYYY-MM-DD.
+ * Uses UTC components to ensure consistency across all timezones.
+ */
+const formatDate = (date: any): string => {
+    if (!date) {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+    
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return date;
+    }
+
+    const d = new Date(date);
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+};
+
+/**
  * Records a new academic result for a student.
  */
 export const createResult = async (req: Request, res: Response) => {
@@ -232,12 +250,17 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
         // If we are viewing a specific term, we stop at its endDate. 
         // If we are viewing yearly/progressive, we stop at the latest term's endDate that has results.
         
+        // ── Synchronized Attendance Logic (Matches Attendance Controller) ──
+        const now = new Date();
+        const todayStr = formatDate(now);
+        const currentYear = now.getFullYear();
+        
         let targetEndDate: string | null = null;
         const requestedSemester = req.query.semester as string; // Optional filter from client
 
         if (requestedSemester) {
             const specificTerm = terms.find(t => t.semester === requestedSemester);
-            if (specificTerm) targetEndDate = new Date(specificTerm.endDate).toLocaleDateString('en-CA');
+            if (specificTerm) targetEndDate = formatDate(specificTerm.endDate);
         }
 
         if (!targetEndDate) {
@@ -248,53 +271,74 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
             );
             const latestSemester = latestResultRes.rows[0]?.semester;
             const termForLatest = terms.find(t => t.semester === latestSemester);
+            
             if (termForLatest) {
-                targetEndDate = new Date(termForLatest.endDate).toLocaleDateString('en-CA');
+                targetEndDate = formatDate(termForLatest.endDate);
             } else {
-                // Fallback to today if no term boundaries or results found
-                targetEndDate = new Date().toLocaleDateString('en-CA');
+                // If no results yet, find the latest term that has already started
+                const latestStartedTerm = [...terms].sort((a, b) => 
+                    new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+                ).find(t => formatDate(t.startDate) <= todayStr);
+                
+                if (latestStartedTerm) {
+                    targetEndDate = formatDate(latestStartedTerm.endDate);
+                } else {
+                    targetEndDate = todayStr;
+                }
             }
         }
 
-        // We count sessions starting from the first term's startDate (or Jan 1st) up to targetEndDate
-        const firstTerm = terms.find(t => t.semester === 'Unit-I');
-        const startDate = firstTerm ? new Date(firstTerm.startDate).toLocaleDateString('en-CA') : `${academicYear}-01-01`;
+        // Safety: Result Dashboards should never count academic days in the future
+        if (academicYear === currentYear && targetEndDate > todayStr) {
+            targetEndDate = todayStr;
+        }
 
-        // Count every non-Sunday calendar day UNLESS this specific class had a full closure
-        // (ALL students in class marked absent, 0 present = 100% closure)
+        // Institutional Launch Lock: January 2026 Minimum
+        const minLaunchDate = '2026-01-01';
+        const firstTerm = terms.find(t => t.semester === 'Unit-I');
+        let startDate = firstTerm ? formatDate(firstTerm.startDate) : `${academicYear}-01-01`;
+        if (startDate < minLaunchDate) startDate = minLaunchDate;
+
+        // 1. Calculate Total Sessions (Academic Days)
+        // Logic: (Not Sunday) AND (Not Closure)
         const sessionsRes = await db.query(
-            `SELECT COUNT(*) as total_sessions
-             FROM (
-                SELECT d::date as d 
-                FROM generate_series($1::date, $2::date, '1 day'::interval) d
-             ) cal
-             WHERE EXTRACT(DOW FROM d) != 0
-               AND NOT (
-                   (SELECT COUNT(*) FROM "Attendance" a WHERE a.date = cal.d AND a."classId" = $3 AND a.status = 'ABSENT')
-                       >= (SELECT COUNT(*) FROM "Student" s WHERE s."classId" = $3)
-                   AND (SELECT COUNT(*) FROM "Student" s WHERE s."classId" = $3) > 0
-                   AND NOT EXISTS (SELECT 1 FROM "Attendance" a2 WHERE a2.date = cal.d AND a2."classId" = $3 AND a2.status IN ('PRESENT', 'LATE'))
-               )`,
+            `WITH DateRange AS (
+                SELECT ($1::date + n) as d
+                FROM generate_series(0, ($2::date - $1::date)) n
+                WHERE EXTRACT(ISODOW FROM ($1::date + n) AT TIME ZONE 'UTC') != 7 -- Exclude Sundays
+            ),
+            -- Identify days where this class was "Closed" (Bulk Absent)
+            ClosureDays AS (
+                SELECT DISTINCT date
+                FROM "Attendance" a1
+                WHERE date >= $1 AND date <= $2
+                  AND "classId" = $3
+                  AND subject = 'BULK_ABSENT'
+                  AND EXTRACT(ISODOW FROM date AT TIME ZONE 'UTC') != 7
+                  AND NOT EXISTS (
+                      SELECT 1 FROM "Attendance" a2
+                      WHERE a2.date = a1.date 
+                        AND a2."classId" = a1."classId"
+                        AND a2.status IN ('PRESENT', 'LATE')
+                  )
+            )
+            SELECT (SELECT COUNT(*) FROM DateRange) - (SELECT COUNT(*) FROM ClosureDays) as total_sessions`,
             [startDate, targetEndDate, student.classId]
         );
         const totalSessions = parseInt(sessionsRes.rows[0].total_sessions || '0');
 
-        // Count absences only on valid academic days (not on class-closure days)
+        // 2. Calculate Absences (Only on valid academic days)
         const explicitAbsentRes = await db.query(
-            `SELECT COUNT(DISTINCT date::date) as absent_count
-             FROM "Attendance" att
-             WHERE att."studentId" = $1 
-               AND att.status = 'ABSENT' 
-               AND att.date >= $2 AND att.date <= $3
-               AND EXTRACT(DOW FROM att.date) != 0
-               AND NOT (
-                   (SELECT COUNT(*) FROM "Attendance" a3 WHERE a3.date = att.date AND a3."classId" = $4 AND a3.status = 'ABSENT')
-                       >= (SELECT COUNT(*) FROM "Student" s WHERE s."classId" = $4)
-                   AND (SELECT COUNT(*) FROM "Student" s WHERE s."classId" = $4) > 0
-                   AND NOT EXISTS (SELECT 1 FROM "Attendance" a4 WHERE a4.date = att.date AND a4."classId" = $4 AND a4.status IN ('PRESENT', 'LATE'))
-               )`,
-            [studentId, startDate, targetEndDate, student.classId]
+            `SELECT COUNT(DISTINCT date) as absent_count
+             FROM "Attendance" a
+             WHERE a."studentId" = $1 
+               AND a.status = 'ABSENT' 
+               AND a.subject != 'BULK_ABSENT' -- Filter out closure records
+               AND a.date >= $2 AND a.date <= $3
+               AND EXTRACT(ISODOW FROM a.date AT TIME ZONE 'UTC') != 7`,
+            [studentId, startDate, targetEndDate]
         );
+        
         const absentCount = parseInt(explicitAbsentRes.rows[0].absent_count || '0');
         const presentCount = Math.max(0, totalSessions - absentCount);
 

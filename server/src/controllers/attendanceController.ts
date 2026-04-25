@@ -158,12 +158,20 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response) => {
         let sessionQuery = `
             SELECT TO_CHAR(($1::date + n), 'YYYY-MM-DD') as session_date 
             FROM generate_series(0, ($2::date - $1::date)) n
-            WHERE EXTRACT(ISODOW FROM ($1::date + n)) != 7
-              AND NOT EXISTS (
-                  SELECT 1 FROM "Attendance" a 
-                  WHERE a.date = ($1::date + n)
-                    AND (a."classId" = $3 OR $3 IS NULL) 
-                    AND a.subject = 'BULK_ABSENT'
+            WHERE EXTRACT(ISODOW FROM ($1::date + n) AT TIME ZONE 'UTC') != 7
+              AND (
+                  NOT EXISTS (
+                      SELECT 1 FROM "Attendance" a1 
+                      WHERE a1.date = ($1::date + n)
+                        AND (a1."classId" = $3 OR $3 IS NULL) 
+                        AND a1.subject = 'BULK_ABSENT'
+                  )
+                  OR EXISTS (
+                      SELECT 1 FROM "Attendance" a2
+                      WHERE a2.date = ($1::date + n)
+                        AND (a2."classId" = $3 OR $3 IS NULL)
+                        AND a2.status IN ('PRESENT', 'LATE')
+                  )
               )
             ORDER BY session_date DESC
         `;
@@ -553,10 +561,16 @@ export const bulkMarkStudentAbsent = async (req: AuthRequest, res: Response) => 
  * Used to display individual stats (X of Y days, %) in the admin dashboard.
  */
 export const getStudentStatsSummary = async (req: AuthRequest, res: Response) => {
-    const { classId, academicYear, startDate: queryStartDate, endDate: queryEndDate } = req.query;
+    const { classId, academicYear, startDate: queryStartDate, endDate: queryEndDate, studentId } = req.query;
 
     try {
         const year = academicYear || new Date().getFullYear();
+
+        // Students can only see their own stats
+        let targetStudentId = studentId;
+        if (req.user?.role === 'STUDENT') {
+            targetStudentId = req.user.id;
+        }
 
         // Institutional Launch Lock: January 2026 Minimum
         const minLaunchDate = '2026-01-01';
@@ -565,9 +579,14 @@ export const getStudentStatsSummary = async (req: AuthRequest, res: Response) =>
         let endDate: string = queryEndDate ? formatDate(queryEndDate) : todayStr;
 
         if (startDate < minLaunchDate) startDate = minLaunchDate;
+        
+        // Safety: Do not count future days for statistics in the current year
+        if (year === new Date().getFullYear() && endDate > todayStr) {
+            endDate = todayStr;
+        }
 
         // Cache Check: Elite Speed optimization
-        const cacheKey = `stats_${classId || 'all'}_${startDate}_${endDate}`;
+        const cacheKey = `stats_${classId || 'all'}_${targetStudentId || 'all'}_${startDate}_${endDate}`;
         const cached = statsCache.get(cacheKey);
         if (cached && Date.now() < cached.expires) {
             return res.json(cached.data);
@@ -579,14 +598,21 @@ export const getStudentStatsSummary = async (req: AuthRequest, res: Response) =>
             WITH DateRange AS (
                 SELECT ($1::date + n) as d
                 FROM generate_series(0, ($2::date - $1::date)) n
-                WHERE EXTRACT(ISODOW FROM ($1::date + n)) != 7 -- Exclude Sundays
+                WHERE EXTRACT(ISODOW FROM ($1::date + n) AT TIME ZONE 'UTC') != 7 -- Exclude Sundays
             ),
             -- Identify days where a class was "Closed" (Bulk Absent)
             ClosureDays AS (
                 SELECT DISTINCT "classId", date
-                FROM "Attendance"
+                FROM "Attendance" a1
                 WHERE date >= $1 AND date <= $2
                   AND subject = 'BULK_ABSENT'
+                  AND EXTRACT(ISODOW FROM date AT TIME ZONE 'UTC') != 7
+                  AND NOT EXISTS (
+                      SELECT 1 FROM "Attendance" a2
+                      WHERE a2.date = a1.date 
+                        AND a2."classId" = a1."classId"
+                        AND a2.status IN ('PRESENT', 'LATE')
+                  )
             ),
             ClassSessionCounts AS (
                 SELECT 
@@ -606,7 +632,7 @@ export const getStudentStatsSummary = async (req: AuthRequest, res: Response) =>
                     COUNT(*) FILTER (WHERE a.status IN ('PRESENT', 'LATE')) as present_count
                 FROM "Attendance" a
                 WHERE a.date >= $1 AND a.date <= $2
-                  AND EXTRACT(ISODOW FROM a.date) != 7
+                  AND EXTRACT(ISODOW FROM a.date AT TIME ZONE 'UTC') != 7
                 GROUP BY a."studentId"
             )
             SELECT 
@@ -618,10 +644,15 @@ export const getStudentStatsSummary = async (req: AuthRequest, res: Response) =>
             FROM "Student" s
             JOIN ClassSessionCounts csc ON s."classId" = csc.class_id
             LEFT JOIN StudentAggregates sa ON s.id = sa."studentId"
-            ${classId ? 'WHERE s."classId" = $3' : ''}
+            WHERE 1=1
+            ${classId ? 'AND s."classId" = $3' : ''}
+            ${targetStudentId ? `AND s.id = ${classId ? '$4' : '$3'}` : ''}
         `;
 
-        const queryParams = classId ? [startDate, endDate, classId] : [startDate, endDate];
+        const queryParams = [startDate, endDate];
+        if (classId) queryParams.push(classId as string);
+        if (targetStudentId) queryParams.push(targetStudentId as string);
+
         const result = await db.query(statsQuery, queryParams);
 
         const statsMap: Record<string, any> = {};
@@ -639,11 +670,12 @@ export const getStudentStatsSummary = async (req: AuthRequest, res: Response) =>
                 `WITH DateRange AS (
                     SELECT ($1::date + n) as d
                     FROM generate_series(0, ($2::date - $1::date)) n
-                    WHERE EXTRACT(ISODOW FROM ($1::date + n)) != 7
+                    WHERE EXTRACT(ISODOW FROM ($1::date + n) AT TIME ZONE 'UTC') != 7
                 ),
                 FullClosures AS (
                     SELECT date FROM "Attendance"
                     WHERE date >= $1 AND date <= $2 AND subject = 'BULK_ABSENT'
+                      AND EXTRACT(ISODOW FROM date AT TIME ZONE 'UTC') != 7
                     GROUP BY date
                     HAVING COUNT(DISTINCT "classId") = (SELECT COUNT(*) FROM "Class")
                 )

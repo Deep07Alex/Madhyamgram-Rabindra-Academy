@@ -90,6 +90,9 @@ const TeacherAttendance = () => {
     const [markSubject, setMarkSubject] = useState('');
     const [students, setStudents] = useState<any[]>([]);
     const [attendanceData, setAttendanceData] = useState<Record<string, string>>({});
+    const [attendanceStats, setAttendanceStats] = useState<Record<string, any>>({});
+    const [cumulativeStats, setCumulativeStats] = useState<Record<string, any>>({});
+    const [isStatsLoading, setIsStatsLoading] = useState(false);
 
     // ── History tab ──────────────────────────────────────────────────────────
     const [histClass, setHistClass] = useState('');
@@ -140,7 +143,8 @@ const TeacherAttendance = () => {
         }
     });
 
-    // Check time-based AUTO closure or Admin override every 3 seconds while on this page
+    // Check time-based AUTO closure or Admin override every 2 minutes as a fallback
+    // (SSE provides real-time updates, so this is just a safety measure)
     useEffect(() => {
         const interval = setInterval(() => {
             api.get('/attendance/config').then(res => {
@@ -149,13 +153,35 @@ const TeacherAttendance = () => {
                 // Fallback to time-based check if API fails
                 checkEviction();
             });
-        }, 3000);
+        }, 120000); // 2 minutes
         return () => clearInterval(interval);
     }, [checkEviction, updateConfigAndCheck]);
 
     useEffect(() => {
         api.get('/users/classes').then(res => setClasses(res.data)).catch(console.error);
     }, []);
+
+    const fetchStudentStats = useCallback(async () => {
+        if (!markClass) return;
+        setIsStatsLoading(true);
+        try {
+            const [y, m] = markDate.split('-').map(Number);
+            const startDate = `${y}-${String(m).padStart(2, '0')}-01`;
+            const endDate = `${y}-${String(m).padStart(2, '0')}-${new Date(y, m, 0).getDate()}`;
+
+            const [monthlyRes, cumulativeRes] = await Promise.all([
+                api.get('/attendance/stats/students', { params: { classId: markClass, startDate, endDate } }),
+                api.get('/attendance/stats/students', { params: { classId: markClass, startDate: '2026-01-01', endDate: new Date().toLocaleDateString('en-CA') } })
+            ]);
+
+            setAttendanceStats(monthlyRes.data.stats || {});
+            setCumulativeStats(cumulativeRes.data.stats || {});
+        } catch (err) {
+            console.error('Failed to fetch stats:', err);
+        } finally {
+            setIsStatsLoading(false);
+        }
+    }, [markClass, markDate]);
 
     // Load students for mark tab
     const loadRegister = useCallback(async () => {
@@ -174,6 +200,7 @@ const TeacherAttendance = () => {
             ]);
 
             setStudents(stuRes.data.students || []);
+            fetchStudentStats();
 
             // Prefill existing attendance status, default to PRESENT if none
             const init: Record<string, string> = {};
@@ -193,7 +220,7 @@ const TeacherAttendance = () => {
             console.error(err);
             showToast('Failed to load class register.', 'error');
         }
-    }, [markClass, markDate, showToast]);
+    }, [markClass, markDate, showToast, fetchStudentStats]);
 
     useEffect(() => {
         loadRegister();
@@ -233,7 +260,21 @@ const TeacherAttendance = () => {
         }
     }, [histClass, histDate]);
 
-    useEffect(() => { fetchHistory(); }, [fetchHistory]);
+    useEffect(() => { 
+        fetchHistory(); 
+        if (histClass && histDate) {
+            const [y, m] = histDate.split('-').map(Number);
+            const startDate = `${y}-${String(m).padStart(2, '0')}-01`;
+            const endDate = `${y}-${String(m).padStart(2, '0')}-${new Date(y, m, 0).getDate()}`;
+            Promise.all([
+                api.get('/attendance/stats/students', { params: { classId: histClass, startDate, endDate } }),
+                api.get('/attendance/stats/students', { params: { classId: histClass, startDate: '2026-01-01', endDate: new Date().toLocaleDateString('en-CA') } })
+            ]).then(([monthlyRes, cumulativeRes]) => {
+                setAttendanceStats(prev => ({ ...prev, ...monthlyRes.data.stats }));
+                setCumulativeStats(prev => ({ ...prev, ...cumulativeRes.data.stats }));
+            }).catch(() => {});
+        }
+    }, [fetchHistory, histClass, histDate]);
 
     // Live: refresh everything when attendance is updated
     useServerEvents({
@@ -359,6 +400,7 @@ const TeacherAttendance = () => {
                                         <tr>
                                             <th>Student</th>
                                             <th style={{ textAlign: 'center' }}>Roll #</th>
+                                            <th style={{ textAlign: 'left' }}>Performance Summary</th>
                                             <th style={{ textAlign: 'right' }}>Status</th>
                                         </tr>
                                     </thead>
@@ -370,6 +412,30 @@ const TeacherAttendance = () => {
                                                     <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{stu.studentId}</p>
                                                 </td>
                                                 <td style={{ textAlign: 'center', fontWeight: '700', opacity: 0.6 }}>#{stu.rollNumber}</td>
+                                                <td style={{ textAlign: 'left' }}>
+                                                    {attendanceStats[stu.id] ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', opacity: isStatsLoading ? 0.5 : 1 }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                <span style={{ fontSize: '0.82rem', fontWeight: '800', color: 'var(--text-main)' }}>
+                                                                    M: {attendanceStats[stu.id].total > 0 ? ((attendanceStats[stu.id].present / attendanceStats[stu.id].total) * 100).toFixed(0) : '0'}%
+                                                                </span>
+                                                                <span style={{ fontSize: '0.68rem', fontWeight: '600', color: 'var(--text-muted)' }}>
+                                                                    ({attendanceStats[stu.id].present}/{attendanceStats[stu.id].total}d)
+                                                                </span>
+                                                            </div>
+                                                            {cumulativeStats[stu.id] && (
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                    <span style={{ fontSize: '0.82rem', fontWeight: '800', color: 'var(--primary-bold)' }}>
+                                                                        O: {cumulativeStats[stu.id].total > 0 ? ((cumulativeStats[stu.id].present / cumulativeStats[stu.id].total) * 100).toFixed(0) : '0'}%
+                                                                    </span>
+                                                                    <span style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--text-muted)', opacity: 0.8 }}>
+                                                                        ({cumulativeStats[stu.id].present}/{cumulativeStats[stu.id].total}d)
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>}
+                                                </td>
                                                 <td style={{ textAlign: 'right' }}>
                                                     <StatusToggle studentId={stu.id} selected={attendanceData[stu.id] || ''} onChange={handleStatusChange} />
                                                 </td>
@@ -455,6 +521,7 @@ const TeacherAttendance = () => {
                                         <tr style={{ background: 'var(--bg-main)', borderBottom: '2px solid var(--border-soft)' }}>
                                             <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Student</th>
                                             <th style={{ padding: '12px 20px', textAlign: 'center', fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Roll #</th>
+                                            <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Performance Summary</th>
                                             <th style={{ padding: '12px 20px', textAlign: 'right', fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                                                 {histDate
                                                     ? `Status on ${new Date(histDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`
@@ -473,6 +540,30 @@ const TeacherAttendance = () => {
                                                     <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{row.studentId}</p>
                                                 </td>
                                                 <td style={{ padding: '13px 20px', textAlign: 'center', fontWeight: '700', color: 'var(--text-muted)' }}>#{row.rollNumber}</td>
+                                                <td style={{ padding: '13px 20px', textAlign: 'left' }}>
+                                                    {attendanceStats[row.id] ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                <span style={{ fontSize: '0.82rem', fontWeight: '800', color: 'var(--text-main)' }}>
+                                                                    M: {attendanceStats[row.id].total > 0 ? ((attendanceStats[row.id].present / attendanceStats[row.id].total) * 100).toFixed(0) : '0'}%
+                                                                </span>
+                                                                <span style={{ fontSize: '0.68rem', fontWeight: '600', color: 'var(--text-muted)' }}>
+                                                                    ({attendanceStats[row.id].present}/{attendanceStats[row.id].total}d)
+                                                                </span>
+                                                            </div>
+                                                            {cumulativeStats[row.id] && (
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                    <span style={{ fontSize: '0.82rem', fontWeight: '800', color: 'var(--primary-bold)' }}>
+                                                                        O: {cumulativeStats[row.id].total > 0 ? ((cumulativeStats[row.id].present / cumulativeStats[row.id].total) * 100).toFixed(0) : '0'}%
+                                                                    </span>
+                                                                    <span style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--text-muted)', opacity: 0.8 }}>
+                                                                        ({cumulativeStats[row.id].present}/{cumulativeStats[row.id].total}d)
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>}
+                                                </td>
                                                 <td style={{ padding: '13px 20px', textAlign: 'right' }}>
                                                     <StatusBadge status={row.status} />
                                                 </td>

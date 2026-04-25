@@ -104,10 +104,12 @@ const TeacherDashboard = () => {
         refreshData();
     }, [refreshData]);
 
+    // Polling fallback every 2 minutes as a safety measure
+    // (SSE already handles most real-time state changes)
     useEffect(() => {
         const interval = setInterval(() => {
             refreshData(true);
-        }, 3000);
+        }, 120000); // 2 minutes
         return () => clearInterval(interval);
     }, [refreshData]);
 

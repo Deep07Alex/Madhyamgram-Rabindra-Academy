@@ -182,7 +182,7 @@ export const generateResultPDF = async (data: any) => {
 
         autoTable(doc, {
             startY: infoY + 20,
-            margin: { left: margin, right: 55 },
+            margin: { left: margin + 2, right: 55 },
             head: tableHeader,
             body: tableBody,
             theme: 'grid',
@@ -236,7 +236,7 @@ export const generateResultPDF = async (data: any) => {
         const summaryY = tableFinalY + 8;
         autoTable(doc, {
             startY: summaryY,
-            margin: { left: margin },
+            margin: { left: margin + 2 },
             tableWidth: 80,
             body: [
                 ['Total Full Marks', totalFull.toString()],
@@ -260,14 +260,15 @@ export const generateResultPDF = async (data: any) => {
         const per = totalFull ? (totalObtained / totalFull) * 100 : 0;
         const remarkText = per >= 90 ? 'Excellent' : per >= 80 ? 'Very Good' : per >= 60 ? 'Good' : per >= 50 ? 'Satisfactory' : 'Needs Improvement';
         doc.setFont('helvetica', 'bolditalic');
-        doc.setFontSize(16);
+        doc.setFontSize(12);
         doc.text(remarkText, remarksX + (pageWidth - remarksX - margin) / 2, summaryY + 18, { align: 'center' });
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
-        doc.text('N.B.:', remarksX + 5, summaryY + 28);
+        doc.text('N.B.:', remarksX + 5, summaryY + 25);
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
-        doc.text('Physical Education: PT+Yoga+Health, Work Ed: Project+Drawing', remarksX + 5, summaryY + 32);
+        doc.setFontSize(6);
+        doc.text('Physical Education = PT+Yoga+Dress & Cleanness+Health & Hygiene', remarksX + 10, summaryY + 29);
+        doc.text('Work Education = Drawing+Handcraft+Cultural activities in school+Project', remarksX + 10, summaryY + 33);
 
         // 8. Signatures
         const footerY = pageHeight - 35;

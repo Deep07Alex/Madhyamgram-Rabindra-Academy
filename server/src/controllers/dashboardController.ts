@@ -25,6 +25,7 @@ async function getGlobalSessions() {
             UNION
             SELECT date::date FROM "TeacherAttendance"
         ) as all_dates WHERE EXTRACT(DOW FROM date) != 0
+          AND date <= CURRENT_DATE
     `);
     const count = parseInt(res.rows[0].count, 10);
     globalSessionCountCache = { count, expires: Date.now() + (30 * 60 * 1000) }; // 30 mins
