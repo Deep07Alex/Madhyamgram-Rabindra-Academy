@@ -257,10 +257,10 @@ export const markTeacherAttendance = async (req: AuthRequest, res: Response) => 
             ON CONFLICT ("teacherId", date) 
             DO UPDATE SET 
                 status = EXCLUDED.status,
-                reason = EXCLUDED.reason,
-                "arrivalTime" = EXCLUDED."arrivalTime",
-                "departureTime" = EXCLUDED."departureTime",
-                "earlyLeaveReason" = EXCLUDED."earlyLeaveReason"
+                reason = COALESCE(EXCLUDED.reason, "TeacherAttendance".reason),
+                "arrivalTime" = COALESCE(EXCLUDED."arrivalTime", "TeacherAttendance"."arrivalTime"),
+                "departureTime" = COALESCE(EXCLUDED."departureTime", "TeacherAttendance"."departureTime"),
+                "earlyLeaveReason" = COALESCE(EXCLUDED."earlyLeaveReason", "TeacherAttendance"."earlyLeaveReason")
             RETURNING *
         `;
 
@@ -419,8 +419,8 @@ export const getTeacherAttendance = async (req: AuthRequest, res: Response) => {
     const userRole = req.user?.role;
     const userId = req.user?.id;
 
-    // Privacy Guard: Teachers can only see their own attendance
-    const targetTeacherId = userRole === 'ADMIN' ? (teacherId || userId) : userId;
+    // Privacy Guard: Teachers can only see their own attendance. Admins can see everyone or a specific teacher.
+    const targetTeacherId = userRole === 'ADMIN' ? teacherId : userId;
 
     try {
         // Institutional Launch Lock: January 2026 Minimum

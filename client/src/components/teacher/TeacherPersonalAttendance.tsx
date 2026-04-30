@@ -36,7 +36,7 @@ const TeacherPersonalAttendance = () => {
 
     useEffect(() => { fetchAttendance(); }, [fetchAttendance]);
 
-    useServerEvents({ 
+    useServerEvents({
         'attendance:updated': () => {
             fetchAttendance(true);
         }
@@ -134,8 +134,8 @@ const TeacherPersonalAttendance = () => {
                         <button
                             onClick={handlePrevMonth}
                             className="btn-view-details btn-sm"
-                            style={{ 
-                                padding: '6px', 
+                            style={{
+                                padding: '6px',
                                 minWidth: 'auto',
                                 opacity: (currentYear === 2026 && currentMonth === 0) ? 0.3 : 1,
                                 cursor: (currentYear === 2026 && currentMonth === 0) ? 'not-allowed' : 'pointer'
@@ -183,11 +183,17 @@ const TeacherPersonalAttendance = () => {
 
                                 let statusLabel = "No Record";
                                 let statusClass = "";
-                                
+
                                 if (record) {
                                     if (record.status === 'ABSENT') {
                                         statusLabel = "ABSENT";
                                         statusClass = "absent";
+                                    } else if (record.status === 'LATE') {
+                                        statusLabel = "LATE";
+                                        statusClass = "warning";
+                                    } else if (record.status === 'PARTIAL') {
+                                        statusLabel = "PARTIAL";
+                                        statusClass = "warning";
                                     } else if (record.status === 'PRESENT') {
                                         if (record.arrivalTime && record.departureTime) {
                                             statusLabel = "PRESENT";

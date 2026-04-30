@@ -178,11 +178,11 @@ const InlineStatusEdit = React.memo(({
                                 textAlign: 'center'
                             }}
                         >
-                            <option value="">No Record</option>
-                            <option value="PRESENT">PRESENT</option>
-                            <option value="ABSENT">ABSENT</option>
-                            <option value="PARTIAL">PARTIAL</option>
-                            <option value="LATE">LATE</option>
+                            <option value="" style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>No Record</option>
+                            <option value="PRESENT" style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>PRESENT</option>
+                            <option value="ABSENT" style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>ABSENT</option>
+                            <option value="PARTIAL" style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>PARTIAL</option>
+                            <option value="LATE" style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}>LATE</option>
                         </select>
                     )
                 )}
@@ -216,8 +216,8 @@ const InlineTimeEdit = React.memo(({
 
     useEffect(() => {
         if (!editing && !isSubmitting) setTime(initialTime || '');
-        // Sync submitting state if prop catches up (null/empty string equivalence check)
-        if (isSubmitting && (initialTime === time || (!initialTime && !time))) {
+        // Sync submitting state if prop catches up
+        if (isSubmitting && (initialTime === time || (!initialTime && !time) || (initialTime && time && initialTime.substring(0, 5) === time.substring(0, 5)))) {
             setIsSubmitting(false);
         }
     }, [initialTime, editing, isSubmitting, time]);
@@ -250,15 +250,29 @@ const InlineTimeEdit = React.memo(({
             onUpdated(true);
         } catch {
             showToast('Failed to update time.', 'error');
+        } finally {
             setIsSubmitting(false);
         }
     };
 
     if (!editing) {
+        const isAbsent = currentStatus === 'ABSENT';
+        const displayValue = isAbsent ? '—' : ((isSubmitting ? time : initialTime) || '—');
+
         return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: isSubmitting ? 'default' : 'pointer', color: 'var(--text-main)', opacity: isSubmitting ? 0.6 : 1 }} onClick={() => !isSubmitting && setEditing(true)}>
-                <span>{(isSubmitting ? time : initialTime) || '—'}</span>
-                {!isSubmitting && <Pencil size={12} style={{ opacity: 0.5 }} />}
+            <div 
+                style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px', 
+                    cursor: (isSubmitting || isAbsent) ? 'default' : 'pointer', 
+                    color: isAbsent ? 'var(--text-muted)' : 'var(--text-main)', 
+                    opacity: isSubmitting ? 0.6 : 1 
+                }} 
+                onClick={() => !isSubmitting && !isAbsent && setEditing(true)}
+            >
+                <span>{displayValue}</span>
+                {!isSubmitting && !isAbsent && <Pencil size={12} style={{ opacity: 0.5 }} />}
             </div>
         );
     }

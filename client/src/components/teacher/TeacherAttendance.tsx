@@ -36,11 +36,13 @@ import {
 } from 'lucide-react';
 import TeacherPersonalAttendance from './TeacherPersonalAttendance';
 
-type AttendanceStatus = 'PRESENT' | 'ABSENT';
+type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'PARTIAL';
 
 const STATUS_COLORS: Record<AttendanceStatus, { bg: string; text: string; border: string }> = {
     PRESENT: { bg: '#dcfce7', text: '#15803d', border: '#86efac' },
     ABSENT: { bg: '#fee2e2', text: '#dc2626', border: '#fca5a5' },
+    LATE: { bg: '#fef3c7', text: '#d97706', border: '#fcd34d' },
+    PARTIAL: { bg: '#fef3c7', text: '#d97706', border: '#fcd34d' },
 };
 
 const StatusBadge = ({ status }: { status: AttendanceStatus | null }) => {
@@ -327,6 +329,10 @@ const TeacherAttendance = () => {
 
 
     const handleSelfAttendance = async (status: string, reason?: string, type: 'check-in' | 'check-out' | 'mark' = 'mark') => {
+        // Guard: Prevent double-marking if time already exists
+        if (type === 'check-in' && todayAttendance?.arrivalTime) return;
+        if (type === 'check-out' && todayAttendance?.departureTime) return;
+
         if (status === 'ABSENT' && !reason?.trim()) {
             showToast('Please provide a reason for being absent.', 'error');
             return;
@@ -344,11 +350,19 @@ const TeacherAttendance = () => {
 
             if (type === 'check-in') {
                 payload.arrivalTime = timeStr;
+                // Preserve existing departureTime if any
+                payload.departureTime = todayAttendance?.departureTime || null;
+                // If previously marked ABSENT, override to PRESENT
+                if (todayAttendance?.status === 'ABSENT' || !todayAttendance?.status) {
+                    payload.status = 'PRESENT';
+                }
             } else if (type === 'check-out') {
                 payload.departureTime = timeStr;
+                // Preserve existing arrivalTime
+                payload.arrivalTime = todayAttendance?.arrivalTime || null;
                 if (reason) payload.earlyLeaveReason = reason;
-                // If checking out, we assume status is PRESENT unless already marked otherwise
-                payload.status = todayAttendance?.status || 'PRESENT';
+                // If checking out, assume status is PRESENT unless already marked otherwise (but override ABSENT)
+                payload.status = (todayAttendance?.status === 'ABSENT' || !todayAttendance?.status) ? 'PRESENT' : todayAttendance.status;
             } else {
                 payload.reason = reason;
             }
@@ -647,7 +661,7 @@ const TeacherAttendance = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                             <h3 style={{ margin: 0 }}><UserCheck size={20} color="var(--success)" /> Faculty Daily Validation</h3>
                             {todayAttendance && (
-                                <span className={`badge ${todayAttendance.status === 'PRESENT' ? 'present' : 'absent'}`} style={{ fontSize: '0.8rem', fontWeight: '800' }}>
+                                <span className={`badge ${todayAttendance.status === 'PRESENT' ? 'present' : (todayAttendance.status === 'ABSENT' ? 'absent' : 'warning')}`} style={{ fontSize: '0.8rem', fontWeight: '800' }}>
                                     Current Status: {todayAttendance.status}
                                 </span>
                             )}
