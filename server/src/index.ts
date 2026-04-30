@@ -13,7 +13,6 @@ import userRoutes from './routes/userRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import homeworkRoutes from './routes/homeworkRoutes.js';
 import feesRoutes from './routes/feesRoutes.js';
-
 import resultRoutes from './routes/resultRoutes.js';
 import galleryRoutes from './routes/galleryRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
@@ -58,8 +57,8 @@ if (!fs.existsSync(teacherUploadDir)) fs.mkdirSync(teacherUploadDir, { recursive
 
 // 1. Logging and Performance
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
-app.use(compression({ 
-    level: 6, 
+app.use(compression({
+    level: 6,
     threshold: 1024,
     filter: (req, res) => {
         if (req.headers['accept'] === 'text/event-stream') return false; // Never compress SSE
@@ -104,8 +103,8 @@ app.use(helmet({
 const allowedOrigins = [
     'https://madhyamgramrabindraacademy.in',
     'https://www.madhyamgramrabindraacademy.in',
-    'capacitor://localhost', // Android Native
-    'http://localhost',       // iOS/Android Dev
+    'capacitor://localhost',
+    'http://localhost',
     'http://localhost:5173',
     'http://localhost:3000'
 ];

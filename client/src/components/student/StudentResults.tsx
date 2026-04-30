@@ -229,6 +229,61 @@ const StudentResults = () => {
                     <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginTop: '4px' }}>{presentDays} of {totalDays} days</div>
                 </div>
             </div>
+            
+            {/* Attendance History Section */}
+            <div className="card" style={{ margin: '0 0 32px 0', padding: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                    <Calendar size={22} color="var(--primary-bold)" />
+                    <h3 style={{ margin: 0 }}>Attendance Record Details</h3>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-main)', padding: '4px 10px', borderRadius: '6px', marginLeft: 'auto' }}>
+                        Showing records from {new Date(attendance.startDate).toLocaleDateString()}
+                    </span>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '12px' }}>
+                    {attendance.dailyRecords && attendance.dailyRecords.length > 0 ? (
+                        attendance.dailyRecords.map((record: any, idx: number) => {
+                            const date = new Date(record.date);
+                            const isAbsent = record.status === 'ABSENT';
+                            const isLate = record.status === 'LATE';
+                            const isBulk = record.subject === 'BULK_ABSENT';
+                            
+                            return (
+                                <div key={idx} style={{ 
+                                    padding: '12px 8px', 
+                                    borderRadius: '12px', 
+                                    background: isBulk ? 'var(--bg-main)' : isAbsent ? '#ef444410' : isLate ? '#f59e0b10' : '#22c55e10',
+                                    border: `1px solid ${isBulk ? 'var(--border-soft)' : isAbsent ? '#ef444430' : isLate ? '#f59e0b30' : '#22c55e30'}`,
+                                    textAlign: 'center',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '4px'
+                                }}>
+                                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                                        {date.toLocaleDateString('en-IN', { weekday: 'short' })}
+                                    </span>
+                                    <span style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--text-main)' }}>
+                                        {date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                                    </span>
+                                    <span style={{ 
+                                        fontSize: '0.65rem', 
+                                        fontWeight: 800, 
+                                        color: isBulk ? 'var(--text-muted)' : isAbsent ? '#ef4444' : isLate ? '#f59e0b' : '#22c55e',
+                                        marginTop: '4px'
+                                    }}>
+                                        {isBulk ? 'CLOSED' : record.status}
+                                    </span>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: 'var(--text-muted)', background: 'var(--bg-main)', borderRadius: '12px' }}>
+                            <Calendar size={32} style={{ opacity: 0.2, marginBottom: '12px' }} />
+                            <p style={{ margin: 0, fontWeight: 600 }}>No attendance logs found for this period.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
 
             {/* Progressive Marks Table */}
             <div className="card" style={{ margin: 0, padding: '0' }}>

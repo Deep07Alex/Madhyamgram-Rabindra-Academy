@@ -58,14 +58,14 @@ export const getFullMarks = (subject: string, className: string = ''): number =>
         case 'History':
         case 'Geography':
         case 'General Knowledge':
-            return className === 'STD-IV' ? 50 : 25;
+            return className.startsWith('STD-IV') ? 50 : 25;
         case 'Hindi':
         case 'HGS':
         case 'Physical Education':
         case 'Work Education':
             return 25;
         case 'Project':
-            return (className === 'KG-II A' || className === 'KG-II B') ? 20 : 25;
+            return className.startsWith('KG-II') ? 20 : 25;
         case 'Computer Written':
             return 20;
         case 'Computer Practical':
@@ -77,11 +77,11 @@ export const getFullMarks = (subject: string, className: string = ''): number =>
         case 'Bengali Handwriting':
         case 'Bengali Handwraiting':
         case 'English Handwriting':
-            return className === 'KG-I' ? 10 : 15;
+            return className.startsWith('KG-I') ? 10 : 15;
         case 'Mathematics Oral':
         case 'Bengali Rhymes':
         case 'English Rhymes':
-            return className === 'KG-I' ? 10 : 15;
+            return className.startsWith('KG-I') ? 10 : 15;
         default:
             return 50;
     }

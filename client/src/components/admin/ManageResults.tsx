@@ -11,7 +11,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import api from '../../services/api';
 import { EXAMINATION_TERMS, ACADEMIC_YEARS, getFullMarks } from '../../utils/constants';
-import { FilePlus, List, Trash2, Download, Upload, FileSpreadsheet, Loader2, Search, X, Calendar, GraduationCap, School } from 'lucide-react';
+import { FilePlus, List, Trash2, Download, Upload, FileSpreadsheet, Loader2, Search, X, Calendar, GraduationCap, School, Trophy, TrendingUp } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import * as XLSX from 'xlsx';
 import CustomSelect from '../common/CustomSelect';
@@ -113,6 +113,7 @@ const ManageResults = () => {
     const [rankings, setRankings] = useState<Record<string, any[]>>({});
     const [marksLedger, setMarksLedger] = useState<Record<string, any[]>>({});
     const [termSchedules, setTermSchedules] = useState<any[]>([]);
+    const [sortByMarks, setSortByMarks] = useState(false);
 
     // Form States
     const [selectedClassId, setSelectedClassId] = useState('');
@@ -122,6 +123,23 @@ const ManageResults = () => {
     const [newResult, setNewResult] = useState({
         studentId: '', semester: 'Unit-I', subject: '', marks: '', totalMarks: '50', academicYear: new Date().getFullYear(), grade: ''
     });
+
+    // Helper to get base class name (e.g., "KG-II A" -> "KG-II")
+    const getBaseClassName = (name: string) => {
+        if (!name) return '';
+        return name.replace(/\s+[A-Z]$/i, '').trim();
+    };
+
+    // Derived state: Related Class IDs for the selected class (all sections)
+    const selectedClassRelatedIds = useMemo(() => {
+        const selectedClass = classes.find(c => c.id === selectedClassId);
+        if (!selectedClass) return [selectedClassId];
+        
+        const baseName = getBaseClassName(selectedClass.name);
+        return classes
+            .filter(c => getBaseClassName(c.name) === baseName)
+            .map(c => c.id);
+    }, [classes, selectedClassId]);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -378,8 +396,20 @@ const ManageResults = () => {
         }, {});
 
         const list = Object.values(grouped);
-        return list.filter((data: any) => data.student?.classId === selectedClassId);
-    }, [results, selectedClassId]);
+        return list
+            .filter((data: any) => data.student?.classId && selectedClassRelatedIds.includes(data.student.classId))
+            .sort((a: any, b: any) => {
+                if (sortByMarks) {
+                    // Sort by total obtained marks for this term
+                    return (b.totalObtained || 0) - (a.totalObtained || 0);
+                }
+                // Default: Primary sort: Class name, Secondary: Roll number
+                if (a.student.className !== b.student.className) {
+                    return a.student.className.localeCompare(b.student.className);
+                }
+                return parseInt(a.student.rollNumber) - parseInt(b.student.rollNumber);
+            });
+    }, [results, selectedClassRelatedIds, sortByMarks]);
 
     return (
         <div className="manage-section">
@@ -588,9 +618,9 @@ const ManageResults = () => {
                                     label="Student"
                                     value={newResult.studentId}
                                     onChange={val => setNewResult({ ...newResult, studentId: val })}
-                                    options={students.filter(s => s.classId === selectedClassId).map((s: any) => ({
+                                    options={students.filter(s => selectedClassRelatedIds.includes(s.classId)).map((s: any) => ({
                                         value: s.id,
-                                        label: `${s.name} (${s.rollNumber})`
+                                        label: `${s.name} (${s.rollNumber} - ${s.className || ''})`
                                     }))}
                                     placeholder="Choose Student..."
                                     searchable
@@ -640,22 +670,39 @@ const ManageResults = () => {
                                 </div>
                                 <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Examination Ledger <span style={{ color: 'var(--text-muted)', fontWeight: 500, marginLeft: '8px' }}>({selectedTerm} - {selectedYear})</span></h3>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                                 {filteredStudentList.length > 0 && (
-                                    <button
-                                        onClick={handleDeleteClassAllResults}
-                                        className="btn-danger"
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px',
-                                            padding: '8px 16px',
-                                            fontSize: '0.75rem',
-                                            fontWeight: 700
-                                        }}
-                                    >
-                                        <Trash2 size={14} /> Bulk Delete Class Results
-                                    </button>
+                                    <>
+                                        <button
+                                            onClick={() => setSortByMarks(!sortByMarks)}
+                                            className={sortByMarks ? "btn-primary" : "btn-secondary"}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                padding: '8px 16px',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 700
+                                            }}
+                                        >
+                                            {sortByMarks ? <Trophy size={14} /> : <TrendingUp size={14} />}
+                                            {sortByMarks ? "Sorted by Marks" : "Sort by Marks"}
+                                        </button>
+                                        <button
+                                            onClick={handleDeleteClassAllResults}
+                                            className="btn-danger"
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                padding: '8px 16px',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 700
+                                            }}
+                                        >
+                                            <Trash2 size={14} /> Bulk Delete Class Results
+                                        </button>
+                                    </>
                                 )}
                                 {isLoading && <Loader2 size={18} className="animate-spin" color="var(--primary-bold)" />}
                             </div>
@@ -767,30 +814,42 @@ const ManageResults = () => {
                         <>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
                                 {(() => {
-                                    const selectedClassName = classes.find(c => c.id === selectedClassId)?.name;
-                                    const filteredRankings = Object.entries(rankings).filter(([name]) => name === selectedClassName);
+                                    const selectedClass = classes.find(c => c.id === selectedClassId);
+                                    const selectedBaseName = selectedClass ? getBaseClassName(selectedClass.name) : '';
+                                    
+                                    const filteredRankings = Object.entries(rankings).filter(([name]) => 
+                                        getBaseClassName(name) === selectedBaseName
+                                    );
 
-                                    if (filteredRankings.length === 0) {
+                                    const combinedRankings = filteredRankings.reduce((acc: any[], [_, students]) => [...acc, ...students], [])
+                                        .sort((a, b) => {
+                                            if (a.rank && b.rank) return a.rank - b.rank;
+                                            if (a.rank) return -1;
+                                            if (b.rank) return 1;
+                                            return a.roll - b.roll;
+                                        });
+
+                                    if (combinedRankings.length === 0) {
                                         return (
                                             <div style={{ textAlign: 'center', padding: '100px', background: 'var(--bg-main)', borderRadius: '16px' }}>
                                                 <Search size={48} color="var(--text-muted)" style={{ opacity: 0.2, marginBottom: '16px' }} />
-                                                <p style={{ fontWeight: 700, color: 'var(--text-muted)' }}>No ranking data available for CLASS-{selectedClassName} in {selectedYear}.</p>
+                                                <p style={{ fontWeight: 700, color: 'var(--text-muted)' }}>No ranking data available for CLASS-{selectedBaseName} in {selectedYear}.</p>
                                             </div>
                                         );
                                     }
 
-                                    return filteredRankings.map(([className, students]) => (
-                                        <div key={className} className="card" style={{ margin: 0, overflow: 'hidden', padding: 0, border: '1px solid var(--border-soft)' }}>
+                                    return (
+                                        <div className="card" style={{ margin: 0, overflow: 'hidden', padding: 0, border: '1px solid var(--border-soft)' }}>
                                             <div style={{ background: 'var(--bg-main)', borderBottom: '1px solid var(--border-soft)', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <h3 style={{ margin: 0, textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 900, color: 'var(--text-main)' }}>
-                                                    CLASS - {className}
+                                                    CLASS - {selectedBaseName} (COMBINED SECTIONS)
                                                 </h3>
                                                 <button
-                                                    onClick={() => generateRankingsPDF({ [className]: students }, selectedYear)}
+                                                    onClick={() => generateRankingsPDF({ [selectedBaseName]: combinedRankings }, selectedYear)}
                                                     className="btn-secondary"
                                                     style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', padding: '8px 16px' }}
                                                 >
-                                                    <Download size={16} /> Download This Class PDF
+                                                    <Download size={16} /> Download Combined PDF
                                                 </button>
                                             </div>
                                             <div className="table-responsive">
@@ -800,6 +859,7 @@ const ManageResults = () => {
                                                             <th rowSpan={2} style={{ verticalAlign: 'middle', borderRight: '1px solid var(--border-soft)' }}>Admission Regn. No.</th>
                                                             <th rowSpan={2} style={{ verticalAlign: 'middle', borderRight: '1px solid var(--border-soft)' }}>Roll</th>
                                                             <th rowSpan={2} style={{ verticalAlign: 'middle', borderRight: '1px solid var(--border-soft)' }}>NAME</th>
+                                                            <th rowSpan={2} style={{ verticalAlign: 'middle', borderRight: '1px solid var(--border-soft)' }}>SECTION</th>
                                                             <th style={{ textAlign: 'center', borderRight: '1px solid var(--border-soft)' }}>Total Unit-I</th>
                                                             <th style={{ textAlign: 'center', borderRight: '1px solid var(--border-soft)' }}>Total Unit-II</th>
                                                             <th style={{ textAlign: 'center', borderRight: '1px solid var(--border-soft)' }}>Total Unit-III</th>
@@ -808,18 +868,19 @@ const ManageResults = () => {
                                                             <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'middle' }}>Rank</th>
                                                         </tr>
                                                         <tr>
-                                                            <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{students[0]?.unit1FM || 'Varies'}</th>
-                                                            <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{students[0]?.unit2FM || 'Varies'}</th>
-                                                            <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{students[0]?.unit3FM || 'Varies'}</th>
-                                                            <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{students[0]?.maxGrandTotal || 'Varies'}</th>
+                                                            <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{combinedRankings[0]?.unit1FM || 'Varies'}</th>
+                                                            <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{combinedRankings[0]?.unit2FM || 'Varies'}</th>
+                                                            <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{combinedRankings[0]?.unit3FM || 'Varies'}</th>
+                                                            <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{combinedRankings[0]?.maxGrandTotal || 'Varies'}</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {students.map((s: any) => (
+                                                        {combinedRankings.map((s: any) => (
                                                             <tr key={s.studentDbId}>
                                                                 <td style={{ textAlign: 'center', fontWeight: 600, borderRight: '1px solid var(--border-soft)' }}>{s.admissionId}</td>
                                                                 <td style={{ textAlign: 'center', fontWeight: 600, borderRight: '1px solid var(--border-soft)' }}>{s.roll}</td>
                                                                 <td style={{ fontWeight: 800, borderRight: '1px solid var(--border-soft)' }}>{s.name.toUpperCase()}</td>
+                                                                <td style={{ textAlign: 'center', fontWeight: 600, borderRight: '1px solid var(--border-soft)', fontSize: '0.75rem' }}>{s.className}</td>
                                                                 <td style={{ textAlign: 'center', borderRight: '1px solid var(--border-soft)' }}>{s.unit1Total != null ? s.unit1Total : '—'}</td>
                                                                 <td style={{ textAlign: 'center', borderRight: '1px solid var(--border-soft)' }}>{s.unit2Total != null ? s.unit2Total : '—'}</td>
                                                                 <td style={{ textAlign: 'center', borderRight: '1px solid var(--border-soft)' }}>{s.unit3Total != null ? s.unit3Total : '—'}</td>
@@ -858,7 +919,7 @@ const ManageResults = () => {
                                                 </table>
                                             </div>
                                         </div>
-                                    ));
+                                    );
                                 })()}
                             </div>
                         </>
@@ -929,48 +990,72 @@ const ManageResults = () => {
                         <>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
                                 {(() => {
-                                    const selectedClassName = classes.find(c => c.id === selectedClassId)?.name;
-                                    const filteredMarks = Object.entries(marksLedger).filter(([name]) => name === selectedClassName);
+                                    const selectedClass = classes.find(c => c.id === selectedClassId);
+                                    const selectedBaseName = selectedClass ? getBaseClassName(selectedClass.name) : '';
+                                    
+                                    const filteredMarks = Object.entries(marksLedger).filter(([name]) => 
+                                        getBaseClassName(name) === selectedBaseName
+                                    );
 
-                                    if (filteredMarks.length === 0) {
-                                        return (
-                                            <div style={{ textAlign: 'center', padding: '100px', background: 'var(--bg-main)', borderRadius: '16px' }}>
-                                                <Search size={48} color="var(--text-muted)" style={{ opacity: 0.2, marginBottom: '16px' }} />
-                                                <p style={{ fontWeight: 700, color: 'var(--text-muted)' }}>No marks record found for CLASS-{selectedClassName} in {selectedYear}.</p>
-                                            </div>
-                                        );
-                                    }
+                                        const combinedMarks = filteredMarks.reduce((acc: any[], [_, students]) => [...acc, ...students], [])
+                                            .sort((a, b) => {
+                                                if (sortByMarks) {
+                                                    // Sort by Performance (Grand Total Descending)
+                                                    return (b.grandTotal || 0) - (a.grandTotal || 0);
+                                                }
+                                                // Default sort: Class name then Roll Number
+                                                if (a.className !== b.className) return a.className.localeCompare(b.className);
+                                                return a.roll - b.roll;
+                                            });
 
-                                    return filteredMarks.map(([className, students]) => {
+                                        if (combinedMarks.length === 0) {
+                                            return (
+                                                <div style={{ textAlign: 'center', padding: '100px', background: 'var(--bg-main)', borderRadius: '16px' }}>
+                                                    <Search size={48} color="var(--text-muted)" style={{ opacity: 0.2, marginBottom: '16px' }} />
+                                                    <p style={{ fontWeight: 700, color: 'var(--text-muted)' }}>No marks record found for CLASS-{selectedBaseName} in {selectedYear}.</p>
+                                                </div>
+                                            );
+                                        }
+
                                         // A class is considered 'Published' only if at least one student has marks in each of the three units
-                                        const hasUnit1 = students.some(s => s.unit1Total != null);
-                                        const hasUnit2 = students.some(s => s.unit2Total != null);
-                                        const hasUnit3 = students.some(s => s.unit3Total != null);
+                                        const hasUnit1 = combinedMarks.some(s => s.unit1Total != null);
+                                        const hasUnit2 = combinedMarks.some(s => s.unit2Total != null);
+                                        const hasUnit3 = combinedMarks.some(s => s.unit3Total != null);
                                         const isComplete = hasUnit1 && hasUnit2 && hasUnit3;
 
                                         if (!isComplete) {
                                             return (
-                                                <div key={className} style={{ textAlign: 'center', padding: '100px', background: 'var(--bg-main)', borderRadius: '16px', border: '1px solid var(--border-soft)' }}>
+                                                <div key={selectedBaseName} style={{ textAlign: 'center', padding: '100px', background: 'var(--bg-main)', borderRadius: '16px', border: '1px solid var(--border-soft)' }}>
                                                     <Search size={48} color="var(--text-muted)" style={{ opacity: 0.2, marginBottom: '16px' }} />
-                                                    <p style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '1.2rem' }}>No marks data for CLASS-{className.toUpperCase()} in {selectedYear}</p>
+                                                    <p style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '1.2rem' }}>No marks data for CLASS-{selectedBaseName.toUpperCase()} in {selectedYear}</p>
                                                     <p style={{ color: 'var(--text-muted)', marginTop: '8px' }}>The consolidated ledger will be available once Unit-I, II, and III results are published.</p>
                                                 </div>
                                             );
                                         }
 
                                         return (
-                                            <div key={className} className="card" style={{ margin: 0, overflow: 'hidden', padding: 0, border: '1px solid var(--border-soft)' }}>
+                                            <div key={selectedBaseName} className="card" style={{ margin: 0, overflow: 'hidden', padding: 0, border: '1px solid var(--border-soft)' }}>
                                                 <div style={{ background: 'var(--bg-main)', borderBottom: '1px solid var(--border-soft)', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <h3 style={{ margin: 0, textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 900, color: 'var(--text-main)' }}>
-                                                        CLASS - {className}
+                                                        CLASS - {selectedBaseName} (COMBINED)
                                                     </h3>
-                                                    <button
-                                                        onClick={() => generateRankingsPDF({ [className]: students }, selectedYear)}
-                                                        className="btn-secondary"
-                                                        style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', padding: '8px 16px' }}
-                                                    >
-                                                        <Download size={16} /> Download This Class PDF
-                                                    </button>
+                                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                                        <button
+                                                            onClick={() => setSortByMarks(!sortByMarks)}
+                                                            className={sortByMarks ? "btn-primary" : "btn-secondary"}
+                                                            style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', padding: '8px 16px' }}
+                                                        >
+                                                            {sortByMarks ? <Trophy size={16} /> : <TrendingUp size={16} />}
+                                                            {sortByMarks ? "Sorted by Performance" : "Sort by Performance"}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => generateRankingsPDF({ [selectedBaseName]: combinedMarks }, selectedYear)}
+                                                            className="btn-secondary"
+                                                            style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', padding: '8px 16px' }}
+                                                        >
+                                                            <Download size={16} /> Download Combined PDF
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <div className="table-responsive">
                                                     <table className="data-table" style={{ margin: 0 }}>
@@ -979,6 +1064,7 @@ const ManageResults = () => {
                                                                 <th rowSpan={2} style={{ verticalAlign: 'middle', borderRight: '1px solid var(--border-soft)' }}>Admission Regn. No.</th>
                                                                 <th rowSpan={2} style={{ verticalAlign: 'middle', borderRight: '1px solid var(--border-soft)' }}>Roll</th>
                                                                 <th rowSpan={2} style={{ verticalAlign: 'middle', borderRight: '1px solid var(--border-soft)' }}>NAME</th>
+                                                                <th rowSpan={2} style={{ verticalAlign: 'middle', borderRight: '1px solid var(--border-soft)' }}>SECTION</th>
                                                                 <th style={{ textAlign: 'center', borderRight: '1px solid var(--border-soft)' }}>Total Unit-I</th>
                                                                 <th style={{ textAlign: 'center', borderRight: '1px solid var(--border-soft)' }}>Total Unit-II</th>
                                                                 <th style={{ textAlign: 'center', borderRight: '1px solid var(--border-soft)' }}>Total Unit-III</th>
@@ -987,18 +1073,19 @@ const ManageResults = () => {
                                                                 <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'middle' }}>Rank</th>
                                                             </tr>
                                                             <tr>
-                                                                <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{students[0]?.unit1FM || '—'}</th>
-                                                                <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{students[0]?.unit2FM || '—'}</th>
-                                                                <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{students[0]?.unit3FM || '—'}</th>
-                                                                <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{students[0]?.maxGrandTotal || '—'}</th>
+                                                                <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{combinedMarks[0]?.unit1FM || '—'}</th>
+                                                                <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{combinedMarks[0]?.unit2FM || '—'}</th>
+                                                                <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{combinedMarks[0]?.unit3FM || '—'}</th>
+                                                                <th style={{ fontSize: '0.7rem', textAlign: 'center', borderRight: '1px solid var(--border-soft)', color: 'var(--text-muted)' }}>F.M.-{combinedMarks[0]?.maxGrandTotal || '—'}</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {students.map((s: any) => (
+                                                            {combinedMarks.map((s: any) => (
                                                                 <tr key={s.studentDbId}>
                                                                     <td style={{ textAlign: 'center', fontWeight: 600, borderRight: '1px solid var(--border-soft)' }}>{s.admissionId}</td>
                                                                     <td style={{ textAlign: 'center', fontWeight: 600, borderRight: '1px solid var(--border-soft)' }}>{s.roll}</td>
                                                                     <td style={{ fontWeight: 800, borderRight: '1px solid var(--border-soft)' }}>{s.name.toUpperCase()}</td>
+                                                                    <td style={{ textAlign: 'center', fontWeight: 600, borderRight: '1px solid var(--border-soft)', fontSize: '0.75rem' }}>{s.className}</td>
                                                                     <td style={{ textAlign: 'center', borderRight: '1px solid var(--border-soft)' }}>{s.unit1Total != null ? s.unit1Total : '—'}</td>
                                                                     <td style={{ textAlign: 'center', borderRight: '1px solid var(--border-soft)' }}>{s.unit2Total != null ? s.unit2Total : '—'}</td>
                                                                     <td style={{ textAlign: 'center', borderRight: '1px solid var(--border-soft)' }}>{s.unit3Total != null ? s.unit3Total : '—'}</td>
@@ -1034,11 +1121,10 @@ const ManageResults = () => {
                                                                 </tr>
                                                             ))}
                                                         </tbody>
-                                                    </table>
-                                                </div>
+                                                </table>
                                             </div>
-                                        );
-                                    });
+                                        </div>
+                                    );
                                 })()}
                             </div>
                         </>

@@ -351,8 +351,8 @@ export const updateTeacherAttendance = async (req: AuthRequest, res: Response) =
     const arrivalProvided = req.body.hasOwnProperty('arrivalTime');
     const departureProvided = req.body.hasOwnProperty('departureTime');
 
-    if (!['PRESENT', 'ABSENT', 'LATE'].includes(status)) {
-        return res.status(400).json({ message: 'Invalid status value (PRESENT, ABSENT, or LATE required)' });
+    if (!['PRESENT', 'ABSENT', 'LATE', 'PARTIAL'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status value (PRESENT, ABSENT, LATE, or PARTIAL required)' });
     }
 
     try {
@@ -412,9 +412,15 @@ export const updateTeacherAttendance = async (req: AuthRequest, res: Response) =
 
 /**
  * Retrieves attendance history for teachers.
+ * Enforces privacy: Teachers can only view their own records.
  */
-export const getTeacherAttendance = async (req: Request, res: Response) => {
+export const getTeacherAttendance = async (req: AuthRequest, res: Response) => {
     const { teacherId, startDate, endDate } = req.query;
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+
+    // Privacy Guard: Teachers can only see their own attendance
+    const targetTeacherId = userRole === 'ADMIN' ? (teacherId || userId) : userId;
 
     try {
         // Institutional Launch Lock: January 2026 Minimum
@@ -434,9 +440,9 @@ export const getTeacherAttendance = async (req: Request, res: Response) => {
         `;
         const params: any[] = [finalStartDate, finalEndDate];
 
-        if (teacherId) {
+        if (targetTeacherId) {
             query += ` AND ta."teacherId" = $3`;
-            params.push(teacherId);
+            params.push(targetTeacherId);
         }
         query += ` ORDER BY ta.date DESC`;
 
@@ -444,6 +450,7 @@ export const getTeacherAttendance = async (req: Request, res: Response) => {
         res.status(200).json(rows);
     } catch (error) {
         console.error('Error fetching teacher attendance:', error);
+        res.status(500).json({ message: 'Error fetching teacher attendance' });
     }
 };
 

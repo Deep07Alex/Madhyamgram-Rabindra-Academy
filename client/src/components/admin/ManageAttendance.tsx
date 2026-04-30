@@ -8,7 +8,7 @@
  * - System Override: Global control to Force Open/Close the attendance window.
  * - Unified View: Shows everyone in the database, matching records where they exist.
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import useServerEvents from '../../hooks/useServerEvents';
@@ -30,7 +30,7 @@ import {
     ChevronRight
 } from 'lucide-react';
 
-type AttendanceStatus = 'PRESENT' | 'ABSENT';
+type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'PARTIAL';
 
 interface StudentRow {
     id: string;
@@ -63,6 +63,8 @@ interface TeacherRow {
 const STATUS_COLORS: Record<AttendanceStatus, string> = {
     PRESENT: '#22c55e',
     ABSENT: '#ef4444',
+    LATE: '#f59e0b',
+    PARTIAL: '#f59e0b',
 };
 
 const StatusBadge = React.memo(({ status, subject }: { status: AttendanceStatus | null, subject?: string | null }) => {
@@ -104,26 +106,35 @@ const InlineStatusEdit = React.memo(({
     }, [currentStatus]);
 
 
-    const toggle = async () => {
+    const handleStudentToggle = async () => {
         // Toggle Logic: Null/Absent -> Present, Present -> Absent
         const nextStatus = currentStatus === 'PRESENT' ? 'ABSENT' : 'PRESENT';
 
         setIsSubmitting(true);
         try {
             if (attendanceId) {
-                const endpoint = type === 'student'
-                    ? `/attendance/admin/student/${attendanceId}`
-                    : `/attendance/admin/teacher/${attendanceId}`;
-                await api.patch(endpoint, type === 'teacher' ? { status: nextStatus, reason: initialReason } : { status: nextStatus });
+                await api.patch(`/attendance/admin/student/${attendanceId}`, { status: nextStatus });
             } else {
-                if (type === 'student') {
-                    await api.post('/attendance/student', {
-                        date, status: nextStatus, studentId: personId,
-                        classId: classId || '', subject: 'FULL DAY SESSION'
-                    });
-                } else {
-                    await api.post('/attendance/teacher', { date, status: nextStatus, reason: '', teacherId: personId });
-                }
+                await api.post('/attendance/student', {
+                    date, status: nextStatus, studentId: personId,
+                    classId: classId || '', subject: 'FULL DAY SESSION'
+                });
+            }
+            showToast(`Marked as ${nextStatus}`, 'success');
+            onUpdated(true);
+        } catch {
+            showToast('Failed to update attendance.', 'error');
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleTeacherStatusChange = async (nextStatus: AttendanceStatus) => {
+        setIsSubmitting(true);
+        try {
+            if (attendanceId) {
+                await api.patch(`/attendance/admin/teacher/${attendanceId}`, { status: nextStatus, reason: initialReason });
+            } else {
+                await api.post('/attendance/teacher', { date, status: nextStatus, reason: '', teacherId: personId });
             }
             showToast(`Marked as ${nextStatus}`, 'success');
             onUpdated(true);
@@ -142,9 +153,38 @@ const InlineStatusEdit = React.memo(({
                         <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--text-muted)' }}>Updating...</span>
                     </div>
                 ) : (
-                    <div onClick={toggle} style={{ cursor: 'pointer', transition: 'transform 0.1s' }} onMouseDown={e => e.currentTarget.style.transform = 'scale(0.96)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
-                        <StatusBadge status={currentStatus} subject={initialReason} />
-                    </div>
+                    type === 'student' ? (
+                        <div onClick={handleStudentToggle} style={{ cursor: 'pointer', transition: 'transform 0.1s' }} onMouseDown={e => e.currentTarget.style.transform = 'scale(0.96)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
+                            <StatusBadge status={currentStatus} subject={initialReason} />
+                        </div>
+                    ) : (
+                        <select 
+                            value={currentStatus || ''} 
+                            onChange={(e) => {
+                                const val = e.target.value as AttendanceStatus;
+                                if (val) handleTeacherStatusChange(val);
+                            }}
+                            style={{
+                                padding: '3px 8px',
+                                borderRadius: '20px',
+                                background: currentStatus ? STATUS_COLORS[currentStatus] + '15' : 'var(--bg-main)',
+                                color: currentStatus ? STATUS_COLORS[currentStatus] : 'var(--text-muted)',
+                                border: `1px solid ${currentStatus ? STATUS_COLORS[currentStatus] + '40' : 'var(--border-soft)'}`,
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                outline: 'none',
+                                cursor: 'pointer',
+                                width: '110px',
+                                textAlign: 'center'
+                            }}
+                        >
+                            <option value="">No Record</option>
+                            <option value="PRESENT">PRESENT</option>
+                            <option value="ABSENT">ABSENT</option>
+                            <option value="PARTIAL">PARTIAL</option>
+                            <option value="LATE">LATE</option>
+                        </select>
+                    )
                 )}
             </div>
             {type === 'teacher' && currentStatus === 'ABSENT' && initialReason && !isSubmitting && (
@@ -395,14 +435,16 @@ const TeacherAttendanceRow = React.memo(({
     dateFilter,
     monthlyDataMap,
     fetchTeacherData,
-    tab
+    tab,
+    onViewMonthly
 }: {
     row: TeacherRow,
     viewMode: 'daily' | 'monthly',
     dateFilter: string,
     monthlyDataMap: any,
     fetchTeacherData: any,
-    tab: string
+    tab: string,
+    onViewMonthly: () => void
 }) => {
     return (
         <tr style={{ borderBottom: '1px solid var(--border-soft)', transition: 'background 0.15s' }}
@@ -484,6 +526,29 @@ const TeacherAttendanceRow = React.memo(({
                 )}
                 {!row.reason && !row.earlyLeaveReason && <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>—</span>}
             </td>
+            <td style={{ padding: '14px 20px' }}>
+                <button 
+                    onClick={onViewMonthly}
+                    style={{
+                        padding: '6px 12px',
+                        background: 'var(--bg-main)',
+                        border: '1px solid var(--border-soft)',
+                        borderRadius: '6px',
+                        color: 'var(--primary-bold)',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary-bold)'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-soft)'}
+                >
+                    <CalendarDays size={14} /> View History
+                </button>
+            </td>
         </tr>
     );
 });
@@ -501,8 +566,8 @@ const ManageAttendance = () => {
     const [togglingOverride, setTogglingOverride] = useState(false);
     const [markingBulkAbsent, setMarkingBulkAbsent] = useState(false);
 
-    // Pagination state
     const [page, setPage] = useState(1);
+    const [selectedTeacherForMonthly, setSelectedTeacherForMonthly] = useState<any>(null);
     const [totalPages, setTotalPages] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
@@ -1236,115 +1301,293 @@ const ManageAttendance = () => {
                                         : 'Monthly Summary'
                                     }
                                 </th>
-                                {tab !== 'students' && <th style={thStyle}>Leave Info</th>}
+                        {tab !== 'students' && <th style={thStyle}>Actions</th>}
+                    </tr>
+                </thead>
+                <tbody key={page} className="animate-fade-in">
+                    {(tab === 'students' ? filteredStudents : filteredTeachers).length > 0 ?
+                        (tab === 'students' ? filteredStudents : filteredTeachers).map((row: any) => (
+                            tab === 'students' ? (
+                                <StudentAttendanceRow
+                                    key={row.id}
+                                    row={row}
+                                    viewMode={viewMode}
+                                    dateFilter={dateFilter}
+                                    monthlyDataMap={monthlyDataMap}
+                                    onRefresh={refreshStudentView}
+                                    stats={attendanceStats[row.id]}
+                                    cumulativeStats={cumulativeStats[row.id]}
+                                    isStatsLoading={isStatsLoading}
+                                />
+                            ) : (
+                                <TeacherAttendanceRow
+                                    key={row.id}
+                                    row={row}
+                                    viewMode={viewMode}
+                                    dateFilter={dateFilter}
+                                    monthlyDataMap={monthlyDataMap}
+                                    fetchTeacherData={fetchTeacherData}
+                                    tab={tab}
+                                    onViewMonthly={() => setSelectedTeacherForMonthly(row)}
+                                />
+                            )
+                        )) : (
+                            <tr>
+                                <td colSpan={10} style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                                        <Users size={48} style={{ opacity: 0.1 }} />
+                                        <div>
+                                            <p style={{ fontWeight: '600', fontSize: '1.1rem', margin: 0 }}>No records matches your criteria</p>
+                                            <p style={{ fontSize: '0.85rem', margin: '4px 0 0' }}>Try adjusting your filters or search query</p>
+                                        </div>
+                                    </div>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody key={page} className="animate-fade-in">
-                            {(tab === 'students' ? filteredStudents : filteredTeachers).length > 0 ?
-                                (tab === 'students' ? filteredStudents : filteredTeachers).map((row: any) => (
-                                    tab === 'students' ? (
-                                        <StudentAttendanceRow
-                                            key={row.id}
-                                            row={row}
-                                            viewMode={viewMode}
-                                            dateFilter={dateFilter}
-                                            monthlyDataMap={monthlyDataMap}
-                                            onRefresh={refreshStudentView}
-                                            stats={attendanceStats[row.id]}
-                                            cumulativeStats={cumulativeStats[row.id]}
-                                            isStatsLoading={isStatsLoading}
-                                        />
-                                    ) : (
-                                        <TeacherAttendanceRow
-                                            key={row.id}
-                                            row={row}
-                                            viewMode={viewMode}
-                                            dateFilter={dateFilter}
-                                            monthlyDataMap={monthlyDataMap}
-                                            fetchTeacherData={fetchTeacherData}
-                                            tab={tab}
-                                        />
-                                    )
-                                )) : (
-                                    <tr>
-                                        <td colSpan={tab === 'students' ? 4 : 5} style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-                                                <Users size={48} style={{ opacity: 0.1 }} />
-                                                <div>
-                                                    <p style={{ fontWeight: '600', fontSize: '1.1rem', margin: 0 }}>No records matches your criteria</p>
-                                                    <p style={{ fontSize: '0.85rem', margin: '4px 0 0' }}>Try adjusting your filters or search query</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
-                        </tbody>
-                    </table>
+                        )}
+                </tbody>
+            </table>
+        </div>
+
+        {/* Pagination Footer */}
+        {totalPages > 1 && (
+            <div style={{
+                padding: '24px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '20px',
+                borderTop: '1px solid var(--border-soft)',
+                background: 'var(--bg-main)'
+            }}>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                        onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }}
+                        disabled={page === 1}
+                        style={{
+                            padding: '10px 20px', borderRadius: '30px',
+                            border: '1px solid var(--border-soft)',
+                            background: 'var(--bg-card)',
+                            cursor: page === 1 ? 'not-allowed' : 'pointer',
+                            opacity: page === 1 ? 0.3 : 1,
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-main)',
+                            transition: 'all 0.2s',
+                            boxShadow: 'var(--shadow-sm)'
+                        }}
+                    >
+                        <ChevronLeft size={18} /> Previous
+                    </button>
                 </div>
 
+                <span style={{ fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: '800' }}>
+                    Page <span style={{ color: 'var(--primary-bold)' }}>{page}</span> of {totalPages}
+                </span>
 
-                {/* Pagination Footer */}
-                {totalPages > 1 && (
-                    <div style={{
-                        padding: '24px',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        gap: '20px',
-                        borderTop: '1px solid var(--border-soft)',
-                        background: 'var(--bg-main)'
-                    }}>
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                            <button
-                                onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }}
-                                disabled={page === 1}
-                                style={{
-                                    padding: '10px 20px', borderRadius: '30px',
-                                    border: '1px solid var(--border-soft)',
-                                    background: 'var(--bg-card)',
-                                    cursor: page === 1 ? 'not-allowed' : 'pointer',
-                                    opacity: page === 1 ? 0.3 : 1,
-                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                    fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-main)',
-                                    transition: 'all 0.2s',
-                                    boxShadow: 'var(--shadow-sm)'
-                                }}
-                            >
-                                <ChevronLeft size={18} /> Previous
-                            </button>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                        onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }}
+                        disabled={page === totalPages}
+                        style={{
+                            padding: '10px 20px', borderRadius: '30px',
+                            border: '1px solid var(--border-soft)',
+                            background: 'var(--bg-card)',
+                            cursor: page === totalPages ? 'not-allowed' : 'pointer',
+                            opacity: page === totalPages ? 0.3 : 1,
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-main)',
+                            transition: 'all 0.2s',
+                            boxShadow: 'var(--shadow-sm)'
+                        }}
+                    >
+                        Next <ChevronRight size={18} />
+                    </button>
+                </div>
+            </div>
+        )}
+    </div>
+
+    {selectedTeacherForMonthly && (
+        <TeacherMonthlyDetailsModal
+            teacher={selectedTeacherForMonthly}
+            monthFilter={monthFilter}
+            onClose={() => setSelectedTeacherForMonthly(null)}
+            onUpdated={() => {
+                fetchTeacherData();
+                fetchMonthlyData();
+            }}
+        />
+    )}
+
+    <p style={{ margin: '16px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+        Showing {totalCount} {tab === 'students' ? 'student' : 'teacher'}{totalCount !== 1 ? 's' : ''}
+        {dateFilter ? ` · ${new Date(dateFilter).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}` : ' · All dates'}
+    </p>
+</div>
+);
+};
+
+const TeacherMonthlyDetailsModal = ({ teacher, monthFilter, onClose, onUpdated }: { teacher: any, monthFilter: string, onClose: () => void, onUpdated: () => void }) => {
+    const [year, month] = monthFilter.split('-').map(Number);
+    const [records, setRecords] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchRecords = useCallback(async () => {
+        setLoading(true);
+        try {
+            const startDate = `${monthFilter}-01`;
+            const endDay = new Date(year, month, 0).getDate();
+            const endDate = `${monthFilter}-${endDay.toString().padStart(2, '0')}`;
+            const res = await api.get('/attendance/teacher', { params: { teacherId: teacher.id, startDate, endDate } });
+            setRecords(res.data || []);
+        } catch (err) {
+            console.error('Failed to fetch teacher monthly records');
+        } finally {
+            setLoading(false);
+        }
+    }, [teacher.id, monthFilter, year, month]);
+
+    useEffect(() => {
+        fetchRecords();
+    }, [fetchRecords]);
+
+    const daysInMonth = useMemo(() => {
+        const days = [];
+        const date = new Date(year, month - 1, 1);
+        while (date.getMonth() === month - 1) {
+            days.push(new Date(date));
+            date.setDate(date.getDate() + 1);
+        }
+        return days;
+    }, [year, month]);
+
+    const stats = useMemo(() => {
+        const present = records.filter((r: any) => r.status === 'PRESENT' || r.status === 'LATE' || r.status === 'PARTIAL').length;
+        const absent = records.filter((r: any) => r.status === 'ABSENT').length;
+        const total = daysInMonth.filter((d: Date) => d.getDay() !== 0).length; // Excluding Sundays
+        return { present, absent, total };
+    }, [records, daysInMonth]);
+
+    const monthName = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(year, month - 1));
+
+    return (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+            <div style={{ background: 'var(--bg-card)', borderRadius: '24px', width: '100%', maxWidth: '1000px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-premium)', border: '1px solid var(--border-soft)', overflow: 'hidden' }}>
+                <div style={{ padding: '24px', borderBottom: '1px solid var(--border-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-main)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <UserCheck size={24} color="var(--primary-bold)" />
                         </div>
-
-                        <span style={{ fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: '800' }}>
-                            Page <span style={{ color: 'var(--primary-bold)' }}>{page}</span> of {totalPages}
-                        </span>
-
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                            <button
-                                onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }}
-                                disabled={page === totalPages}
-                                style={{
-                                    padding: '10px 20px', borderRadius: '30px',
-                                    border: '1px solid var(--border-soft)',
-                                    background: 'var(--bg-card)',
-                                    cursor: page === totalPages ? 'not-allowed' : 'pointer',
-                                    opacity: page === totalPages ? 0.3 : 1,
-                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                    fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-main)',
-                                    transition: 'all 0.2s',
-                                    boxShadow: 'var(--shadow-sm)'
-                                }}
-                            >
-                                Next <ChevronRight size={18} />
-                            </button>
+                        <div>
+                            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800' }}>{teacher.name}</h2>
+                            <p style={{ margin: '2px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{teacher.designation} · {monthName} {year}</p>
                         </div>
                     </div>
-                )}
-            </div>
+                    
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <div style={{ padding: '4px 12px', background: '#22c55e10', borderRadius: '12px', border: '1px solid #22c55e20' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#22c55e' }}>{stats.present} Present</span>
+                            </div>
+                            <div style={{ padding: '4px 12px', background: '#ef444410', borderRadius: '12px', border: '1px solid #ef444420' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#ef4444' }}>{stats.absent} Absent</span>
+                            </div>
+                        </div>
+                        <button onClick={onClose} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-soft)', padding: '10px', borderRadius: '50%', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
+                            <X size={20} />
+                        </button>
+                    </div>
+                </div>
 
-            <p style={{ margin: '16px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'right' }}>
-                Showing {totalCount} {tab === 'students' ? 'student' : 'teacher'}{totalCount !== 1 ? 's' : ''}
-                {dateFilter ? ` · ${new Date(dateFilter).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}` : ' · All dates'}
-            </p>
+                <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+                    {loading ? (
+                        <div style={{ display: 'flex', justifyContent: 'center', padding: '100px' }}>
+                            <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid var(--primary-bold)', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
+                        </div>
+                    ) : (
+                        <div className="table-responsive">
+                            <table className="data-table">
+                                <thead>
+                                    <tr style={{ background: 'var(--bg-main)' }}>
+                                        <th style={thStyle}>Date</th>
+                                        <th style={thStyle}>Day</th>
+                                        <th style={{ ...thStyle, textAlign: 'center' }}>Arrival</th>
+                                        <th style={{ ...thStyle, textAlign: 'center' }}>Departure</th>
+                                        <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
+                                        <th style={thStyle}>Remarks</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {daysInMonth.map((day: Date) => {
+                                    const dateStr = day.toLocaleDateString('en-CA');
+                                    const record = records.find((r: any) => r.date.split('T')[0] === dateStr);
+                                        const isSunday = day.getDay() === 0;
+
+                                        return (
+                                            <tr key={dateStr} style={{ 
+                                                borderBottom: '1px solid var(--border-soft)', 
+                                                background: isSunday ? 'var(--bg-main)' : 'transparent',
+                                                opacity: isSunday ? 0.7 : 1
+                                            }}>
+                                                <td style={{ padding: '12px 20px', fontWeight: '700', color: 'var(--text-main)' }}>
+                                                    {day.getDate().toString().padStart(2, '0')} {monthName.substring(0, 3)}
+                                                </td>
+                                                <td style={{ padding: '12px 20px', color: isSunday ? '#ef4444' : 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '600' }}>
+                                                    {day.toLocaleDateString(undefined, { weekday: 'long' })}
+                                                </td>
+                                                <td style={{ padding: '12px 20px', textAlign: 'center' }}>
+                                                    <InlineTimeEdit
+                                                        attendanceId={record?.id || null}
+                                                        personId={teacher.id}
+                                                        date={dateStr}
+                                                        type="arrival"
+                                                        initialTime={record?.arrivalTime || null}
+                                                        otherTime={record?.departureTime || null}
+                                                        currentStatus={record?.status || null}
+                                                        currentReason={record?.reason || null}
+                                                        onUpdated={() => { fetchRecords(); onUpdated(); }}
+                                                    />
+                                                </td>
+                                                <td style={{ padding: '12px 20px', textAlign: 'center' }}>
+                                                    <InlineTimeEdit
+                                                        attendanceId={record?.id || null}
+                                                        personId={teacher.id}
+                                                        date={dateStr}
+                                                        type="departure"
+                                                        initialTime={record?.departureTime || null}
+                                                        otherTime={record?.arrivalTime || null}
+                                                        currentStatus={record?.status || null}
+                                                        currentReason={record?.reason || null}
+                                                        onUpdated={() => { fetchRecords(); onUpdated(); }}
+                                                    />
+                                                </td>
+                                                <td style={{ padding: '12px 20px', textAlign: 'center' }}>
+                                                    <InlineStatusEdit
+                                                        attendanceId={record?.id || null}
+                                                        currentStatus={record?.status || null}
+                                                        type="teacher"
+                                                        personId={teacher.id}
+                                                        date={dateStr}
+                                                        initialReason={record?.reason || null}
+                                                        onUpdated={() => { fetchRecords(); onUpdated(); }}
+                                                    />
+                                                </td>
+                                                <td style={{ padding: '12px 20px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                                    {record?.reason || record?.earlyLeaveReason || (isSunday ? 'Sunday (Weekly Off)' : '—')}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+                <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-soft)', background: 'var(--bg-main)', display: 'flex', justifyContent: 'flex-end' }}>
+                    <button onClick={onClose} style={{ padding: '8px 20px', borderRadius: '10px', border: 'none', background: 'var(--primary-bold)', color: 'white', fontWeight: '700', cursor: 'pointer' }}>
+                        Done
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };

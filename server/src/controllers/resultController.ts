@@ -30,6 +30,16 @@ const formatDate = (date: any): string => {
 };
 
 /**
+ * Normalizes a class name to group sections together.
+ * Example: "KG-II A" -> "KG-II", "STD-1 B" -> "STD-1"
+ */
+const getBaseClassName = (name: string): string => {
+    if (!name) return '';
+    // Removes trailing space and a single uppercase letter (A-Z) if present
+    return name.replace(/\s+[A-Z]$/i, '').trim();
+};
+
+/**
  * Records a new academic result for a student.
  */
 export const createResult = async (req: Request, res: Response) => {
@@ -342,17 +352,84 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
         const absentCount = parseInt(explicitAbsentRes.rows[0].absent_count || '0');
         const presentCount = Math.max(0, totalSessions - absentCount);
 
+        // 2. Calculate Daily Records for detailed view
+        const dailyRecordsRes = await db.query(
+            `SELECT date, status, subject FROM "Attendance" 
+             WHERE "studentId" = $1 AND date >= $2 AND date <= $3 
+             ORDER BY date DESC`,
+            [studentId, startDate, targetEndDate]
+        );
+
         const attendanceData = {
             total_days: totalSessions,
             present_days: presentCount,
             absent_days: absentCount,
             startDate,
-            endDate: targetEndDate
+            endDate: targetEndDate,
+            dailyRecords: dailyRecordsRes.rows
         };
 
-        // Calculate Rank in Class (Only if student has all 3 units AND ranked against others with all 3 units)
+        // Dynamic Class Grouping: Combine highest marks across all sections of the same class (e.g., KG-II A, B, C...)
+        const baseClassName = getBaseClassName(student.className);
+        const siblingsRes = await db.query(
+            `SELECT id FROM "Class" WHERE name = $1 OR name ~ ('^' || $1 || ' [A-Z]$')`,
+            [baseClassName]
+        );
+        let targetClassIds = siblingsRes.rows.map(r => r.id);
+        if (targetClassIds.length === 0) targetClassIds = [student.classId];
+
+        // 1. Calculate Subject-wise Highest Marks across all sections (per Unit)
+        const highestMarksRes = await db.query(
+            `SELECT subject, semester, MAX(marks::numeric) as max_marks
+             FROM "Result"
+             WHERE "academicYear" = $1 AND "studentId" IN (SELECT id FROM "Student" WHERE "classId" = ANY($2))
+             GROUP BY subject, semester`,
+            [academicYear, targetClassIds]
+        );
+        const highestMarks = highestMarksRes.rows;
+
+        // 1b. Calculate Subject-wise YEARLY Highest Marks (Highest total U1+U2+U3 for each subject)
+        const subjectYearlyHighestRes = await db.query(
+            `SELECT subject, MAX(subject_total) as max_yearly_marks
+             FROM (
+                SELECT "studentId", subject, SUM(marks::numeric) as subject_total
+                FROM "Result"
+                WHERE "academicYear" = $1 AND "studentId" IN (SELECT id FROM "Student" WHERE "classId" = ANY($2))
+                GROUP BY "studentId", subject
+             ) as StudentSubjectTotals
+             GROUP BY subject`,
+            [academicYear, targetClassIds]
+        );
+        const subjectYearlyHighest = subjectYearlyHighestRes.rows;
+
+        // 2. Calculate Class-wide Highest Total Marks
+        const classHighestTotalRes = await db.query(
+            `WITH StudentTotals AS (
+                SELECT "studentId", SUM(marks::numeric) as total
+                FROM "Result"
+                WHERE "academicYear" = $1 AND "studentId" IN (SELECT id FROM "Student" WHERE "classId" = ANY($2))
+                GROUP BY "studentId"
+            )
+            SELECT MAX(total) as max_total FROM StudentTotals`,
+            [academicYear, targetClassIds]
+        );
+        const classHighestTotal = parseFloat(classHighestTotalRes.rows[0].max_total || '0');
+
+        // 2b. Calculate Unit-wise Highest Total Marks
+        const unitHighestTotalsRes = await db.query(
+            `WITH UnitTotals AS (
+                SELECT "studentId", semester, SUM(marks::numeric) as total
+                FROM "Result"
+                WHERE "academicYear" = $1 AND "studentId" IN (SELECT id FROM "Student" WHERE "classId" = ANY($2))
+                GROUP BY "studentId", semester
+            )
+            SELECT semester, MAX(total) as max_unit_total FROM UnitTotals GROUP BY semester`,
+            [academicYear, targetClassIds]
+        );
+        const unitHighestTotals = unitHighestTotalsRes.rows;
+
+        // 3. Calculate Rank in Class (Combined sections)
         let myRank = '-';
-        
         const rankRes = await db.query(
             `WITH StudentUnitCounts AS (
                 SELECT 
@@ -362,7 +439,7 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
                     COUNT(CASE WHEN semester = 'Unit-II' THEN 1 END) as u2_count,
                     COUNT(CASE WHEN semester = 'Unit-III' THEN 1 END) as u3_count
                 FROM "Result"
-                WHERE "academicYear" = $1 AND "studentId" IN (SELECT id FROM "Student" WHERE "classId" = $2)
+                WHERE "academicYear" = $1 AND "studentId" IN (SELECT id FROM "Student" WHERE "classId" = ANY($2))
                 GROUP BY "studentId"
             ),
             QualifiedStudents AS (
@@ -372,31 +449,18 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
                 WHERE u1_count > 0 AND u2_count > 0 AND u3_count > 0
             )
             SELECT rank FROM QualifiedStudents WHERE "studentId" = $3`,
-            [academicYear, student.classId, studentId]
+            [academicYear, targetClassIds, studentId]
         );
         
         if (rankRes.rows.length > 0) {
             const rankValue = parseInt(rankRes.rows[0].rank);
-            
-            // Only show rank 1 to 5
             if (rankValue <= 5) {
                 myRank = String(rankValue);
-                // Add suffix like 1st, 2nd, etc.
                 const suffixes = ["th", "st", "nd", "rd"];
                 const v = rankValue % 100;
                 myRank += (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
             }
         }
-
-        // Fetch Highest Marks per Subject in Class for the year/semester
-        const highestMarksRes = await db.query(
-            `SELECT subject, semester, MAX(marks) as max_marks
-             FROM "Result"
-             WHERE "academicYear" = $1 AND "studentId" IN (SELECT id FROM "Student" WHERE "classId" = $2)
-             GROUP BY subject, semester`,
-            [academicYear, student.classId]
-        );
-        const highestMarks = highestMarksRes.rows;
 
         res.json({
             student,
@@ -404,6 +468,9 @@ export const getConsolidatedReport = async (req: AuthRequest, res: Response) => 
             attendance: attendanceData,
             rank: myRank,
             highestMarks,
+            subjectYearlyHighest,
+            classHighestTotal,
+            unitHighestTotals,
             academicYear
         });
     } catch (error) {
@@ -452,7 +519,12 @@ export const getResults = async (req: AuthRequest, res: Response) => {
             params.push(classId);
         }
 
-        query += ` ORDER BY r."createdAt" DESC`;
+        if (classId) {
+            // Sort by roll number for class-wise views
+            query += ` ORDER BY s."rollNumber"::integer ASC, r."createdAt" DESC`;
+        } else {
+            query += ` ORDER BY r."createdAt" DESC`;
+        }
         const resultsRes = await db.query(query, params);
 
         res.json(resultsRes.rows);
@@ -533,6 +605,18 @@ export const getClassRankings = async (req: Request, res: Response) => {
         const academicYear = parseInt(req.query.academicYear as string || new Date().getFullYear().toString());
         const showAll = req.query.all === 'true';
         const { classId } = req.query;
+        let targetClassIds: string[] | null = null;
+        if (classId) {
+            const selectedClassRes = await db.query('SELECT name FROM "Class" WHERE id = $1', [classId as string]);
+            if (selectedClassRes.rows.length > 0) {
+                const baseName = getBaseClassName(selectedClassRes.rows[0].name);
+                const siblingsRes = await db.query(
+                    `SELECT id FROM "Class" WHERE name = $1 OR name ~ ('^' || $1 || ' [A-Z]$')`,
+                    [baseName]
+                );
+                targetClassIds = siblingsRes.rows.map(r => r.id);
+            }
+        }
 
         let query = `
             WITH StudentTotals AS (
@@ -543,31 +627,32 @@ export const getClassRankings = async (req: Request, res: Response) => {
                     s."rollNumber" as "roll", 
                     s."classId",
                     c.name as "className",
+                    -- Extract Base Class Name for grouping sections (e.g., "KG-II A" -> "KG-II")
+                    regexp_replace(c.name, '\\s+[A-Z]$', '', 'i') as "baseClassName",
                     COUNT(CASE WHEN r.semester = 'Unit-I' THEN 1 END) as "unit1Count",
-                    SUM(CASE WHEN r.semester = 'Unit-I' THEN r.marks ELSE 0 END) as "unit1TotalRaw",
-                    SUM(CASE WHEN r.semester = 'Unit-I' THEN r."totalMarks" ELSE 0 END) as "unit1FMRaw",
+                    SUM(CASE WHEN r.semester = 'Unit-I' THEN r.marks::numeric ELSE 0 END) as "unit1TotalRaw",
+                    SUM(CASE WHEN r.semester = 'Unit-I' THEN r."totalMarks"::numeric ELSE 0 END) as "unit1FMRaw",
                     
                     COUNT(CASE WHEN r.semester = 'Unit-II' THEN 1 END) as "unit2Count",
-                    SUM(CASE WHEN r.semester = 'Unit-II' THEN r.marks ELSE 0 END) as "unit2TotalRaw",
-                    SUM(CASE WHEN r.semester = 'Unit-II' THEN r."totalMarks" ELSE 0 END) as "unit2FMRaw",
+                    SUM(CASE WHEN r.semester = 'Unit-II' THEN r.marks::numeric ELSE 0 END) as "unit2TotalRaw",
+                    SUM(CASE WHEN r.semester = 'Unit-II' THEN r."totalMarks"::numeric ELSE 0 END) as "unit2FMRaw",
                     
                     COUNT(CASE WHEN r.semester = 'Unit-III' THEN 1 END) as "unit3Count",
-                    SUM(CASE WHEN r.semester = 'Unit-III' THEN r.marks ELSE 0 END) as "unit3TotalRaw",
-                    SUM(CASE WHEN r.semester = 'Unit-III' THEN r."totalMarks" ELSE 0 END) as "unit3FMRaw",
+                    SUM(CASE WHEN r.semester = 'Unit-III' THEN r.marks::numeric ELSE 0 END) as "unit3TotalRaw",
+                    SUM(CASE WHEN r.semester = 'Unit-III' THEN r."totalMarks"::numeric ELSE 0 END) as "unit3FMRaw",
                     
-                    SUM(r.marks) as "rawGrandTotal",
-                    SUM(r."totalMarks") as "rawMaxGrandTotal"
+                    SUM(r.marks::numeric) as "rawGrandTotal",
+                    SUM(r."totalMarks"::numeric) as "rawMaxGrandTotal"
                 FROM "Student" s
                 JOIN "Class" c ON s."classId" = c.id
                 LEFT JOIN "Result" r ON s.id = r."studentId" AND r."academicYear" = $1
                 WHERE 1=1
-                ${classId ? 'AND s."classId" = $2' : ''}
+                ${targetClassIds ? 'AND s."classId" = ANY($2)' : ''}
                 GROUP BY s.id, c.id, c.name
             ),
             RankedStudents AS (
                 SELECT 
                     st."studentDbId", st.name, st."admissionId", st.roll, st."classId", st."className",
-                    -- Individual Unit Totals: Show as 0 only if results exist (count > 0)
                     CASE WHEN st."unit1Count" > 0 THEN st."unit1TotalRaw" ELSE NULL END as "unit1Total",
                     CASE WHEN st."unit1Count" > 0 THEN st."unit1FMRaw" ELSE NULL END as "unit1FM",
                     CASE WHEN st."unit2Count" > 0 THEN st."unit2TotalRaw" ELSE NULL END as "unit2Total",
@@ -575,10 +660,10 @@ export const getClassRankings = async (req: Request, res: Response) => {
                     CASE WHEN st."unit3Count" > 0 THEN st."unit3TotalRaw" ELSE NULL END as "unit3Total",
                     CASE WHEN st."unit3Count" > 0 THEN st."unit3FMRaw" ELSE NULL END as "unit3FM",
                     
-                    -- Aggregate Rank and Totals: Null/0 if any unit is missing
+                    -- Rank is partitioned by baseClassName to group all sections of the same class together
                     CASE 
                         WHEN st."unit1Count" > 0 AND st."unit2Count" > 0 AND st."unit3Count" > 0 
-                        THEN rank() OVER (PARTITION BY st."classId" ORDER BY st."rawGrandTotal" DESC) 
+                        THEN rank() OVER (PARTITION BY st."baseClassName" ORDER BY st."rawGrandTotal" DESC) 
                         ELSE NULL 
                     END as "rank",
                     CASE 
@@ -595,12 +680,12 @@ export const getClassRankings = async (req: Request, res: Response) => {
             )
             SELECT * FROM RankedStudents 
             WHERE ${showAll ? '1=1' : '"rank" IS NOT NULL AND "rank" <= 5'} 
-            ORDER BY "className", "rank" NULLS LAST, "grandTotal" DESC
+            ORDER BY "className" ASC, ${showAll ? '"roll"::integer ASC' : '"rank" ASC NULLS LAST, "grandTotal" DESC'}
         `;
         
         const params: any[] = [academicYear];
-        if (classId) {
-            params.push(classId);
+        if (targetClassIds) {
+            params.push(targetClassIds);
         }
 
         const result = await db.query(query, params);
@@ -727,7 +812,7 @@ function getOfficialFullMarks(subject: string, className: string = ''): number {
         case 'History':
         case 'Geography':
         case 'General Knowledge':
-            return className === 'STD-IV' ? 50 : 25;
+            return className.startsWith('STD-IV') ? 50 : 25;
 
         // Fixed 25-mark subjects
         case 'Hindi':
@@ -736,9 +821,9 @@ function getOfficialFullMarks(subject: string, className: string = ''): number {
         case 'Work Education':
             return 25;
 
-        // Project — 20 for KG-II A/B, 25 elsewhere
+        // Project — 20 for KG-II (any section), 25 elsewhere
         case 'Project':
-            return (className === 'KG-II A' || className === 'KG-II B') ? 20 : 25;
+            return className.startsWith('KG-II') ? 20 : 25;
 
         // Computer subjects
         case 'Computer Written':
@@ -756,13 +841,13 @@ function getOfficialFullMarks(subject: string, className: string = ''): number {
         case 'Bengali Handwriting':
         case 'Bengali Handwraiting': // typo variant
         case 'English Handwriting':
-            return className === 'KG-I' ? 10 : 15;
+            return className.startsWith('KG-I') ? 10 : 15;
 
         // Oral / Rhymes — 10 for KG-I, 15 elsewhere
         case 'Mathematics Oral':
         case 'Bengali Rhymes':
         case 'English Rhymes':
-            return className === 'KG-I' ? 10 : 15;
+            return className.startsWith('KG-I') ? 10 : 15;
 
         default:
             return 50;

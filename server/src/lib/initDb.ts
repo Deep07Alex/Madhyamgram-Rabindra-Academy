@@ -20,7 +20,12 @@ export const initDb = async () => {
             -- 1. Enums
             DO $$ BEGIN
                 IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'AttendanceStatus') THEN
-                    CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE');
+                    CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE', 'PARTIAL');
+                ELSE
+                    -- Ensure PARTIAL exists if enum type was created before support was added
+                    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'PARTIAL' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'AttendanceStatus')) THEN
+                        ALTER TYPE "AttendanceStatus" ADD VALUE 'PARTIAL';
+                    END IF;
                 END IF;
             EXCEPTION
                 WHEN duplicate_object THEN null;

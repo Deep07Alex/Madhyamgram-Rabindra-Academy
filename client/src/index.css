@@ -874,7 +874,7 @@ textarea:focus {
   color: #ef4444;
 }
 
-.badge.late {
+.badge.late, .badge.warning {
   background: var(--bg-main);
   border: 1px solid #f59e0b40;
   color: #f59e0b;

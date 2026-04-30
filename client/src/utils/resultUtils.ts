@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core';
 
 export const generateResultPDF = async (data: any) => {
     try {
-        const { student, results, attendance, rank, highestMarks = [], targetSemester } = data;
+        const { student, results, attendance, rank, highestMarks = [], subjectYearlyHighest = [], classHighestTotal, unitHighestTotals = [], targetSemester } = data;
         
         // Safety check for critical data
         if (!student || !results) {
@@ -152,7 +152,9 @@ export const generateResultPDF = async (data: any) => {
                 totalObtained += mo;
                 return [subject, fm || '-', mo || '-', calculateGrade(mo, fm), highestVal || '-'];
             });
-            tableBody.push([{ content: 'Grand Total', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: totalFull.toString(), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: totalObtained.toString(), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: calculateGrade(totalObtained, totalFull), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: '', styles: { fillColor: [230, 230, 230] } }]);
+            const unitHighest = (unitHighestTotals || []).find((u: any) => u.semester === targetSemester);
+            const unitHighestVal = unitHighest ? (parseFloat(unitHighest.max_unit_total) || 0) : totalObtained;
+            tableBody.push([{ content: 'Grand Total', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: totalFull.toString(), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: totalObtained.toString(), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: calculateGrade(totalObtained, totalFull), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: unitHighestVal.toString(), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }]);
         } else {
             tableHeader = [
                 [{ content: 'Subject', rowSpan: 2 }, { content: 'UNIT - I', colSpan: 2 }, { content: 'UNIT - II', colSpan: 2 }, { content: 'UNIT - III', colSpan: 2 }, { content: 'Full Marks', rowSpan: 2 }, { content: 'Obtained Marks', rowSpan: 2 }, { content: 'Grade', rowSpan: 2 }, { content: 'Highest Marks', rowSpan: 2 }],
@@ -162,10 +164,13 @@ export const generateResultPDF = async (data: any) => {
                 const getMarks = (sem: string) => results.find((r: any) => r.subject === subject && r.semester === sem);
                 const u1 = getMarks('Unit-I'), u2 = getMarks('Unit-II'), u3 = getMarks('Unit-III');
                 
-                // Sum of highest marks for this subject across all units
-                const yearlyHighest = (highestMarks || [])
-                    .filter((h: any) => h.subject === subject)
-                    .reduce((sum: number, h: any) => sum + (parseFloat(h.max_marks) || 0), 0);
+                // Use true yearly highest from backend if available, else sum unit-wise highest
+                const foundYearlyHighest = subjectYearlyHighest.find((h: any) => h.subject === subject);
+                const yearlyHighest = foundYearlyHighest 
+                    ? (parseFloat(foundYearlyHighest.max_yearly_marks) || 0)
+                    : (highestMarks || [])
+                        .filter((h: any) => h.subject === subject)
+                        .reduce((sum: number, h: any) => sum + (parseFloat(h.max_marks) || 0), 0);
 
                 const totalObt = (u1?.marks || 0) + (u2?.marks || 0) + (u3?.marks || 0);
                 const totalFM = (u1?.totalMarks || 0) + (u2?.totalMarks || 0) + (u3?.totalMarks || 0);
@@ -177,7 +182,7 @@ export const generateResultPDF = async (data: any) => {
                 return { fm: r.reduce((a, b) => a + (b.totalMarks || 0), 0), mo: r.reduce((a, b) => a + (b.marks || 0), 0) };
             };
             const t1 = t('Unit-I'), t2 = t('Unit-II'), t3 = t('Unit-III');
-            tableBody.push([{ content: 'Grand Total', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: t1.fm || '-', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: t1.mo || '-', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: t2.fm || '-', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: t2.mo || '-', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: t3.fm || '-', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: t3.mo || '-', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: totalFull.toString(), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: totalObtained.toString(), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: calculateGrade(totalObtained, totalFull), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: '', styles: { fillColor: [230, 230, 230] } }]);
+            tableBody.push([{ content: 'Grand Total', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: t1.fm || '-', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: t1.mo || '-', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: t2.fm || '-', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: t2.mo || '-', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: t3.fm || '-', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: t3.mo || '-', styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: totalFull.toString(), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: totalObtained.toString(), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: calculateGrade(totalObtained, totalFull), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }, { content: (classHighestTotal || totalObtained).toString(), styles: { fontStyle: 'bold', fillColor: [230, 230, 230] } }]);
         }
 
         autoTable(doc, {
@@ -241,6 +246,7 @@ export const generateResultPDF = async (data: any) => {
             body: [
                 ['Total Full Marks', totalFull.toString()],
                 ['Total Obtained Marks', totalObtained.toString()],
+                ['Class Highest Marks', (classHighestTotal || '-').toString()],
                 ['Percentage of Marks', `${totalFull ? ((totalObtained / totalFull) * 100).toFixed(2) : 0}%`],
                 ...(rank && rank !== '-' ? [['Class Rank', `${rank === '1st' ? 'FIRST (1st)' : rank === '2nd' ? 'SECOND (2nd)' : rank === '3rd' ? 'THIRD (3rd)' : rank.toString()}`]] : [])
             ],
@@ -326,10 +332,27 @@ export const generateRankingsPDF = async (rankingsData: Record<string, any[]>, a
 
         const logoData = await getLogoData();
 
-        const sortedClasses = Object.keys(rankingsData).sort();
+        // Dynamic Grouping: Combine sections into base classes (e.g., Nursery A + Nursery B -> Nursery)
+        const getBaseName = (name: string) => name.replace(/\s+[A-Z]$/i, '');
+        const groupedData: { [key: string]: any[] } = {};
+        
+        Object.entries(rankingsData).forEach(([className, students]) => {
+            const baseName = getBaseName(className);
+            if (!groupedData[baseName]) groupedData[baseName] = [];
+            groupedData[baseName] = [...groupedData[baseName], ...students];
+        });
+
+        const sortedClasses = Object.keys(groupedData).sort();
         
         sortedClasses.forEach((className, pageIdx) => {
             if (pageIdx > 0) doc.addPage();
+            
+            const students = groupedData[className].sort((a, b) => {
+                if (a.rank && b.rank) return a.rank - b.rank;
+                if (a.rank) return -1;
+                if (b.rank) return 1;
+                return a.roll - b.roll;
+            });
 
             // 1. Header
             if (logoData) {
@@ -355,23 +378,23 @@ export const generateRankingsPDF = async (rankingsData: Record<string, any[]>, a
             doc.text(`CLASS - ${className.toUpperCase()}`, pageWidth / 2, margin + 36.5, { align: 'center' });
 
             // 3. Table
-            const students = rankingsData[className];
             const tableData = students.map(s => [
                 s.admissionId || '—',
                 s.roll || '—',
                 s.name,
-                s.unit1Total || '—',
-                s.unit2Total || '—',
-                s.unit3Total || '—',
-                s.grandTotal || '—',
-                s.maxGrandTotal > 0 ? `${(s.grandTotal / s.maxGrandTotal * 100).toFixed(2)}%` : '—',
+                s.className || '—',
+                s.unit1Total != null ? s.unit1Total : '—',
+                s.unit2Total != null ? s.unit2Total : '—',
+                s.unit3Total != null ? s.unit3Total : '—',
+                s.grandTotal != null ? s.grandTotal : '—',
+                s.grandTotal != null && s.maxGrandTotal != null && s.maxGrandTotal > 0 ? `${(s.grandTotal / s.maxGrandTotal * 100).toFixed(2)}%` : '—',
                 s.rank && s.rank <= 5 ? `${s.rank}${["th", "st", "nd", "rd"][(s.rank % 100 - 20) % 10] || ["th", "st", "nd", "rd"][s.rank % 100] || "th"}` : ''
             ]);
 
             autoTable(doc, {
                 startY: margin + 42,
                 head: [[
-                    'Admission Regn No.', 'Roll', 'NAME', 
+                    'Admission Regn No.', 'Roll', 'NAME', 'SECTION',
                     `Unit-I\n(FM:${students[0]?.unit1FM || '—'})`,
                     `Unit-II\n(FM:${students[0]?.unit2FM || '—'})`,
                     `Unit-III\n(FM:${students[0]?.unit3FM || '—'})`,
@@ -391,7 +414,8 @@ export const generateRankingsPDF = async (rankingsData: Record<string, any[]>, a
                 bodyStyles: { fontSize: 8, valign: 'middle', halign: 'center' },
                 columnStyles: {
                     2: { halign: 'left', fontStyle: 'bold' }, // Name
-                    8: { fontStyle: 'bold' } // Rank
+                    3: { fontSize: 7 }, // Section
+                    9: { fontStyle: 'bold' } // Rank
                 },
                 margin: { left: margin, right: margin }
             } as UserOptions);

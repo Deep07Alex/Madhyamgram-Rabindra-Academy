@@ -30,8 +30,11 @@ import {
     Search,
     BarChart3,
     GraduationCap,
-    School
+    School,
+    Clock,
+    LogOut
 } from 'lucide-react';
+import TeacherPersonalAttendance from './TeacherPersonalAttendance';
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT';
 
@@ -108,6 +111,8 @@ const TeacherAttendance = () => {
     const [showAbsentForm, setShowAbsentForm] = useState(false);
     const [absentReason, setAbsentReason] = useState('');
     const [lastConfig, setLastConfig] = useState('AUTO');
+    const [todayAttendance, setTodayAttendance] = useState<any>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     /**
      * Session Guard:
@@ -157,9 +162,26 @@ const TeacherAttendance = () => {
         return () => clearInterval(interval);
     }, [checkEviction, updateConfigAndCheck]);
 
+    const fetchTodayAttendance = useCallback(async () => {
+        try {
+            const today = new Date().toLocaleDateString('en-CA');
+            const res = await api.get('/attendance/teacher', {
+                params: { startDate: today, endDate: today }
+            });
+            if (res.data && res.data.length > 0) {
+                setTodayAttendance(res.data[0]);
+            } else {
+                setTodayAttendance(null);
+            }
+        } catch (err) {
+            console.error('Failed to fetch today attendance:', err);
+        }
+    }, []);
+
     useEffect(() => {
         api.get('/users/classes').then(res => setClasses(res.data)).catch(console.error);
-    }, []);
+        fetchTodayAttendance();
+    }, [fetchTodayAttendance]);
 
     const fetchStudentStats = useCallback(async () => {
         if (!markClass) return;
@@ -304,21 +326,47 @@ const TeacherAttendance = () => {
     };
 
 
-    const handleSelfAttendance = async (status: string, reason?: string) => {
+    const handleSelfAttendance = async (status: string, reason?: string, type: 'check-in' | 'check-out' | 'mark' = 'mark') => {
         if (status === 'ABSENT' && !reason?.trim()) {
             showToast('Please provide a reason for being absent.', 'error');
             return;
         }
 
+        setIsSubmitting(true);
         try {
-            await api.post('/attendance/teacher', {
-                date: new Date().toLocaleDateString('en-CA'), status, reason
-            });
-            showToast(`Your attendance marked as ${status}`, 'info');
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            
+            const payload: any = {
+                date: now.toLocaleDateString('en-CA'),
+                status
+            };
+
+            if (type === 'check-in') {
+                payload.arrivalTime = timeStr;
+            } else if (type === 'check-out') {
+                payload.departureTime = timeStr;
+                if (reason) payload.earlyLeaveReason = reason;
+                // If checking out, we assume status is PRESENT unless already marked otherwise
+                payload.status = todayAttendance?.status || 'PRESENT';
+            } else {
+                payload.reason = reason;
+            }
+
+            await api.post('/attendance/teacher', payload);
+            
+            let msg = `Attendance marked as ${status}`;
+            if (type === 'check-in') msg = "Successfully checked in!";
+            if (type === 'check-out') msg = "Successfully checked out!";
+            
+            showToast(msg, 'success');
             setShowAbsentForm(false);
             setAbsentReason('');
-        } catch {
-            showToast('Failed to mark attendance.', 'error');
+            fetchTodayAttendance();
+        } catch (error) {
+            showToast('Failed to update attendance.', 'error');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -592,47 +640,102 @@ const TeacherAttendance = () => {
                 </div>
             )}
 
-            {/* ── SELF CHECK-IN ─────────────────────────────────────────────────── */}
+            {/* ── SELF CHECK-IN & REPORTING ────────────────────────────────────────── */}
             {tab === 'self' && (
-                <div className="card">
-                    <h3><UserCheck size={20} color="var(--success)" /> Faculty Daily Validation</h3>
-                    <div style={{ padding: '24px', background: 'var(--success-soft)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 800, color: 'var(--success)', marginBottom: '8px' }}>Today's Date</div>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)' }}>
-                            {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                    <div className="card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <h3 style={{ margin: 0 }}><UserCheck size={20} color="var(--success)" /> Faculty Daily Validation</h3>
+                            {todayAttendance && (
+                                <span className={`badge ${todayAttendance.status === 'PRESENT' ? 'present' : 'absent'}`} style={{ fontSize: '0.8rem', fontWeight: '800' }}>
+                                    Current Status: {todayAttendance.status}
+                                </span>
+                            )}
                         </div>
-                    </div>
 
-                    {!showAbsentForm ? (
-                        <div style={{ marginTop: '32px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
-                            <button onClick={() => handleSelfAttendance('PRESENT')} className="btn-primary" style={{ height: '100px', flexDirection: 'column', gap: '8px', background: 'var(--success)', boxShadow: '0 8px 16px rgba(16,185,129,0.2)' }}>
-                                <CheckCircle2 size={32} /> <span>Mark Present</span>
-                            </button>
-                            <button onClick={() => setShowAbsentForm(true)} className="btn-primary" style={{ height: '100px', flexDirection: 'column', gap: '8px', background: 'var(--error)', boxShadow: '0 8px 16px rgba(239,68,68,0.2)' }}>
-                                <XCircle size={32} /> <span>Mark Absent</span>
-                            </button>
-                        </div>
-                    ) : (
-                        <div style={{ marginTop: '32px', padding: '24px', background: '#fee2e2', borderRadius: 'var(--radius-md)', border: '1px solid #fca5a5' }}>
-                            <h4 style={{ margin: '0 0 16px 0', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <AlertCircle size={20} /> Please provide a reason for absence
-                            </h4>
-                            <textarea
-                                value={absentReason}
-                                onChange={e => setAbsentReason(e.target.value)}
-                                placeholder="E.g., Sick leave, Personal emergency, etc."
-                                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #fca5a5', minHeight: '100px', marginBottom: '16px', fontSize: '0.9rem', outline: 'none', resize: 'vertical' }}
-                                autoFocus
-                            />
-                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                                <button onClick={() => { setShowAbsentForm(false); setAbsentReason(''); }} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #dc2626', color: '#dc2626', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>Cancel</button>
-                                <button onClick={() => handleSelfAttendance('ABSENT', absentReason)} style={{ padding: '8px 16px', background: '#dc2626', border: 'none', color: 'white', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Submit Absence</button>
+                        <div style={{ padding: '24px', background: 'var(--bg-main)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-soft)', textAlign: 'center', marginBottom: '32px' }}>
+                            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px' }}>Today's Date</div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)' }}>
+                                {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                             </div>
                         </div>
-                    )}
-                    <p style={{ marginTop: '24px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                        You can update your attendance for the day at any time — only one record per day is kept.
-                    </p>
+
+                        {todayAttendance && todayAttendance.status === 'PRESENT' ? (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '32px' }}>
+                                <div style={{ padding: '20px', background: 'var(--success-soft)', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)', textAlign: 'center' }}>
+                                    <p style={{ margin: '0 0 8px 0', fontSize: '0.7rem', fontWeight: '800', color: 'var(--success)', textTransform: 'uppercase' }}>Check-in Time</p>
+                                    <p style={{ margin: 0, fontSize: '1.4rem', fontWeight: '900', color: 'var(--text-main)' }}>{todayAttendance.arrivalTime ? todayAttendance.arrivalTime.substring(0, 5) : '--:--'}</p>
+                                </div>
+                                <div style={{ padding: '20px', background: todayAttendance.departureTime ? 'var(--primary-soft)' : 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: `1px solid ${todayAttendance.departureTime ? 'var(--primary-bold)' : 'var(--border-soft)'}`, textAlign: 'center' }}>
+                                    <p style={{ margin: '0 0 8px 0', fontSize: '0.7rem', fontWeight: '800', color: todayAttendance.departureTime ? 'var(--primary-bold)' : 'var(--text-muted)', textTransform: 'uppercase' }}>Check-out Time</p>
+                                    <p style={{ margin: 0, fontSize: '1.4rem', fontWeight: '900', color: 'var(--text-main)' }}>{todayAttendance.departureTime ? todayAttendance.departureTime.substring(0, 5) : '--:--'}</p>
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {!showAbsentForm ? (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                                {!todayAttendance?.arrivalTime && (
+                                    <button 
+                                        onClick={() => handleSelfAttendance('PRESENT', undefined, 'check-in')} 
+                                        disabled={isSubmitting}
+                                        className="btn-primary" 
+                                        style={{ height: '80px', flexDirection: 'column', gap: '8px', background: 'var(--success)' }}
+                                    >
+                                        <Clock size={24} /> <span>{isSubmitting ? 'Processing...' : 'Mark Check-in'}</span>
+                                    </button>
+                                )}
+                                
+                                {todayAttendance?.arrivalTime && !todayAttendance?.departureTime && (
+                                    <button 
+                                        onClick={() => handleSelfAttendance('PRESENT', undefined, 'check-out')} 
+                                        disabled={isSubmitting}
+                                        className="btn-primary" 
+                                        style={{ height: '80px', flexDirection: 'column', gap: '8px', background: 'var(--primary-bold)' }}
+                                    >
+                                        <LogOut size={24} /> <span>{isSubmitting ? 'Processing...' : 'Mark Check-out'}</span>
+                                    </button>
+                                )}
+
+                                {!todayAttendance && (
+                                    <button 
+                                        onClick={() => setShowAbsentForm(true)} 
+                                        disabled={isSubmitting}
+                                        className="btn-primary" 
+                                        style={{ height: '80px', flexDirection: 'column', gap: '8px', background: 'var(--error)' }}
+                                    >
+                                        <XCircle size={24} /> <span>Mark Absent</span>
+                                    </button>
+                                )}
+
+                                {todayAttendance && (
+                                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '12px', background: 'var(--bg-main)', borderRadius: '12px', fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic', border: '1px dashed var(--border-soft)' }}>
+                                        <CheckCircle2 size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                                        Your attendance for today has been successfully recorded.
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div style={{ padding: '24px', background: 'rgba(var(--error-rgb), 0.05)', borderRadius: 'var(--radius-md)', border: '1px solid var(--error)' }}>
+                                <h4 style={{ margin: '0 0 16px 0', color: 'var(--error)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <AlertCircle size={20} /> Please provide a reason for absence
+                                </h4>
+                                <textarea
+                                    value={absentReason}
+                                    onChange={e => setAbsentReason(e.target.value)}
+                                    placeholder="E.g., Sick leave, Personal emergency, etc."
+                                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-soft)', background: 'var(--bg-card)', color: 'var(--text-main)', minHeight: '100px', marginBottom: '16px', fontSize: '0.9rem', outline: 'none', resize: 'vertical' }}
+                                    autoFocus
+                                />
+                                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                                    <button onClick={() => { setShowAbsentForm(false); setAbsentReason(''); }} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid var(--text-muted)', color: 'var(--text-muted)', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>Cancel</button>
+                                    <button onClick={() => handleSelfAttendance('ABSENT', absentReason)} disabled={isSubmitting} style={{ padding: '8px 16px', background: 'var(--error)', border: 'none', color: 'white', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>{isSubmitting ? 'Submitting...' : 'Submit Absence'}</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <TeacherPersonalAttendance />
                 </div>
             )}
         </div>
